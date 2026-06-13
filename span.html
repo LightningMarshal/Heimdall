@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Strict CSP: no external resource loading of any kind.
+  - default-src 'self'       : nothing loads from the network by default
+  - script-src 'unsafe-inline': required so the inlined <script> runs from file://
+  - style-src  'unsafe-inline': required so the inlined <style> applies from file://
+  - img-src 'self' data:     : allow same-origin and data: images only
+  - connect-src 'none'        : no fetch/XHR/WebSocket anywhere
+  The File System Access API is not a network connection, so it is unaffected.
+-->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'">
+<title>Span — Phase 0</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --border: #e2e5ea;
+    --text: #1d2229;
+    --muted: #6b7280;
+    --accent: #2f6feb;
+    --accent-weak: #e8f0fe;
+    --danger: #c2392c;
+    --danger-weak: #fdecea;
+    --ok: #1f8a51;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.45;
+    font-size: 15px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 24px 20px 64px; }
+  header h1 { font-size: 24px; margin: 0 0 2px; }
+  header .sub { color: var(--muted); margin: 0 0 4px; }
+  .target-note { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+
+  .banner {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--accent-weak);
+    border: 1px solid #cfe0fb;
+    border-radius: var(--radius);
+    padding: 10px 14px; margin-bottom: 16px;
+  }
+  .banner .b-text { flex: 1 1 auto; font-size: 14px; }
+  .banner .file-name { color: var(--muted); font-size: 13px; }
+
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+
+  button {
+    font: inherit;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: background .12s ease, border-color .12s ease, box-shadow .12s ease;
+  }
+  button:hover { border-color: #c4c9d2; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: #275fcf; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.04);
+  }
+  .panel h2 { margin: 0 0 12px; font-size: 17px; }
+
+  .notice { font-size: 14px; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; display: none; }
+  .notice.show { display: block; }
+  .notice.info { background: var(--accent-weak); border: 1px solid #cfe0fb; }
+  .notice.ok { background: #e7f6ee; border: 1px solid #bfe6cf; color: var(--ok); }
+  .notice.err { background: var(--danger-weak); border: 1px solid #f3c6c1; color: var(--danger); }
+
+  .guard { display: none; }
+  .guard.show { display: block; }
+  .guard .panel { border-color: #f3c6c1; background: #fff7f6; }
+
+  .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: var(--muted); }
+  .field input[type="text"] {
+    font: inherit; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 8px; min-width: 200px;
+  }
+  .field.check { flex-direction: row; align-items: center; gap: 6px; padding-bottom: 9px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td.id { color: var(--muted); font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 12px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 6px 2px; }
+  .count { color: var(--muted); font-size: 13px; margin-left: 6px; }
+
+  .footer-note { color: var(--muted); font-size: 12px; margin-top: 24px; }
+
+  /* Name modal */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(16,24,40,.4);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: var(--panel); border-radius: var(--radius); padding: 22px;
+    width: 100%; max-width: 380px; box-shadow: 0 12px 40px rgba(16,24,40,.25);
+  }
+  .modal h3 { margin: 0 0 6px; font-size: 17px; }
+  .modal p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+  .modal input[type="text"] { width: 100%; font: inherit; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Span</h1>
+    <p class="sub">Team Workload Tracker — Phase 0 (skeleton &amp; data layer)</p>
+    <p class="target-note">Best in Microsoft Edge or Chrome. Other browsers: use Export / Import JSON.</p>
+  </header>
+
+  <div class="banner">
+    <div class="b-text">
+      <div id="bannerText">No file open yet.</div>
+      <div class="file-name" id="fileName"></div>
+    </div>
+    <button id="btnReload" disabled>Reload latest</button>
+  </div>
+
+  <div class="toolbar">
+    <button id="btnOpen" class="primary">Open span-data.json</button>
+    <button id="btnSave" disabled>Save</button>
+    <button id="btnExport">Export JSON</button>
+    <button id="btnImport">Import JSON</button>
+  </div>
+
+  <div class="notice" id="notice"></div>
+
+  <div class="guard" id="guard">
+    <div class="panel">
+      <h2>Could not load this file safely</h2>
+      <p id="guardMsg"></p>
+      <p>The existing file was <strong>not overwritten</strong>. You can load a backup
+        copy instead, review it, then Save to restore <code>span-data.json</code>.</p>
+      <button id="btnLoadBackup" class="primary">Load a backup file…</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Managers <span class="count" id="mgrCount"></span></h2>
+    <div class="form-row">
+      <div class="field">
+        <label for="mName">Name</label>
+        <input type="text" id="mName" placeholder="e.g. Jordan Lee" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="mTitle">Title (optional)</label>
+        <input type="text" id="mTitle" placeholder="e.g. Senior Manager" autocomplete="off">
+      </div>
+      <div class="field check">
+        <input type="checkbox" id="mActive" checked>
+        <label for="mActive" style="font-size:14px;color:var(--text);">Active</label>
+      </div>
+      <button id="btnAddManager">Add manager</button>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Title</th><th>Active</th><th>ID</th></tr>
+      </thead>
+      <tbody id="mgrRows"></tbody>
+    </table>
+  </div>
+
+  <p class="footer-note">
+    Phase 0 proves the persistence loop only. Do not store sensitive content
+    (incident details, customer data) in this file — reference tickets by ID or short title.
+    Data lives entirely in the JSON file you choose; nothing leaves your machine.
+  </p>
+</div>
+
+<!-- Name modal -->
+<div class="overlay" id="nameOverlay">
+  <div class="modal">
+    <h3>What's your name?</h3>
+    <p>Used to attribute saves in the "Last saved by" banner. Asked once per session.</p>
+    <input type="text" id="nameInput" placeholder="Your name" autocomplete="off">
+    <div class="actions">
+      <button id="nameCancel">Cancel</button>
+      <button id="nameOk" class="primary">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden file input for Import (universal fallback) -->
+<input type="file" id="importInput" accept="application/json,.json" style="display:none">
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- Constants -------------------------------------------------------
+  var APP_VERSION = "0.1.0";
+  var MAX_BACKUPS = 10;
+  var BACKUP_RE = /^span-data\.backup-\d{8}-\d{4}\.json$/;
+  var FSA = (typeof window.showOpenFilePicker === "function");
+
+  // ---- Session state (in-memory only) ----------------------------------
+  var dataFileHandle = null;   // FileSystemFileHandle for span-data.json
+  var dirHandle = null;        // FileSystemDirectoryHandle for backups (lazy)
+  var userName = null;         // asked once per session
+  var data = null;             // parsed Span data
+  var loadBlocked = false;     // true when current file is malformed
+
+  // ---- Elements --------------------------------------------------------
+  var el = function (id) { return document.getElementById(id); };
+  var bannerText = el("bannerText"), fileNameEl = el("fileName");
+  var btnReload = el("btnReload"), btnOpen = el("btnOpen"), btnSave = el("btnSave");
+  var btnExport = el("btnExport"), btnImport = el("btnImport");
+  var noticeEl = el("notice");
+  var guardEl = el("guard"), guardMsg = el("guardMsg"), btnLoadBackup = el("btnLoadBackup");
+  var mName = el("mName"), mTitle = el("mTitle"), mActive = el("mActive");
+  var btnAddManager = el("btnAddManager"), mgrRows = el("mgrRows"), mgrCount = el("mgrCount");
+  var importInput = el("importInput");
+  var nameOverlay = el("nameOverlay"), nameInput = el("nameInput"),
+      nameOk = el("nameOk"), nameCancel = el("nameCancel");
+
+  // ---- Default schema (full section-4 shape) ---------------------------
+  function defaultData() {
+    return {
+      managers: [],
+      projects: [],
+      assignments: [],
+      workItems: [],
+      settings: {
+        appVersion: APP_VERSION,
+        lastSavedBy: null,
+        lastSavedAt: null,
+        weights: {
+          projectLead: 3,
+          projectContributor: 1,
+          escalation: 4,
+          ditl: 2,
+          oneoff: 1,
+          other: 1
+        },
+        effort: { light: 1, medium: 1.5, heavy: 2 },
+        bands: [
+          { label: "Light",      min: 0,  max: 4 },
+          { label: "Balanced",   min: 5,  max: 9 },
+          { label: "Heavy",      min: 10, max: 14 },
+          { label: "Overloaded", min: 15, max: null }
+        ]
+      }
+    };
+  }
+
+  // ---- Validation & normalization --------------------------------------
+  function isPlainObject(x) {
+    return x !== null && typeof x === "object" && !Array.isArray(x);
+  }
+
+  // Returns { ok:true, data } or { ok:false, error }. Lenient about missing
+  // keys (filled from defaults) but strict about wrong-typed structures.
+  function validate(parsed) {
+    if (!isPlainObject(parsed)) {
+      return { ok: false, error: "top level is not a JSON object." };
+    }
+    var arrays = ["managers", "projects", "assignments", "workItems"];
+    for (var i = 0; i < arrays.length; i++) {
+      var k = arrays[i];
+      if (k in parsed && !Array.isArray(parsed[k])) {
+        return { ok: false, error: '"' + k + '" must be an array.' };
+      }
+    }
+    if ("settings" in parsed && !isPlainObject(parsed.settings)) {
+      return { ok: false, error: '"settings" must be an object.' };
+    }
+    // Merge onto defaults so every expected key exists.
+    var out = defaultData();
+    arrays.forEach(function (k) {
+      if (Array.isArray(parsed[k])) out[k] = parsed[k];
+    });
+    if (isPlainObject(parsed.settings)) {
+      var s = parsed.settings;
+      out.settings.appVersion  = (s.appVersion != null) ? s.appVersion : out.settings.appVersion;
+      out.settings.lastSavedBy = (s.lastSavedBy != null) ? s.lastSavedBy : null;
+      out.settings.lastSavedAt = (s.lastSavedAt != null) ? s.lastSavedAt : null;
+      if (isPlainObject(s.weights)) out.settings.weights = s.weights;
+      if (isPlainObject(s.effort))  out.settings.effort = s.effort;
+      if (Array.isArray(s.bands))   out.settings.bands = s.bands;
+    }
+    return { ok: true, data: out };
+  }
+
+  // ---- Helpers ---------------------------------------------------------
+  function genId() {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID();
+    }
+    return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+  }
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+  // YYYYMMDD-HHMM in local time.
+  function stamp(d) {
+    return "" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
+           "-" + pad(d.getHours()) + pad(d.getMinutes());
+  }
+
+  var noticeTimer = null;
+  function notice(msg, kind) {
+    noticeEl.textContent = msg;
+    noticeEl.className = "notice show " + (kind || "info");
+    if (noticeTimer) clearTimeout(noticeTimer);
+    if (kind === "ok") {
+      noticeTimer = setTimeout(function () { noticeEl.className = "notice"; }, 4000);
+    }
+  }
+
+  function showGuard(msg) {
+    loadBlocked = true;
+    data = null;
+    guardMsg.textContent = msg;
+    guardEl.className = "guard show";
+    refreshButtons();
+    updateBanner();
+    renderManagers();
+  }
+  function hideGuard() {
+    guardEl.className = "guard";
+  }
+
+  function refreshButtons() {
+    btnOpen.disabled = !FSA;
+    btnReload.disabled = !FSA || !dataFileHandle;
+    btnSave.disabled = !FSA || !dataFileHandle || !data || loadBlocked;
+  }
+
+  function updateBanner() {
+    var s = data && data.settings;
+    if (s && s.lastSavedBy && s.lastSavedAt) {
+      var when;
+      try { when = new Date(s.lastSavedAt).toLocaleString(); }
+      catch (e) { when = s.lastSavedAt; }
+      bannerText.textContent = "Last saved by " + s.lastSavedBy + " at " + when;
+    } else if (data) {
+      bannerText.textContent = "Loaded — not yet saved in this app.";
+    } else {
+      bannerText.textContent = "No file open yet.";
+    }
+    fileNameEl.textContent = dataFileHandle ? ("File: " + dataFileHandle.name) : "";
+  }
+
+  function renderManagers() {
+    mgrRows.innerHTML = "";
+    var list = (data && data.managers) || [];
+    mgrCount.textContent = list.length ? ("(" + list.length + ")") : "";
+    if (!list.length) {
+      var tr = document.createElement("tr");
+      var td = document.createElement("td");
+      td.colSpan = 4;
+      td.className = "empty";
+      td.textContent = data ? "No managers yet." : "Open or import a data file to begin.";
+      tr.appendChild(td);
+      mgrRows.appendChild(tr);
+      return;
+    }
+    list.forEach(function (m) {
+      var tr = document.createElement("tr");
+      tr.appendChild(cell(m.name || ""));
+      tr.appendChild(cell(m.title || "—"));
+      tr.appendChild(cell(m.active ? "Yes" : "No"));
+      var idTd = cell(m.id || "");
+      idTd.className = "id";
+      tr.appendChild(idTd);
+      mgrRows.appendChild(tr);
+    });
+  }
+  function cell(text) {
+    var td = document.createElement("td");
+    td.textContent = text;
+    return td;
+  }
+
+  // ---- Name prompt (asked once per session) ----------------------------
+  function ensureName() {
+    return new Promise(function (resolve) {
+      if (userName) { resolve(userName); return; }
+      nameInput.value = (data && data.settings && data.settings.lastSavedBy) || "";
+      nameOverlay.className = "overlay show";
+      nameInput.focus();
+
+      function cleanup() {
+        nameOverlay.className = "overlay";
+        nameOk.removeEventListener("click", onOk);
+        nameCancel.removeEventListener("click", onCancel);
+        nameInput.removeEventListener("keydown", onKey);
+      }
+      function onOk() {
+        var v = nameInput.value.trim();
+        if (!v) { nameInput.focus(); return; }
+        userName = v;
+        cleanup();
+        resolve(userName);
+      }
+      function onCancel() { cleanup(); resolve(null); }
+      function onKey(e) {
+        if (e.key === "Enter") onOk();
+        else if (e.key === "Escape") onCancel();
+      }
+      nameOk.addEventListener("click", onOk);
+      nameCancel.addEventListener("click", onCancel);
+      nameInput.addEventListener("keydown", onKey);
+    });
+  }
+
+  // ---- File System Access plumbing -------------------------------------
+  async function verifyPermission(handle, readWrite) {
+    var opts = readWrite ? { mode: "readwrite" } : {};
+    if ((await handle.queryPermission(opts)) === "granted") return true;
+    if ((await handle.requestPermission(opts)) === "granted") return true;
+    return false;
+  }
+
+  async function writeText(handle, text) {
+    var w = await handle.createWritable();
+    await w.write(text);
+    await w.close();
+  }
+
+  async function readHandleText(handle) {
+    var file = await handle.getFile();
+    return await file.text();
+  }
+
+  // Open existing span-data.json and load it.
+  async function openFile() {
+    try {
+      var picked = await window.showOpenFilePicker({
+        multiple: false,
+        types: [{ description: "Span data (JSON)", accept: { "application/json": [".json"] } }]
+      });
+      dataFileHandle = picked[0];
+      await verifyPermission(dataFileHandle, true);
+      hideGuard();
+      await loadFromHandle();
+    } catch (e) {
+      if (e && e.name === "AbortError") return; // user cancelled
+      notice("Could not open file: " + (e && e.message ? e.message : e), "err");
+    }
+    refreshButtons();
+  }
+
+  async function loadFromHandle() {
+    var text = await readHandleText(dataFileHandle);
+    if (text.trim() === "") {
+      // Brand-new / empty file: initialize schema in memory (not malformed).
+      data = defaultData();
+      loadBlocked = false;
+      hideGuard();
+      afterLoad();
+      notice("New/empty file — initialized the Span schema in memory. Add a manager, then Save.", "info");
+      return;
+    }
+    var parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      showGuard("The file is not valid JSON (" + e.message + ").");
+      return;
+    }
+    var v = validate(parsed);
+    if (!v.ok) {
+      showGuard("The file is not a valid Span data file: " + v.error);
+      return;
+    }
+    data = v.data;
+    loadBlocked = false;
+    hideGuard();
+    afterLoad();
+    notice("Loaded.", "ok");
+  }
+
+  function afterLoad() {
+    updateBanner();
+    renderManagers();
+    refreshButtons();
+  }
+
+  async function reloadLatest() {
+    if (!dataFileHandle) { notice("Open a file first.", "err"); return; }
+    try {
+      await loadFromHandle();
+    } catch (e) {
+      notice("Reload failed: " + (e && e.message ? e.message : e), "err");
+    }
+  }
+
+  // Acquire (lazily) a directory handle so backups can be written as siblings.
+  async function ensureDirHandle() {
+    if (dirHandle) return dirHandle;
+    if (typeof window.showDirectoryPicker !== "function") return null;
+    try {
+      dirHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+      await verifyPermission(dirHandle, true);
+      return dirHandle;
+    } catch (e) {
+      if (e && e.name === "AbortError") return null;
+      throw e;
+    }
+  }
+
+  async function writeBackup(text) {
+    var dir = await ensureDirHandle();
+    if (!dir) {
+      notice("Saved to span-data.json, but auto-backup was skipped (no folder access granted).", "info");
+      return;
+    }
+    var name = "span-data.backup-" + stamp(new Date()) + ".json";
+    var fh = await dir.getFileHandle(name, { create: true });
+    await writeText(fh, text);
+    await pruneBackups(dir);
+  }
+
+  async function pruneBackups(dir) {
+    var names = [];
+    for await (var entry of dir.values()) {
+      if (entry.kind === "file" && BACKUP_RE.test(entry.name)) names.push(entry.name);
+    }
+    names.sort(); // fixed-width timestamp => lexicographic == chronological
+    while (names.length > MAX_BACKUPS) {
+      var oldest = names.shift();
+      try { await dir.removeEntry(oldest); } catch (e) { /* ignore */ }
+    }
+  }
+
+  async function saveAll() {
+    if (!dataFileHandle) { notice("Open span-data.json first.", "err"); return; }
+    if (loadBlocked) { notice("This file is malformed — load a backup before saving.", "err"); return; }
+    if (!data) { notice("Nothing to save yet.", "err"); return; }
+
+    var who = await ensureName();
+    if (!who) { notice("Save cancelled — a name is needed for attribution.", "err"); return; }
+
+    if (!(await verifyPermission(dataFileHandle, true))) {
+      notice("Write permission was not granted.", "err");
+      return;
+    }
+
+    data.settings.lastSavedBy = who;
+    data.settings.lastSavedAt = new Date().toISOString();
+    var text = JSON.stringify(data, null, 2);
+
+    try {
+      await writeText(dataFileHandle, text);
+    } catch (e) {
+      notice("Save failed: " + (e && e.message ? e.message : e), "err");
+      return;
+    }
+    try {
+      await writeBackup(text);
+    } catch (e) {
+      notice("Saved span-data.json, but backup failed: " + (e && e.message ? e.message : e), "err");
+      updateBanner();
+      return;
+    }
+    updateBanner();
+    notice("Saved (with backup).", "ok");
+  }
+
+  // ---- Export / Import (universal fallback) ----------------------------
+  function exportJson() {
+    var src = data || defaultData();
+    var text = JSON.stringify(src, null, 2);
+    var blob = new Blob([text], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "span-data.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    notice("Exported span-data.json to your downloads.", "ok");
+  }
+
+  function importJson() { importInput.click(); }
+
+  async function onImportFile(ev) {
+    var file = ev.target.files && ev.target.files[0];
+    importInput.value = ""; // allow re-importing the same file
+    if (!file) return;
+    var text = await file.text();
+    var parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      notice("Import failed — not valid JSON (" + e.message + ").", "err");
+      return;
+    }
+    var v = validate(parsed);
+    if (!v.ok) {
+      notice("Import failed — not a valid Span data file: " + v.error, "err");
+      return;
+    }
+    data = v.data;
+    loadBlocked = false;
+    hideGuard();
+    afterLoad();
+    notice("Imported into the session. " +
+           (dataFileHandle ? "Click Save to write it to span-data.json." :
+            "Open a span-data.json (or Export) to persist it."), "info");
+  }
+
+  // ---- Malformed-file recovery: load a backup --------------------------
+  async function loadBackupFile() {
+    if (!FSA) { notice("Use Import JSON to load a backup in this browser.", "info"); return; }
+    try {
+      var picked = await window.showOpenFilePicker({
+        multiple: false,
+        types: [{ description: "Span backup (JSON)", accept: { "application/json": [".json"] } }]
+      });
+      var text = await readHandleText(picked[0]);
+      var parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (e) {
+        notice("That backup is also invalid JSON (" + e.message + ").", "err");
+        return;
+      }
+      var v = validate(parsed);
+      if (!v.ok) {
+        notice("That backup is not a valid Span data file: " + v.error, "err");
+        return;
+      }
+      data = v.data;
+      loadBlocked = false;
+      hideGuard();
+      afterLoad();
+      notice("Loaded from backup. Review it, then Save to restore span-data.json.", "ok");
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+      notice("Could not load backup: " + (e && e.message ? e.message : e), "err");
+    }
+  }
+
+  // ---- Managers: add (Phase 0 wires add/list only) ---------------------
+  async function addManager() {
+    if (loadBlocked) { notice("Resolve the malformed file before adding data.", "err"); return; }
+    if (!data) {
+      // Allow building in memory even before a file is opened (then Export/Save).
+      data = defaultData();
+    }
+    var name = mName.value.trim();
+    if (!name) { notice("Manager name is required.", "err"); mName.focus(); return; }
+
+    await ensureName(); // first action: ask for the user's name once
+
+    data.managers.push({
+      id: genId(),
+      name: name,
+      title: mTitle.value.trim() || null,
+      active: !!mActive.checked
+    });
+    mName.value = "";
+    mTitle.value = "";
+    mActive.checked = true;
+    renderManagers();
+    refreshButtons();
+    notice("Manager added (in memory). Click Save to persist.", "info");
+    mName.focus();
+  }
+
+  // ---- Wire up ---------------------------------------------------------
+  btnOpen.addEventListener("click", openFile);
+  btnReload.addEventListener("click", reloadLatest);
+  btnSave.addEventListener("click", saveAll);
+  btnExport.addEventListener("click", exportJson);
+  btnImport.addEventListener("click", importJson);
+  btnLoadBackup.addEventListener("click", loadBackupFile);
+  btnAddManager.addEventListener("click", addManager);
+  importInput.addEventListener("change", onImportFile);
+  mName.addEventListener("keydown", function (e) { if (e.key === "Enter") addManager(); });
+  mTitle.addEventListener("keydown", function (e) { if (e.key === "Enter") addManager(); });
+
+  // ---- Init ------------------------------------------------------------
+  if (!FSA) {
+    notice("This browser does not support the File System Access API. " +
+           "Use Edge or Chrome for direct save/reload, or use Import / Export JSON here.", "info");
+  }
+  refreshButtons();
+  updateBanner();
+  renderManagers();
+})();
+</script>
+</body>
+</html>
