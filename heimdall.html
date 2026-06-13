@@ -14,7 +14,7 @@
 -->
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'">
-<title>Span — Phase 0</title>
+<title>Heimdall — Phase 0</title>
 <style>
   :root {
     --bg: #f6f7f9;
@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>Span</h1>
+    <h1>Heimdall</h1>
     <p class="sub">Team Workload Tracker — Phase 0 (skeleton &amp; data layer)</p>
     <p class="target-note">Best in Microsoft Edge or Chrome. Other browsers: use Export / Import JSON.</p>
   </header>
@@ -141,7 +141,7 @@
   </div>
 
   <div class="toolbar">
-    <button id="btnOpen" class="primary">Open span-data.json</button>
+    <button id="btnOpen" class="primary">Open heimdall-data.json</button>
     <button id="btnSave" disabled>Save</button>
     <button id="btnExport">Export JSON</button>
     <button id="btnImport">Import JSON</button>
@@ -154,7 +154,7 @@
       <h2>Could not load this file safely</h2>
       <p id="guardMsg"></p>
       <p>The existing file was <strong>not overwritten</strong>. You can load a backup
-        copy instead, review it, then Save to restore <code>span-data.json</code>.</p>
+        copy instead, review it, then Save to restore <code>heimdall-data.json</code>.</p>
       <button id="btnLoadBackup" class="primary">Load a backup file…</button>
     </div>
   </div>
@@ -214,14 +214,14 @@
   // ---- Constants -------------------------------------------------------
   var APP_VERSION = "0.1.0";
   var MAX_BACKUPS = 10;
-  var BACKUP_RE = /^span-data\.backup-\d{8}-\d{4}\.json$/;
+  var BACKUP_RE = /^heimdall-data\.backup-\d{8}-\d{4}\.json$/;
   var FSA = (typeof window.showOpenFilePicker === "function");
 
   // ---- Session state (in-memory only) ----------------------------------
-  var dataFileHandle = null;   // FileSystemFileHandle for span-data.json
+  var dataFileHandle = null;   // FileSystemFileHandle for heimdall-data.json
   var dirHandle = null;        // FileSystemDirectoryHandle for backups (lazy)
   var userName = null;         // asked once per session
-  var data = null;             // parsed Span data
+  var data = null;             // parsed Heimdall data
   var loadBlocked = false;     // true when current file is malformed
 
   // ---- Elements --------------------------------------------------------
@@ -447,12 +447,12 @@
     return await file.text();
   }
 
-  // Open existing span-data.json and load it.
+  // Open existing heimdall-data.json and load it.
   async function openFile() {
     try {
       var picked = await window.showOpenFilePicker({
         multiple: false,
-        types: [{ description: "Span data (JSON)", accept: { "application/json": [".json"] } }]
+        types: [{ description: "Heimdall data (JSON)", accept: { "application/json": [".json"] } }]
       });
       dataFileHandle = picked[0];
       await verifyPermission(dataFileHandle, true);
@@ -473,7 +473,7 @@
       loadBlocked = false;
       hideGuard();
       afterLoad();
-      notice("New/empty file — initialized the Span schema in memory. Add a manager, then Save.", "info");
+      notice("New/empty file — initialized the Heimdall schema in memory. Add a manager, then Save.", "info");
       return;
     }
     var parsed;
@@ -485,7 +485,7 @@
     }
     var v = validate(parsed);
     if (!v.ok) {
-      showGuard("The file is not a valid Span data file: " + v.error);
+      showGuard("The file is not a valid Heimdall data file: " + v.error);
       return;
     }
     data = v.data;
@@ -527,10 +527,10 @@
   async function writeBackup(text) {
     var dir = await ensureDirHandle();
     if (!dir) {
-      notice("Saved to span-data.json, but auto-backup was skipped (no folder access granted).", "info");
+      notice("Saved to heimdall-data.json, but auto-backup was skipped (no folder access granted).", "info");
       return;
     }
-    var name = "span-data.backup-" + stamp(new Date()) + ".json";
+    var name = "heimdall-data.backup-" + stamp(new Date()) + ".json";
     var fh = await dir.getFileHandle(name, { create: true });
     await writeText(fh, text);
     await pruneBackups(dir);
@@ -549,7 +549,7 @@
   }
 
   async function saveAll() {
-    if (!dataFileHandle) { notice("Open span-data.json first.", "err"); return; }
+    if (!dataFileHandle) { notice("Open heimdall-data.json first.", "err"); return; }
     if (loadBlocked) { notice("This file is malformed — load a backup before saving.", "err"); return; }
     if (!data) { notice("Nothing to save yet.", "err"); return; }
 
@@ -574,7 +574,7 @@
     try {
       await writeBackup(text);
     } catch (e) {
-      notice("Saved span-data.json, but backup failed: " + (e && e.message ? e.message : e), "err");
+      notice("Saved heimdall-data.json, but backup failed: " + (e && e.message ? e.message : e), "err");
       updateBanner();
       return;
     }
@@ -590,12 +590,12 @@
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    a.download = "span-data.json";
+    a.download = "heimdall-data.json";
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    notice("Exported span-data.json to your downloads.", "ok");
+    notice("Exported heimdall-data.json to your downloads.", "ok");
   }
 
   function importJson() { importInput.click(); }
@@ -614,7 +614,7 @@
     }
     var v = validate(parsed);
     if (!v.ok) {
-      notice("Import failed — not a valid Span data file: " + v.error, "err");
+      notice("Import failed — not a valid Heimdall data file: " + v.error, "err");
       return;
     }
     data = v.data;
@@ -622,8 +622,8 @@
     hideGuard();
     afterLoad();
     notice("Imported into the session. " +
-           (dataFileHandle ? "Click Save to write it to span-data.json." :
-            "Open a span-data.json (or Export) to persist it."), "info");
+           (dataFileHandle ? "Click Save to write it to heimdall-data.json." :
+            "Open a heimdall-data.json (or Export) to persist it."), "info");
   }
 
   // ---- Malformed-file recovery: load a backup --------------------------
@@ -632,7 +632,7 @@
     try {
       var picked = await window.showOpenFilePicker({
         multiple: false,
-        types: [{ description: "Span backup (JSON)", accept: { "application/json": [".json"] } }]
+        types: [{ description: "Heimdall backup (JSON)", accept: { "application/json": [".json"] } }]
       });
       var text = await readHandleText(picked[0]);
       var parsed;
@@ -644,14 +644,14 @@
       }
       var v = validate(parsed);
       if (!v.ok) {
-        notice("That backup is not a valid Span data file: " + v.error, "err");
+        notice("That backup is not a valid Heimdall data file: " + v.error, "err");
         return;
       }
       data = v.data;
       loadBlocked = false;
       hideGuard();
       afterLoad();
-      notice("Loaded from backup. Review it, then Save to restore span-data.json.", "ok");
+      notice("Loaded from backup. Review it, then Save to restore heimdall-data.json.", "ok");
     } catch (e) {
       if (e && e.name === "AbortError") return;
       notice("Could not load backup: " + (e && e.message ? e.message : e), "err");
