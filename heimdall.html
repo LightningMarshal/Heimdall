@@ -15,7 +15,7 @@
 -->
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'">
-<title>Heimdall — Phase 0</title>
+<title>Heimdall — Team Workload Tracker</title>
 <style>
   :root {
     --bg: #f6f7f9;
@@ -127,6 +127,46 @@
   .empty { color: var(--muted); font-size: 14px; padding: 6px 2px; }
   .count { color: var(--muted); font-size: 13px; margin-left: 6px; }
 
+  /* Small inline action buttons in table rows */
+  button.mini { padding: 4px 9px; font-size: 13px; border-radius: 6px; }
+  td.actions { white-space: nowrap; }
+  td.actions button + button { margin-left: 5px; }
+  tr.archived td { opacity: .55; }
+
+  /* Type / status pills (light taxonomy; full design is Phase 2) */
+  .pill {
+    display: inline-block; padding: 1px 9px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; border: 1px solid transparent; white-space: nowrap;
+  }
+  .pill.escalation { background: var(--danger-weak); color: var(--danger); border-color: #f3c6c1; }
+  .pill.ditl       { background: #e8f0fe; color: #2456c7; border-color: #cfe0fb; }
+  .pill.oneoff     { background: #fdf3e2; color: #9a6a16; border-color: #f0dcb8; }
+  .pill.other      { background: #eef0f3; color: #4b5563; border-color: #dde1e7; }
+  .pill.lead       { background: #eceefe; color: #3a3fb1; border-color: #d6d9f7; }
+  .pill.contributor{ background: #eef0f3; color: #4b5563; border-color: #dde1e7; }
+
+  /* Per-project assignment editor (expandable row) */
+  tr.assign-row > td { background: #fafbfc; padding: 0; }
+  .assign-box { padding: 12px 14px; }
+  .assign-box h3 { margin: 0 0 8px; font-size: 14px; }
+  .assign-list { list-style: none; margin: 0 0 10px; padding: 0; }
+  .assign-list li {
+    display: flex; align-items: center; gap: 8px; padding: 5px 0;
+    border-bottom: 1px solid var(--border); font-size: 14px;
+  }
+  .assign-list li .who { flex: 1 1 auto; }
+
+  /* Generic form modal */
+  .modal-form { max-width: 460px; max-height: 88vh; overflow-y: auto; }
+  .modal-form .ff { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  .modal-form .ff > label { font-size: 12px; color: var(--muted); }
+  .modal-form .ff input, .modal-form .ff select, .modal-form .ff textarea {
+    font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; width: 100%;
+  }
+  .modal-form .ff textarea { min-height: 60px; resize: vertical; }
+  .modal-form .ff.check { flex-direction: row; align-items: center; gap: 8px; }
+  .modal-form .ff.check input { width: auto; }
+
   .footer-note { color: var(--muted); font-size: 12px; margin-top: 24px; }
 
   /* Name modal */
@@ -149,7 +189,7 @@
 <div class="wrap">
   <header>
     <h1>Heimdall</h1>
-    <p class="sub">Team Workload Tracker — Phase 0 (skeleton &amp; data layer)</p>
+    <p class="sub">Team Workload Tracker</p>
     <p class="target-note">Works in any modern browser. Your data is saved automatically on this
       device. Live team sync (a shared file) is available in Microsoft Edge or Chrome.</p>
   </header>
@@ -200,9 +240,32 @@
     </div>
     <table>
       <thead>
-        <tr><th>Name</th><th>Title</th><th>Active</th><th>ID</th></tr>
+        <tr><th>Name</th><th>Title</th><th>Active</th><th>ID</th><th>Actions</th></tr>
       </thead>
       <tbody id="mgrRows"></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>Projects <span class="count" id="projCount"></span>
+      <button id="btnAddProject" style="margin-left:10px;">Add project</button></h2>
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Status</th><th>Priority</th><th>Target</th><th>Team</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="projRows"></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>Work items <span class="count" id="wiCount"></span>
+      <button id="btnAddWorkItem" style="margin-left:10px;">Add work item</button></h2>
+    <table>
+      <thead>
+        <tr><th>Type</th><th>Title</th><th>Owner</th><th>Status</th><th>Priority</th>
+            <th>Opened</th><th>Due</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="wiRows"></tbody>
     </table>
   </div>
 
@@ -223,11 +286,22 @@
   </details>
 
   <p class="footer-note">
-    Phase 0 proves the persistence loop only. Do not store sensitive content
-    (incident details, customer data) — reference tickets by ID or short title.
-    Data is stored locally in this browser; nothing leaves your machine unless you link a
-    shared file or export it.
+    Do not store sensitive content (incident details, customer data) — reference tickets by
+    ID or short title, with an optional link. Data is stored locally in this browser; nothing
+    leaves your machine unless you link a shared file or export it.
   </p>
+</div>
+
+<!-- Generic entity form modal (built dynamically) -->
+<div class="overlay" id="formOverlay">
+  <div class="modal modal-form">
+    <h3 id="formTitle"></h3>
+    <div id="formBody"></div>
+    <div class="actions">
+      <button id="formCancel">Cancel</button>
+      <button id="formOk" class="primary">Save</button>
+    </div>
+  </div>
 </div>
 
 <!-- Name modal -->
@@ -272,6 +346,7 @@
   var saveTimer = null;        // debounce handle for auto-save
   var syncing = false;         // reentrancy guard for syncFromFile
   var dbReady = false;         // IndexedDB opened successfully
+  var expandedProject = null;  // projectId whose assignment editor is open
 
   // ---- Elements --------------------------------------------------------
   var el = function (id) { return document.getElementById(id); };
@@ -284,9 +359,13 @@
   var btnLoadBackup = el("btnLoadBackup"), btnGuardUnlink = el("btnGuardUnlink");
   var mName = el("mName"), mTitle = el("mTitle"), mActive = el("mActive");
   var btnAddManager = el("btnAddManager"), mgrRows = el("mgrRows"), mgrCount = el("mgrCount");
+  var btnAddProject = el("btnAddProject"), projRows = el("projRows"), projCount = el("projCount");
+  var btnAddWorkItem = el("btnAddWorkItem"), wiRows = el("wiRows"), wiCount = el("wiCount");
   var importInput = el("importInput"), appVersionEl = el("appVersion");
   var nameOverlay = el("nameOverlay"), nameInput = el("nameInput"),
       nameOk = el("nameOk"), nameCancel = el("nameCancel");
+  var formOverlay = el("formOverlay"), formTitle = el("formTitle"), formBody = el("formBody"),
+      formOk = el("formOk"), formCancel = el("formCancel");
 
   // Toolbar buttons (built dynamically so we can show the right link control).
   var btnLink = mkButton("btnLink", "Link shared file", "primary");
@@ -482,35 +561,430 @@
     btnRetry.style.display = (state === "error") ? "" : "none";
   }
 
+  function renderAll() {
+    renderManagers();
+    renderProjects();
+    renderWorkItems();
+  }
+
+  function emptyRow(tbody, cols, msg) {
+    var tr = document.createElement("tr");
+    var td = document.createElement("td");
+    td.colSpan = cols;
+    td.className = "empty";
+    td.textContent = msg;
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  }
+
   function renderManagers() {
     mgrRows.innerHTML = "";
     var list = (data && data.managers) || [];
     mgrCount.textContent = list.length ? ("(" + list.length + ")") : "";
     if (!list.length) {
-      var tr = document.createElement("tr");
-      var td = document.createElement("td");
-      td.colSpan = 4;
-      td.className = "empty";
-      td.textContent = "No managers yet — add one above and it saves automatically.";
-      tr.appendChild(td);
-      mgrRows.appendChild(tr);
+      emptyRow(mgrRows, 5, "No managers yet — add one above and it saves automatically.");
       return;
     }
     list.forEach(function (m) {
       var tr = document.createElement("tr");
+      if (!m.active) tr.className = "archived";
       tr.appendChild(cell(m.name || ""));
       tr.appendChild(cell(m.title || "—"));
       tr.appendChild(cell(m.active ? "Yes" : "No"));
-      var idTd = cell(m.id || "");
-      idTd.className = "id";
-      tr.appendChild(idTd);
+      var idTd = cell(m.id || ""); idTd.className = "id"; tr.appendChild(idTd);
+      var act = document.createElement("td"); act.className = "actions";
+      act.appendChild(miniBtn("Edit", function () { editManager(m.id); }));
+      act.appendChild(miniBtn(m.active ? "Archive" : "Restore", function () { toggleManagerActive(m.id); }));
+      tr.appendChild(act);
       mgrRows.appendChild(tr);
     });
   }
+
+  function renderProjects() {
+    projRows.innerHTML = "";
+    var list = (data && data.projects) || [];
+    projCount.textContent = list.length ? ("(" + list.length + ")") : "";
+    if (!list.length) {
+      emptyRow(projRows, 6, "No projects yet — use “Add project”.");
+      return;
+    }
+    list.forEach(function (p) {
+      var tr = document.createElement("tr");
+      if (p.status === "complete") tr.className = "archived";
+      tr.appendChild(cell(p.name || ""));
+      tr.appendChild(cell(p.status || "active"));
+      tr.appendChild(cell(p.priority || "med"));
+      tr.appendChild(cell(p.targetDate || "—"));
+      var live = activeAssignments(p.id);
+      tr.appendChild(cell(live.length ? teamSummary(live) : "—"));
+      var act = document.createElement("td"); act.className = "actions";
+      act.appendChild(miniBtn("Edit", function () { editProject(p.id); }));
+      act.appendChild(miniBtn("Team (" + live.length + ")", function () { toggleAssignEditor(p.id); }));
+      tr.appendChild(act);
+      projRows.appendChild(tr);
+      if (expandedProject === p.id) projRows.appendChild(assignEditorRow(p));
+    });
+  }
+
+  function renderWorkItems() {
+    wiRows.innerHTML = "";
+    var list = (data && data.workItems) || [];
+    wiCount.textContent = list.length ? ("(" + list.length + ")") : "";
+    if (!list.length) {
+      emptyRow(wiRows, 8, "No work items yet — use “Add work item”.");
+      return;
+    }
+    list.forEach(function (w) {
+      var tr = document.createElement("tr");
+      if (w.archived || w.status === "done") tr.className = "archived";
+      var typeTd = document.createElement("td");
+      typeTd.appendChild(pill(w.type || "other", w.type || "other"));
+      tr.appendChild(typeTd);
+      tr.appendChild(cell(w.title || ""));
+      tr.appendChild(cell(managerName(w.managerId)));
+      tr.appendChild(cell(w.status || "open"));
+      tr.appendChild(cell(w.priority || "med"));
+      tr.appendChild(cell(w.openedDate || "—"));
+      tr.appendChild(cell(w.dueDate || "—"));
+      var act = document.createElement("td"); act.className = "actions";
+      act.appendChild(miniBtn("Edit", function () { editWorkItem(w.id); }));
+      if (w.status !== "done") act.appendChild(miniBtn("Done", function () { markWorkItemDone(w.id); }));
+      act.appendChild(miniBtn(w.archived ? "Restore" : "Archive", function () { toggleWorkItemArchived(w.id); }));
+      tr.appendChild(act);
+      wiRows.appendChild(tr);
+    });
+  }
+
   function cell(text) {
     var td = document.createElement("td");
     td.textContent = text;
     return td;
+  }
+  function miniBtn(label, fn) {
+    var b = document.createElement("button");
+    b.className = "mini"; b.textContent = label;
+    b.addEventListener("click", fn);
+    return b;
+  }
+  function pill(cls, label) {
+    var s = document.createElement("span");
+    s.className = "pill " + cls; s.textContent = label;
+    return s;
+  }
+
+  // ---- Entity helpers --------------------------------------------------
+  function findById(arr, id) {
+    for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i];
+    return null;
+  }
+  function todayISO() { return new Date().toISOString().slice(0, 10); }
+  function managerName(id) {
+    var m = id && findById(data.managers, id);
+    return m ? m.name : (id ? "(unknown)" : "—");
+  }
+  function activeAssignments(projectId) {
+    return data.assignments.filter(function (a) {
+      return a.projectId === projectId && !a.archived;
+    });
+  }
+  function teamSummary(list) {
+    var leads = list.filter(function (a) { return a.role === "lead"; }).length;
+    var contribs = list.length - leads;
+    var parts = [];
+    if (leads) parts.push(leads + " lead" + (leads > 1 ? "s" : ""));
+    if (contribs) parts.push(contribs + " contributor" + (contribs > 1 ? "s" : ""));
+    return parts.join(", ") || "—";
+  }
+
+  // ---- Option lists (mirror the brief's data model) --------------------
+  var STATUS_PROJECT = ["active", "on-hold", "complete"];
+  var PRIORITY = ["low", "med", "high"];
+  var WORK_TYPES = ["escalation", "ditl", "oneoff", "other"];
+  var WORK_STATUS = ["open", "in-progress", "done"];
+  var ROLES = ["lead", "contributor"];
+  var EFFORTS = ["light", "medium", "heavy"];
+
+  // ---- Generic form modal ----------------------------------------------
+  // fields: [{ key, label, type:"text"|"textarea"|"select"|"date"|"checkbox",
+  //            options?:[...], required?:bool, placeholder? }]
+  // Resolves to a values object, or null if cancelled.
+  function openForm(title, fields, values) {
+    values = values || {};
+    return new Promise(function (resolve) {
+      formTitle.textContent = title;
+      formBody.innerHTML = "";
+      var inputs = {};
+
+      fields.forEach(function (f) {
+        var wrap = document.createElement("div");
+        wrap.className = "ff" + (f.type === "checkbox" ? " check" : "");
+        var input;
+        if (f.type === "textarea") {
+          input = document.createElement("textarea");
+        } else if (f.type === "select") {
+          input = document.createElement("select");
+          (f.options || []).forEach(function (opt) {
+            var o = document.createElement("option");
+            o.value = (opt.value !== undefined) ? opt.value : opt;
+            o.textContent = (opt.label !== undefined) ? opt.label : opt;
+            input.appendChild(o);
+          });
+        } else if (f.type === "checkbox") {
+          input = document.createElement("input");
+          input.type = "checkbox";
+        } else {
+          input = document.createElement("input");
+          input.type = (f.type === "date") ? "date" : "text";
+          if (f.placeholder) input.placeholder = f.placeholder;
+        }
+        input.id = "ff_" + f.key;
+
+        // Seed current value.
+        var v = values[f.key];
+        if (f.type === "checkbox") { input.checked = !!v; }
+        else if (v != null) { input.value = v; }
+        else if (f.type === "select" && f.options && f.options.length) {
+          input.value = (f.options[0].value !== undefined) ? f.options[0].value : f.options[0];
+        }
+
+        var label = document.createElement("label");
+        label.setAttribute("for", input.id);
+        label.textContent = f.label + (f.required ? " *" : "");
+
+        if (f.type === "checkbox") { wrap.appendChild(input); wrap.appendChild(label); }
+        else { wrap.appendChild(label); wrap.appendChild(input); }
+        formBody.appendChild(wrap);
+        inputs[f.key] = { el: input, spec: f };
+      });
+
+      formOverlay.className = "overlay show";
+      var first = formBody.querySelector("input, select, textarea");
+      if (first) first.focus();
+
+      function cleanup() {
+        formOverlay.className = "overlay";
+        formOk.removeEventListener("click", onOk);
+        formCancel.removeEventListener("click", onCancel);
+      }
+      function onOk() {
+        var out = {};
+        for (var key in inputs) {
+          var rec = inputs[key], elx = rec.el, spec = rec.spec;
+          if (spec.type === "checkbox") { out[key] = elx.checked; continue; }
+          var val = elx.value;
+          if (typeof val === "string") val = val.trim();
+          if (spec.required && !val) { elx.focus(); return; } // block until filled
+          out[key] = val || null;
+        }
+        cleanup();
+        resolve(out);
+      }
+      function onCancel() { cleanup(); resolve(null); }
+      formOk.addEventListener("click", onOk);
+      formCancel.addEventListener("click", onCancel);
+    });
+  }
+
+  function selOpts(arr) {
+    return arr.map(function (v) { return { value: v, label: v }; });
+  }
+  function managerOpts(includeBlank) {
+    var opts = includeBlank ? [{ value: "", label: "— none —" }] : [];
+    data.managers.forEach(function (m) {
+      opts.push({ value: m.id, label: m.name + (m.active ? "" : " (archived)") });
+    });
+    return opts;
+  }
+
+  // After any mutation: re-render everything and auto-save.
+  function commit() { renderAll(); scheduleSave(); }
+
+  // ---- Managers CRUD (add is the inline quick-add; edit/archive here) ---
+  async function editManager(id) {
+    var m = findById(data.managers, id);
+    if (!m) return;
+    await ensureName();
+    var v = await openForm("Edit manager", [
+      { key: "name", label: "Name", type: "text", required: true },
+      { key: "title", label: "Title", type: "text" },
+      { key: "active", label: "Active", type: "checkbox" }
+    ], { name: m.name, title: m.title, active: m.active });
+    if (!v) return;
+    m.name = v.name; m.title = v.title; m.active = v.active;
+    commit();
+  }
+  async function toggleManagerActive(id) {
+    var m = findById(data.managers, id);
+    if (!m) return;
+    await ensureName();
+    m.active = !m.active;
+    commit();
+  }
+
+  // ---- Projects CRUD ---------------------------------------------------
+  var projectFields = [
+    { key: "name", label: "Name", type: "text", required: true },
+    { key: "description", label: "Description", type: "textarea" },
+    { key: "status", label: "Status", type: "select", options: selOpts(STATUS_PROJECT) },
+    { key: "priority", label: "Priority", type: "select", options: selOpts(PRIORITY) },
+    { key: "startDate", label: "Start date", type: "date" },
+    { key: "targetDate", label: "Target date", type: "date" },
+    { key: "completedDate", label: "Completed date", type: "date" }
+  ];
+  async function addProject() {
+    await ensureName();
+    var v = await openForm("Add project", projectFields,
+      { status: "active", priority: "med", startDate: todayISO() });
+    if (!v) return;
+    if (v.status === "complete" && !v.completedDate) v.completedDate = todayISO();
+    data.projects.push({
+      id: genId(), name: v.name, description: v.description,
+      status: v.status, priority: v.priority,
+      startDate: v.startDate, targetDate: v.targetDate, completedDate: v.completedDate
+    });
+    commit();
+  }
+  async function editProject(id) {
+    var p = findById(data.projects, id);
+    if (!p) return;
+    await ensureName();
+    var v = await openForm("Edit project", projectFields, p);
+    if (!v) return;
+    if (v.status === "complete" && !v.completedDate) v.completedDate = todayISO();
+    p.name = v.name; p.description = v.description; p.status = v.status;
+    p.priority = v.priority; p.startDate = v.startDate;
+    p.targetDate = v.targetDate; p.completedDate = v.completedDate;
+    commit();
+  }
+
+  // ---- Assignments (managed per project) -------------------------------
+  function toggleAssignEditor(projectId) {
+    expandedProject = (expandedProject === projectId) ? null : projectId;
+    renderProjects();
+  }
+  function assignEditorRow(p) {
+    var tr = document.createElement("tr");
+    tr.className = "assign-row";
+    var td = document.createElement("td");
+    td.colSpan = 6;
+    var box = document.createElement("div");
+    box.className = "assign-box";
+    var h = document.createElement("h3");
+    h.textContent = "Team on “" + (p.name || "project") + "”";
+    box.appendChild(h);
+
+    var list = activeAssignments(p.id);
+    var ul = document.createElement("ul");
+    ul.className = "assign-list";
+    if (!list.length) {
+      var li0 = document.createElement("li");
+      li0.className = "who"; li0.textContent = "No one assigned yet.";
+      ul.appendChild(li0);
+    } else {
+      list.forEach(function (a) {
+        var li = document.createElement("li");
+        var who = document.createElement("span");
+        who.className = "who";
+        who.textContent = managerName(a.managerId);
+        li.appendChild(who);
+        li.appendChild(pill(a.role, a.role));
+        var eff = document.createElement("span");
+        eff.textContent = a.effort;
+        li.appendChild(eff);
+        li.appendChild(miniBtn("Remove", function () { archiveAssignment(a.id); }));
+        ul.appendChild(li);
+      });
+    }
+    box.appendChild(ul);
+    box.appendChild(miniBtn("Assign a manager", function () { addAssignment(p.id); }));
+    td.appendChild(box);
+    tr.appendChild(td);
+    return tr;
+  }
+  async function addAssignment(projectId) {
+    if (!data.managers.length) { notice("Add a manager first.", "err"); return; }
+    await ensureName();
+    var v = await openForm("Assign a manager", [
+      { key: "managerId", label: "Manager", type: "select", options: managerOpts(false), required: true },
+      { key: "role", label: "Role", type: "select", options: selOpts(ROLES) },
+      { key: "effort", label: "Effort", type: "select", options: selOpts(EFFORTS) },
+      { key: "endDate", label: "End date (roll-off, optional)", type: "date" }
+    ], { role: "contributor", effort: "medium" });
+    if (!v) return;
+    data.assignments.push({
+      id: genId(), projectId: projectId, managerId: v.managerId,
+      role: v.role, effort: v.effort,
+      startDate: todayISO(), endDate: v.endDate, archived: false
+    });
+    commit();
+  }
+  async function archiveAssignment(id) {
+    var a = findById(data.assignments, id);
+    if (!a) return;
+    await ensureName();
+    a.archived = true;
+    commit();
+  }
+
+  // ---- Work items CRUD -------------------------------------------------
+  function workItemFields() {
+    return [
+      { key: "type", label: "Type", type: "select", options: selOpts(WORK_TYPES) },
+      { key: "title", label: "Title", type: "text", required: true },
+      { key: "managerId", label: "Owner (manager)", type: "select", options: managerOpts(true) },
+      { key: "relatedProjectId", label: "Related project", type: "select",
+        options: [{ value: "", label: "— none —" }].concat(
+          data.projects.map(function (p) { return { value: p.id, label: p.name }; })) },
+      { key: "status", label: "Status", type: "select", options: selOpts(WORK_STATUS) },
+      { key: "priority", label: "Priority", type: "select", options: selOpts(PRIORITY) },
+      { key: "openedDate", label: "Opened date", type: "date" },
+      { key: "dueDate", label: "Due date", type: "date" },
+      { key: "rollOffDate", label: "Roll-off date", type: "date" },
+      { key: "link", label: "Link (ticket/doc URL — no sensitive content)", type: "text" },
+      { key: "notes", label: "Notes (short)", type: "textarea" }
+    ];
+  }
+  async function addWorkItem() {
+    await ensureName();
+    var v = await openForm("Add work item", workItemFields(),
+      { type: "escalation", status: "open", priority: "med", openedDate: todayISO() });
+    if (!v) return;
+    data.workItems.push({
+      id: genId(), type: v.type, title: v.title, managerId: v.managerId,
+      relatedProjectId: v.relatedProjectId, status: v.status, priority: v.priority,
+      openedDate: v.openedDate, dueDate: v.dueDate, rollOffDate: v.rollOffDate,
+      completedDate: (v.status === "done") ? todayISO() : null,
+      archived: false, link: v.link, notes: v.notes
+    });
+    commit();
+  }
+  async function editWorkItem(id) {
+    var w = findById(data.workItems, id);
+    if (!w) return;
+    await ensureName();
+    var v = await openForm("Edit work item", workItemFields(), w);
+    if (!v) return;
+    if (v.status === "done" && !w.completedDate) w.completedDate = todayISO();
+    if (v.status !== "done") w.completedDate = null;
+    w.type = v.type; w.title = v.title; w.managerId = v.managerId;
+    w.relatedProjectId = v.relatedProjectId; w.status = v.status; w.priority = v.priority;
+    w.openedDate = v.openedDate; w.dueDate = v.dueDate; w.rollOffDate = v.rollOffDate;
+    w.link = v.link; w.notes = v.notes;
+    commit();
+  }
+  async function markWorkItemDone(id) {
+    var w = findById(data.workItems, id);
+    if (!w) return;
+    await ensureName();
+    w.status = "done"; w.completedDate = todayISO();
+    commit();
+  }
+  async function toggleWorkItemArchived(id) {
+    var w = findById(data.workItems, id);
+    if (!w) return;
+    await ensureName();
+    w.archived = !w.archived;
+    commit();
   }
 
   function showGuard(msg) {
@@ -755,7 +1229,7 @@
         data = v.data;
         await saveLocal();
         updateBanner();
-        renderManagers();
+        renderAll();
         setSaveStatus("saved");
         if (interactive) notice("Loaded the latest from the shared file.", "ok");
         else notice("Updated with a teammate's latest changes.", "info");
@@ -815,7 +1289,7 @@
     data.settings.lastSavedAt = new Date().toISOString();
     await saveLocal();
     updateBanner();
-    renderManagers();
+    renderAll();
     scheduleSave(); // pushes to the shared file too, if linked
     notice("Imported and saved.", "ok");
   }
@@ -839,7 +1313,7 @@
       hideGuard();
       await saveLocal();
       updateBanner();
-      renderManagers();
+      renderAll();
       scheduleSave(); // restore the shared file from the backup
       notice("Loaded from backup — restoring the shared file.", "ok");
     } catch (e) {
@@ -865,8 +1339,7 @@
     mName.value = "";
     mTitle.value = "";
     mActive.checked = true;
-    renderManagers();
-    scheduleSave();
+    commit();
     mName.focus();
   }
 
@@ -878,6 +1351,8 @@
   btnLoadBackup.addEventListener("click", loadBackupFile);
   btnGuardUnlink.addEventListener("click", unlinkSharedFile);
   btnAddManager.addEventListener("click", addManager);
+  btnAddProject.addEventListener("click", addProject);
+  btnAddWorkItem.addEventListener("click", addWorkItem);
   btnLink.addEventListener("click", linkSharedFile);
   btnReconnect.addEventListener("click", reconnectSharedFile);
   btnUnlink.addEventListener("click", unlinkSharedFile);
@@ -911,7 +1386,7 @@
 
     // 2) Render immediately — the app is usable now, with zero clicks.
     updateBanner();
-    renderManagers();
+    renderAll();
     setSaveStatus(hasContent(data) ? "saved" : "");
 
     // 3) If a shared file was linked before, try to reconnect silently.
