@@ -5,12 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!--
   Strict CSP: no external resource loading of any kind.
-  - default-src 'self'       : nothing loads from the network by default
-  - script-src 'unsafe-inline': required so the inlined <script> runs from file://
-  - style-src  'unsafe-inline': required so the inlined <style> applies from file://
-  - img-src 'self' data:     : allow same-origin and data: images only
-  - connect-src 'none'        : no fetch/XHR/WebSocket anywhere
-  The File System Access API is not a network connection, so it is unaffected.
+  - default-src 'self'        : nothing loads from the network by default
+  - script-src 'unsafe-inline' : required so the inlined <script> runs from file://
+  - style-src  'unsafe-inline' : required so the inlined <style> applies from file://
+  - img-src 'self' data:      : allow same-origin and data: images only
+  - connect-src 'none'         : no fetch/XHR/WebSocket anywhere
+  IndexedDB and the File System Access API are not network connections, so they
+  are unaffected by connect-src.
 -->
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'">
@@ -51,14 +52,15 @@
     padding: 10px 14px; margin-bottom: 16px;
   }
   .banner .b-text { flex: 1 1 auto; font-size: 14px; }
-  .banner .file-name { color: var(--muted); font-size: 13px; }
+  .banner .sync-line { color: var(--muted); font-size: 13px; }
   .save-status { font-size: 13px; color: var(--muted); white-space: nowrap; }
   .save-status.saving { color: var(--accent); }
   .save-status.saved { color: var(--ok); }
   .save-status.dirty { color: var(--muted); }
   .save-status.error { color: var(--danger); font-weight: 600; }
 
-  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .toolbar .note { color: var(--muted); font-size: 13px; }
 
   button {
     font: inherit;
@@ -94,6 +96,7 @@
   details.panel[open] > summary::before { content: "▾"; }
   .settings-body { margin-top: 14px; }
   .settings-note { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .settings-sub { font-size: 13px; font-weight: 600; margin: 18px 0 8px; }
   .settings-meta { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
   .settings-meta span { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }
 
@@ -106,6 +109,7 @@
   .guard { display: none; }
   .guard.show { display: block; }
   .guard .panel { border-color: #f3c6c1; background: #fff7f6; }
+  .guard .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
   .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px; }
   .field { display: flex; flex-direction: column; gap: 4px; }
@@ -146,33 +150,34 @@
   <header>
     <h1>Heimdall</h1>
     <p class="sub">Team Workload Tracker — Phase 0 (skeleton &amp; data layer)</p>
-    <p class="target-note">Best in Microsoft Edge or Chrome. Other browsers: use Export / Import JSON.</p>
+    <p class="target-note">Works in any modern browser. Your data is saved automatically on this
+      device. Live team sync (a shared file) is available in Microsoft Edge or Chrome.</p>
   </header>
 
   <div class="banner">
     <div class="b-text">
-      <div id="bannerText">No file open yet.</div>
-      <div class="file-name" id="fileName"></div>
+      <div id="bannerText">Loading…</div>
+      <div class="sync-line" id="syncLine"></div>
     </div>
     <span class="save-status" id="saveStatus"></span>
-    <button id="btnRetry" style="display:none;">Retry save</button>
-    <button id="btnReload" disabled>Reload latest</button>
+    <button id="btnRetry" style="display:none;">Retry sync</button>
+    <button id="btnReload" style="display:none;">Reload latest</button>
   </div>
 
-  <div class="toolbar">
-    <button id="btnOpen" class="primary">Open data folder</button>
-  </div>
+  <div class="toolbar" id="toolbar"></div>
 
   <div class="notice" id="notice"></div>
 
   <div class="guard" id="guard">
     <div class="panel">
-      <h2>Could not load this file safely</h2>
+      <h2>The shared file could not be read safely</h2>
       <p id="guardMsg"></p>
-      <p>The existing file was <strong>not overwritten</strong>. You can load a backup
-        copy instead; once loaded it is saved automatically to restore
-        <code>heimdall-data.json</code>.</p>
-      <button id="btnLoadBackup" class="primary">Load a backup file…</button>
+      <p>It was <strong>not overwritten</strong>, and your local data is untouched and still
+        editable. You can load a backup copy to restore it, or unlink the shared file.</p>
+      <div class="actions">
+        <button id="btnLoadBackup" class="primary">Load a backup file…</button>
+        <button id="btnGuardUnlink">Unlink shared file</button>
+      </div>
     </div>
   </div>
 
@@ -204,9 +209,10 @@
   <details class="panel" id="settingsPanel">
     <summary>Settings</summary>
     <div class="settings-body">
+      <p class="settings-sub">Backup &amp; portability</p>
       <p class="settings-note">
-        Export / Import JSON is the manual-backup mechanism and the fallback for
-        browsers without the File System Access API (anything other than Edge or Chrome).
+        Export downloads the current data as a JSON file (a manual backup, and the way to
+        share with anyone not using the shared-file sync). Import loads a JSON file back in.
       </p>
       <div class="form-row">
         <button id="btnExport">Export JSON</button>
@@ -218,8 +224,9 @@
 
   <p class="footer-note">
     Phase 0 proves the persistence loop only. Do not store sensitive content
-    (incident details, customer data) in this file — reference tickets by ID or short title.
-    Data lives entirely in the JSON file you choose; nothing leaves your machine.
+    (incident details, customer data) — reference tickets by ID or short title.
+    Data is stored locally in this browser; nothing leaves your machine unless you link a
+    shared file or export it.
   </p>
 </div>
 
@@ -227,7 +234,7 @@
 <div class="overlay" id="nameOverlay">
   <div class="modal">
     <h3>What's your name?</h3>
-    <p>Used to attribute saves in the "Last saved by" banner. Asked once per session.</p>
+    <p>Used to attribute saves in the "Last saved by" banner. Asked once, then remembered.</p>
     <input type="text" id="nameInput" placeholder="Your name" autocomplete="off">
     <div class="actions">
       <button id="nameCancel">Cancel</button>
@@ -244,36 +251,55 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.1.0";
+  var APP_VERSION = "0.2.0";
   var MAX_BACKUPS = 10;
   var BACKUP_RE = /^heimdall-data\.backup-\d{8}-\d{4}\.json$/;
   var DATA_FILE = "heimdall-data.json";
-  // Primary persistence path uses the directory picker; showOpenFilePicker is
-  // only needed for the malformed-file "Load a backup" recovery path.
+  var SAVE_DEBOUNCE_MS = 600;
+  // Live shared-file sync needs the File System Access API (Chromium only).
   var DIR_API = (typeof window.showDirectoryPicker === "function");
   var FSA = (typeof window.showOpenFilePicker === "function");
+  var HAS_IDB = (typeof indexedDB !== "undefined" && !!indexedDB);
 
-  // ---- Session state (in-memory only) ----------------------------------
-  var dataFileHandle = null;   // FileSystemFileHandle for heimdall-data.json
-  var dirHandle = null;        // FileSystemDirectoryHandle for backups
-  var userName = null;         // asked once per session
-  var data = null;             // parsed Heimdall data
-  var loadBlocked = false;     // true when current file is malformed
+  // ---- Session state ---------------------------------------------------
+  var data = null;             // current in-memory data (always editable)
+  var userName = null;         // persisted across sessions in IndexedDB
+  var fileHandle = null;       // FileSystemFileHandle for the shared data file
+  var dirHandle = null;        // FileSystemDirectoryHandle (for backups + reconnect)
+  var linkState = "none";      // "none" | "needs-reconnect" | "linked"
+  var fileBlocked = false;     // shared file is malformed -> pause file writes
+  var lastSaveOk = true;       // last file write succeeded (for status text)
   var saveTimer = null;        // debounce handle for auto-save
+  var syncing = false;         // reentrancy guard for syncFromFile
+  var dbReady = false;         // IndexedDB opened successfully
 
   // ---- Elements --------------------------------------------------------
   var el = function (id) { return document.getElementById(id); };
-  var bannerText = el("bannerText"), fileNameEl = el("fileName");
-  var btnReload = el("btnReload"), btnOpen = el("btnOpen");
-  var saveStatus = el("saveStatus"), btnRetry = el("btnRetry");
+  var bannerText = el("bannerText"), syncLine = el("syncLine");
+  var btnReload = el("btnReload"), btnRetry = el("btnRetry");
+  var saveStatus = el("saveStatus"), toolbar = el("toolbar");
   var btnExport = el("btnExport"), btnImport = el("btnImport");
   var noticeEl = el("notice");
-  var guardEl = el("guard"), guardMsg = el("guardMsg"), btnLoadBackup = el("btnLoadBackup");
+  var guardEl = el("guard"), guardMsg = el("guardMsg");
+  var btnLoadBackup = el("btnLoadBackup"), btnGuardUnlink = el("btnGuardUnlink");
   var mName = el("mName"), mTitle = el("mTitle"), mActive = el("mActive");
   var btnAddManager = el("btnAddManager"), mgrRows = el("mgrRows"), mgrCount = el("mgrCount");
   var importInput = el("importInput"), appVersionEl = el("appVersion");
   var nameOverlay = el("nameOverlay"), nameInput = el("nameInput"),
       nameOk = el("nameOk"), nameCancel = el("nameCancel");
+
+  // Toolbar buttons (built dynamically so we can show the right link control).
+  var btnLink = mkButton("btnLink", "Link shared file", "primary");
+  var btnReconnect = mkButton("btnReconnect", "Reconnect shared file", "primary");
+  var btnUnlink = mkButton("btnUnlink", "Unlink shared file", "");
+  var toolbarNote = document.createElement("span");
+  toolbarNote.className = "note";
+  function mkButton(id, label, cls) {
+    var b = document.createElement("button");
+    b.id = id; b.textContent = label;
+    if (cls) b.className = cls;
+    return b;
+  }
 
   // ---- Default schema (full section-4 shape) ---------------------------
   function defaultData() {
@@ -326,7 +352,6 @@
     if ("settings" in parsed && !isPlainObject(parsed.settings)) {
       return { ok: false, error: '"settings" must be an object.' };
     }
-    // Merge onto defaults so every expected key exists.
     var out = defaultData();
     arrays.forEach(function (k) {
       if (Array.isArray(parsed[k])) out[k] = parsed[k];
@@ -359,6 +384,14 @@
            "-" + pad(d.getHours()) + pad(d.getMinutes());
   }
 
+  function tsValue(iso) { var t = iso ? Date.parse(iso) : NaN; return isNaN(t) ? 0 : t; }
+
+  function hasContent(d) {
+    return !!d && (d.managers.length || d.projects.length ||
+                   d.assignments.length || d.workItems.length ||
+                   (d.settings && d.settings.lastSavedAt));
+  }
+
   var noticeTimer = null;
   function notice(msg, kind) {
     noticeEl.textContent = msg;
@@ -369,36 +402,39 @@
     }
   }
 
-  function showGuard(msg) {
-    loadBlocked = true;
-    data = null;
-    guardMsg.textContent = msg;
-    guardEl.className = "guard show";
-    refreshButtons();
-    updateBanner();
-    renderManagers();
+  // ---- IndexedDB (the always-on local store) ---------------------------
+  var DB_NAME = "heimdall", STORE = "kv", db = null;
+  function idbOpen() {
+    return new Promise(function (resolve, reject) {
+      var req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore(STORE); };
+      req.onsuccess = function () { db = req.result; resolve(db); };
+      req.onerror = function () { reject(req.error); };
+    });
   }
-  function hideGuard() {
-    guardEl.className = "guard";
+  function idbReq(mode, fn) {
+    return new Promise(function (resolve, reject) {
+      var tx = db.transaction(STORE, mode);
+      var r = fn(tx.objectStore(STORE));
+      tx.oncomplete = function () { resolve(r ? r.result : undefined); };
+      tx.onerror = function () { reject(tx.error); };
+      tx.onabort = function () { reject(tx.error); };
+    });
+  }
+  function idbGet(key) { return idbReq("readonly", function (s) { return s.get(key); }); }
+  function idbSet(key, val) { return idbReq("readwrite", function (s) { return s.put(val, key); }); }
+  function idbDel(key) { return idbReq("readwrite", function (s) { return s.delete(key); }); }
+
+  // Persist current data to the local store (always available, never prompts).
+  async function saveLocal() {
+    if (!dbReady) return;
+    try {
+      // Store a structured clone of plain data (deep copy via JSON).
+      await idbSet("data", JSON.parse(JSON.stringify(data)));
+    } catch (e) { /* local store best-effort; file/export remain */ }
   }
 
-  // Editing is allowed once a folder is open (Chromium) or always in memory
-  // mode (no File System Access), but never while the file is malformed.
-  function canEdit() {
-    return !loadBlocked && (!!dataFileHandle || !DIR_API);
-  }
-
-  function refreshButtons() {
-    btnOpen.disabled = !DIR_API;
-    btnReload.disabled = !dataFileHandle;
-    var editable = canEdit();
-    mName.disabled = !editable;
-    mTitle.disabled = !editable;
-    mActive.disabled = !editable;
-    btnAddManager.disabled = !editable;
-    if (btnImport) btnImport.disabled = !editable;
-  }
-
+  // ---- Rendering / UI state -------------------------------------------
   function updateBanner() {
     var s = data && data.settings;
     if (s && s.lastSavedBy && s.lastSavedAt) {
@@ -406,35 +442,44 @@
       try { when = new Date(s.lastSavedAt).toLocaleString(); }
       catch (e) { when = s.lastSavedAt; }
       bannerText.textContent = "Last saved by " + s.lastSavedBy + " at " + when;
-    } else if (data) {
-      bannerText.textContent = "Loaded — not yet saved in this app.";
     } else {
-      bannerText.textContent = "No data folder open yet.";
+      bannerText.textContent = "No changes saved yet.";
     }
-    fileNameEl.textContent = dataFileHandle ? ("File: " + dataFileHandle.name) : "";
-    appVersionEl.textContent = (data && data.settings && data.settings.appVersion) || APP_VERSION;
+    appVersionEl.textContent = (s && s.appVersion) || APP_VERSION;
+    updateLinkUI();
   }
 
-  // ---- Save status indicator (replaces the manual Save button) ---------
+  // Reflect the shared-file link state in the toolbar + banner.
+  function updateLinkUI() {
+    toolbar.innerHTML = "";
+    if (!DIR_API) {
+      toolbarNote.textContent =
+        "Live team sync requires Edge or Chrome. Your data is saved locally here; " +
+        "use Settings → Export to share it.";
+      toolbar.appendChild(toolbarNote);
+      syncLine.textContent = "Local only — saved in this browser.";
+    } else if (linkState === "linked") {
+      toolbar.appendChild(btnUnlink);
+      syncLine.textContent = "Synced with shared file (" + DATA_FILE + ").";
+    } else if (linkState === "needs-reconnect") {
+      toolbar.appendChild(btnReconnect);
+      syncLine.textContent = "Shared file remembered — click Reconnect to resume syncing.";
+    } else {
+      toolbar.appendChild(btnLink);
+      syncLine.textContent = "Local only — link a shared file to sync with your team.";
+    }
+    btnReload.style.display = (linkState === "linked") ? "" : "none";
+  }
+
   function setSaveStatus(state) {
     var text = "";
     if (state === "dirty")       text = "Unsaved changes…";
     else if (state === "saving") text = "Saving…";
-    else if (state === "saved")  text = "All changes saved";
-    else if (state === "error")  text = "Save failed";
+    else if (state === "saved")  text = (linkState === "linked") ? "Saved & synced" : "Saved locally";
+    else if (state === "error")  text = "Saved locally · sync failed";
     saveStatus.textContent = text;
     saveStatus.className = "save-status" + (state ? " " + state : "");
     btnRetry.style.display = (state === "error") ? "" : "none";
-  }
-
-  // ---- Auto-save -------------------------------------------------------
-  // Debounce writes so a burst of edits coalesces into one save. Only runs
-  // when a folder is open; memory mode (no File System Access) uses Export.
-  function scheduleSave() {
-    if (!dataFileHandle) return;
-    setSaveStatus("dirty");
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(function () { saveTimer = null; persist(); }, 600);
   }
 
   function renderManagers() {
@@ -446,9 +491,7 @@
       var td = document.createElement("td");
       td.colSpan = 4;
       td.className = "empty";
-      td.textContent = canEdit()
-        ? "No managers yet."
-        : "Open a data folder to begin — your changes then save automatically.";
+      td.textContent = "No managers yet — add one above and it saves automatically.";
       tr.appendChild(td);
       mgrRows.appendChild(tr);
       return;
@@ -470,7 +513,14 @@
     return td;
   }
 
-  // ---- Name prompt (asked once per session) ----------------------------
+  function showGuard(msg) {
+    fileBlocked = true;
+    guardMsg.textContent = msg;
+    guardEl.className = "guard show";
+  }
+  function hideGuard() { guardEl.className = "guard"; }
+
+  // ---- Name prompt (asked once, then remembered) -----------------------
   function ensureName() {
     return new Promise(function (resolve) {
       if (userName) { resolve(userName); return; }
@@ -489,6 +539,7 @@
         if (!v) { nameInput.focus(); return; }
         userName = v;
         cleanup();
+        if (dbReady) idbSet("name", userName);
         resolve(userName);
       }
       function onCancel() { cleanup(); resolve(null); }
@@ -503,14 +554,15 @@
   }
 
   // ---- File System Access plumbing -------------------------------------
-  async function verifyPermission(handle, readWrite) {
+  async function verifyPermission(handle, readWrite, allowPrompt) {
     var opts = readWrite ? { mode: "readwrite" } : {};
     if ((await handle.queryPermission(opts)) === "granted") return true;
+    if (!allowPrompt) return false; // querying only (no user gesture available)
     if ((await handle.requestPermission(opts)) === "granted") return true;
     return false;
   }
 
-  async function writeText(handle, text) {
+  async function writeTextTo(handle, text) {
     var w = await handle.createWritable();
     await w.write(text);
     await w.close();
@@ -521,90 +573,11 @@
     return await file.text();
   }
 
-  // Prompt for a folder and find-or-create heimdall-data.json inside it.
-  // Sets both dirHandle (for backups) and dataFileHandle from one grant.
-  // Returns true on success, false if the user cancelled.
-  async function acquireFolder() {
-    var dh = await window.showDirectoryPicker({ mode: "readwrite" });
-    if (!(await verifyPermission(dh, true))) {
-      notice("Write permission to the folder was not granted.", "err");
-      return false;
-    }
-    dirHandle = dh;
-    dataFileHandle = await dirHandle.getFileHandle(DATA_FILE, { create: true });
-    return true;
-  }
-
-  // Open a data folder and load heimdall-data.json (creating it if absent).
-  async function openFolder() {
-    try {
-      if (!(await acquireFolder())) return;
-      hideGuard();
-      await loadFromHandle();
-    } catch (e) {
-      if (e && e.name === "AbortError") return; // user cancelled
-      notice("Could not open folder: " + (e && e.message ? e.message : e), "err");
-    }
-    refreshButtons();
-  }
-
-  async function loadFromHandle() {
-    var text = await readHandleText(dataFileHandle);
-    if (text.trim() === "") {
-      // Brand-new / empty file: initialize schema in memory (not malformed).
-      data = defaultData();
-      loadBlocked = false;
-      hideGuard();
-      afterLoad();
-      notice("New data file ready — Heimdall schema initialized. Add a manager, then Save.", "info");
-      return;
-    }
-    var parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch (e) {
-      showGuard("The file is not valid JSON (" + e.message + ").");
-      return;
-    }
-    var v = validate(parsed);
-    if (!v.ok) {
-      showGuard("The file is not a valid Heimdall data file: " + v.error);
-      return;
-    }
-    data = v.data;
-    loadBlocked = false;
-    hideGuard();
-    afterLoad();
-    notice("Loaded.", "ok");
-  }
-
-  function afterLoad() {
-    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-    setSaveStatus(""); // in sync with disk after a fresh load
-    updateBanner();
-    renderManagers();
-    refreshButtons();
-  }
-
-  async function reloadLatest() {
-    if (!dataFileHandle) { notice("Open a data folder first.", "err"); return; }
-    try {
-      await loadFromHandle();
-    } catch (e) {
-      notice("Reload failed: " + (e && e.message ? e.message : e), "err");
-    }
-  }
-
-  // Backups go in the same folder we opened. dirHandle is set when the folder
-  // is acquired, so no extra prompt is ever needed here.
   async function writeBackup(text) {
-    if (!dirHandle) {
-      notice("Saved heimdall-data.json, but auto-backup was skipped (no folder access).", "info");
-      return;
-    }
+    if (!dirHandle) return;
     var name = "heimdall-data.backup-" + stamp(new Date()) + ".json";
     var fh = await dirHandle.getFileHandle(name, { create: true });
-    await writeText(fh, text);
+    await writeTextTo(fh, text);
     await pruneBackups(dirHandle);
   }
 
@@ -620,40 +593,195 @@
     }
   }
 
-  // Prompt-free writer used by the auto-save scheduler and the Retry button.
-  // Assumes a folder/target is already open and the user's name is known
-  // (both are established within the gesture that triggered the edit).
+  // Write the current data to the shared file (+ backup). Does NOT re-stamp;
+  // callers stamp when appropriate. Returns true on success.
+  async function writeToFile() {
+    if (linkState !== "linked" || !fileHandle || fileBlocked) return false;
+    if (!(await verifyPermission(fileHandle, true, false))) {
+      linkState = "needs-reconnect";
+      updateLinkUI();
+      throw new Error("permission to the shared file was lost");
+    }
+    var text = JSON.stringify(data, null, 2);
+    await writeTextTo(fileHandle, text);
+    await writeBackup(text);
+    return true;
+  }
+
+  // ---- Save / auto-save ------------------------------------------------
+  function scheduleSave() {
+    setSaveStatus("dirty");
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { saveTimer = null; persist(); }, SAVE_DEBOUNCE_MS);
+  }
+
+  // Called on every edit: stamp, save locally (always), then sync to the
+  // shared file if linked. Local data is never lost even if the file fails.
   async function persist() {
-    if (!dataFileHandle || !data || loadBlocked) return;
+    if (!data) return;
     setSaveStatus("saving");
     var who = userName || (data.settings && data.settings.lastSavedBy) || "Unknown";
     data.settings.lastSavedBy = who;
     data.settings.lastSavedAt = new Date().toISOString();
-    var text = JSON.stringify(data, null, 2);
-    try {
-      if (!(await verifyPermission(dataFileHandle, true))) {
-        throw new Error("write permission not granted");
+    await saveLocal();
+    updateBanner();
+    if (linkState === "linked" && !fileBlocked) {
+      try {
+        await writeToFile();
+        lastSaveOk = true;
+        setSaveStatus("saved");
+      } catch (e) {
+        lastSaveOk = false;
+        setSaveStatus("error");
+        notice("Saved locally, but syncing to the shared file failed: " +
+               (e && e.message ? e.message : e) + " — click Retry sync.", "err");
       }
-      await writeText(dataFileHandle, text);
-      await writeBackup(text);
-      updateBanner();
+    } else {
       setSaveStatus("saved");
-    } catch (e) {
-      updateBanner();
-      setSaveStatus("error");
-      notice("Auto-save failed: " + (e && e.message ? e.message : e) +
-             " — your changes are still in memory. Click Retry save.", "err");
     }
   }
 
-  // ---- Export / Import (universal fallback) ----------------------------
+  // Retry button: re-attempt the shared-file write only (local is already saved).
+  async function retrySync() {
+    if (linkState === "needs-reconnect") { return reconnectSharedFile(); }
+    setSaveStatus("saving");
+    try {
+      await writeToFile();
+      lastSaveOk = true;
+      setSaveStatus("saved");
+      notice("Synced to the shared file.", "ok");
+    } catch (e) {
+      lastSaveOk = false;
+      setSaveStatus("error");
+      notice("Still couldn't sync: " + (e && e.message ? e.message : e), "err");
+    }
+  }
+
+  // ---- Shared-file linking & sync --------------------------------------
+  // Pick a folder, find/create the shared data file, remember it, reconcile.
+  async function linkSharedFile() {
+    try {
+      var dh = await window.showDirectoryPicker({ mode: "readwrite" });
+      if (!(await verifyPermission(dh, true, true))) {
+        notice("Write permission to the folder was not granted.", "err");
+        return;
+      }
+      dirHandle = dh;
+      fileHandle = await dirHandle.getFileHandle(DATA_FILE, { create: true });
+      if (dbReady) { try { await idbSet("dirHandle", dirHandle); } catch (e) {} }
+      linkState = "linked";
+      fileBlocked = false;
+      hideGuard();
+      await ensureName();
+      await syncFromFile(true); // reconcile: adopt newer peer data or push local
+      updateLinkUI();
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+      notice("Could not link shared file: " + (e && e.message ? e.message : e), "err");
+    }
+  }
+
+  // Re-grant permission to a remembered folder (requires a user gesture).
+  async function reconnectSharedFile() {
+    if (!dirHandle) { return linkSharedFile(); }
+    try {
+      if (!(await verifyPermission(dirHandle, true, true))) {
+        notice("Permission to the shared folder was not granted.", "err");
+        return;
+      }
+      fileHandle = await dirHandle.getFileHandle(DATA_FILE, { create: true });
+      linkState = "linked";
+      fileBlocked = false;
+      hideGuard();
+      await ensureName();
+      await syncFromFile(true);
+      updateLinkUI();
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+      notice("Could not reconnect: " + (e && e.message ? e.message : e), "err");
+    }
+  }
+
+  async function unlinkSharedFile() {
+    fileHandle = null;
+    dirHandle = null;
+    linkState = "none";
+    fileBlocked = false;
+    hideGuard();
+    if (dbReady) { try { await idbDel("dirHandle"); } catch (e) {} }
+    updateBanner();
+    setSaveStatus(lastSaveOk ? "saved" : "");
+    notice("Unlinked the shared file. Data stays saved locally; Export to share.", "info");
+  }
+
+  // Read the shared file and reconcile with local data (last-write-wins).
+  // interactive=true surfaces problems (called from a user action); when
+  // false it is a quiet background refresh (focus/visibility).
+  async function syncFromFile(interactive) {
+    if (linkState !== "linked" || !fileHandle || fileBlocked || syncing) return;
+    syncing = true;
+    try {
+      // Flush any pending local edit first so timestamps compare correctly,
+      // but only if there were actual unsaved changes.
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; await persist(); }
+
+      if (!(await verifyPermission(fileHandle, true, false))) {
+        linkState = "needs-reconnect";
+        updateLinkUI();
+        if (interactive) notice("Permission to the shared file lapsed — click Reconnect.", "err");
+        return;
+      }
+
+      var text = await readHandleText(fileHandle);
+      if (text.trim() === "") {
+        // Empty shared file: seed it from local data if we have any.
+        if (hasContent(data)) { await writeToFile(); }
+        if (interactive) notice("Shared file is empty — initialized from your local data.", "info");
+        return;
+      }
+
+      var parsed;
+      try { parsed = JSON.parse(text); }
+      catch (e) { showGuard("The shared file is not valid JSON (" + e.message + ")."); return; }
+
+      var v = validate(parsed);
+      if (!v.ok) { showGuard("The shared file is not a valid Heimdall data file: " + v.error); return; }
+
+      var fileTs = tsValue(v.data.settings.lastSavedAt);
+      var localTs = tsValue(data && data.settings && data.settings.lastSavedAt);
+
+      if (fileTs > localTs) {
+        // Peer's copy is newer — adopt it.
+        data = v.data;
+        await saveLocal();
+        updateBanner();
+        renderManagers();
+        setSaveStatus("saved");
+        if (interactive) notice("Loaded the latest from the shared file.", "ok");
+        else notice("Updated with a teammate's latest changes.", "info");
+      } else if (localTs > fileTs) {
+        // Our copy is newer — push it to the shared file.
+        await writeToFile();
+        setSaveStatus("saved");
+        if (interactive) notice("Your local changes were newer — synced them to the shared file.", "ok");
+      } else if (interactive) {
+        notice("Already up to date.", "ok");
+      }
+    } catch (e) {
+      if (interactive) notice("Sync failed: " + (e && e.message ? e.message : e), "err");
+    } finally {
+      syncing = false;
+    }
+  }
+
+  // ---- Export / Import -------------------------------------------------
   async function exportJson() {
     var src = data || defaultData();
-    // Stamp attribution so exported files (esp. in memory mode) carry it.
     var who = await ensureName();
     if (who) {
       src.settings.lastSavedBy = who;
       src.settings.lastSavedAt = new Date().toISOString();
+      await saveLocal();
       updateBanner();
     }
     var text = JSON.stringify(src, null, 2);
@@ -661,49 +789,40 @@
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    a.download = "heimdall-data.json";
+    a.download = DATA_FILE;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    notice("Exported heimdall-data.json to your downloads.", "ok");
+    notice("Exported " + DATA_FILE + " to your downloads.", "ok");
   }
 
   function importJson() { importInput.click(); }
 
   async function onImportFile(ev) {
     var file = ev.target.files && ev.target.files[0];
-    importInput.value = ""; // allow re-importing the same file
+    importInput.value = "";
     if (!file) return;
     var text = await file.text();
     var parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch (e) {
-      notice("Import failed — not valid JSON (" + e.message + ").", "err");
-      return;
-    }
+    try { parsed = JSON.parse(text); }
+    catch (e) { notice("Import failed — not valid JSON (" + e.message + ").", "err"); return; }
     var v = validate(parsed);
-    if (!v.ok) {
-      notice("Import failed — not a valid Heimdall data file: " + v.error, "err");
-      return;
-    }
+    if (!v.ok) { notice("Import failed — not a valid Heimdall data file: " + v.error, "err"); return; }
     data = v.data;
-    loadBlocked = false;
-    hideGuard();
-    afterLoad();
-    if (dataFileHandle) {
-      await ensureName();
-      scheduleSave(); // auto-save imported data into the open folder
-      notice("Imported — saving to your data folder.", "info");
-    } else {
-      notice("Imported into the session. Use Settings → Export JSON to save.", "info");
-    }
+    await ensureName();
+    data.settings.lastSavedBy = userName || data.settings.lastSavedBy || "Unknown";
+    data.settings.lastSavedAt = new Date().toISOString();
+    await saveLocal();
+    updateBanner();
+    renderManagers();
+    scheduleSave(); // pushes to the shared file too, if linked
+    notice("Imported and saved.", "ok");
   }
 
-  // ---- Malformed-file recovery: load a backup --------------------------
+  // ---- Malformed shared file: load a backup to restore -----------------
   async function loadBackupFile() {
-    if (!FSA) { notice("Use Import JSON to load a backup in this browser.", "info"); return; }
+    if (!FSA) { notice("Use Settings → Import JSON to load a backup in this browser.", "info"); return; }
     try {
       var picked = await window.showOpenFilePicker({
         multiple: false,
@@ -711,28 +830,18 @@
       });
       var text = await readHandleText(picked[0]);
       var parsed;
-      try {
-        parsed = JSON.parse(text);
-      } catch (e) {
-        notice("That backup is also invalid JSON (" + e.message + ").", "err");
-        return;
-      }
+      try { parsed = JSON.parse(text); }
+      catch (e) { notice("That backup is also invalid JSON (" + e.message + ").", "err"); return; }
       var v = validate(parsed);
-      if (!v.ok) {
-        notice("That backup is not a valid Heimdall data file: " + v.error, "err");
-        return;
-      }
+      if (!v.ok) { notice("That backup is not a valid Heimdall data file: " + v.error, "err"); return; }
       data = v.data;
-      loadBlocked = false;
+      fileBlocked = false;
       hideGuard();
-      afterLoad();
-      if (dataFileHandle) {
-        await ensureName();
-        scheduleSave(); // auto-restore heimdall-data.json from the backup
-        notice("Loaded from backup — restoring heimdall-data.json.", "ok");
-      } else {
-        notice("Loaded from backup into the session.", "ok");
-      }
+      await saveLocal();
+      updateBanner();
+      renderManagers();
+      scheduleSave(); // restore the shared file from the backup
+      notice("Loaded from backup — restoring the shared file.", "ok");
     } catch (e) {
       if (e && e.name === "AbortError") return;
       notice("Could not load backup: " + (e && e.message ? e.message : e), "err");
@@ -741,18 +850,11 @@
 
   // ---- Managers: add (Phase 0 wires add/list only) ---------------------
   async function addManager() {
-    if (!canEdit()) {
-      notice(DIR_API ? "Open a data folder first." : "Cannot edit a malformed file.", "err");
-      return;
-    }
     var name = mName.value.trim();
     if (!name) { notice("Manager name is required.", "err"); mName.focus(); return; }
-
-    // Memory mode (no File System Access) builds in memory; otherwise a folder
-    // is already open and loaded by the time editing is enabled.
     if (!data) data = defaultData();
 
-    await ensureName(); // first action: ask for the user's name once (in-gesture)
+    await ensureName(); // first edit: ask once (then remembered)
 
     data.managers.push({
       id: genId(),
@@ -764,35 +866,82 @@
     mTitle.value = "";
     mActive.checked = true;
     renderManagers();
-    refreshButtons();
-    if (dataFileHandle) {
-      scheduleSave(); // auto-save (debounced)
-    } else {
-      notice("Manager added (in memory). Use Settings → Export JSON to save.", "info");
-    }
+    scheduleSave();
     mName.focus();
   }
 
   // ---- Wire up ---------------------------------------------------------
-  btnOpen.addEventListener("click", openFolder);
-  btnReload.addEventListener("click", reloadLatest);
-  btnRetry.addEventListener("click", persist);
+  btnReload.addEventListener("click", function () { syncFromFile(true); });
+  btnRetry.addEventListener("click", retrySync);
   btnExport.addEventListener("click", exportJson);
   btnImport.addEventListener("click", importJson);
   btnLoadBackup.addEventListener("click", loadBackupFile);
+  btnGuardUnlink.addEventListener("click", unlinkSharedFile);
   btnAddManager.addEventListener("click", addManager);
+  btnLink.addEventListener("click", linkSharedFile);
+  btnReconnect.addEventListener("click", reconnectSharedFile);
+  btnUnlink.addEventListener("click", unlinkSharedFile);
   importInput.addEventListener("change", onImportFile);
   mName.addEventListener("keydown", function (e) { if (e.key === "Enter") addManager(); });
   mTitle.addEventListener("keydown", function (e) { if (e.key === "Enter") addManager(); });
 
+  // Pull teammates' changes automatically when returning to the tab.
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") syncFromFile(false);
+  });
+  window.addEventListener("focus", function () { syncFromFile(false); });
+
   // ---- Init ------------------------------------------------------------
-  if (!DIR_API) {
-    notice("This browser can't open a data folder (no File System Access API). " +
-           "Use Edge or Chrome for direct save/reload, or use Settings → Import / Export JSON here.", "info");
+  async function init() {
+    // 1) Open the local store and load saved data + name (instant, no prompts).
+    if (HAS_IDB) {
+      try {
+        await idbOpen();
+        dbReady = true;
+        var savedName = await idbGet("name");
+        if (typeof savedName === "string" && savedName) userName = savedName;
+        var savedData = await idbGet("data");
+        if (savedData != null) {
+          var v = validate(savedData);
+          data = v.ok ? v.data : defaultData();
+        }
+      } catch (e) { dbReady = false; }
+    }
+    if (!data) data = defaultData();
+
+    // 2) Render immediately — the app is usable now, with zero clicks.
+    updateBanner();
+    renderManagers();
+    setSaveStatus(hasContent(data) ? "saved" : "");
+
+    // 3) If a shared file was linked before, try to reconnect silently.
+    if (DIR_API && dbReady) {
+      var savedDir = null;
+      try { savedDir = await idbGet("dirHandle"); } catch (e) {}
+      if (savedDir) {
+        dirHandle = savedDir;
+        if (await verifyPermission(dirHandle, true, false)) {
+          try {
+            fileHandle = await dirHandle.getFileHandle(DATA_FILE, { create: true });
+            linkState = "linked";
+            updateLinkUI();
+            await syncFromFile(false); // auto-pull latest from teammates
+          } catch (e) { linkState = "needs-reconnect"; }
+        } else {
+          linkState = "needs-reconnect"; // remembered, but needs a click to resume
+        }
+      }
+    }
+    updateBanner();
+    setSaveStatus(hasContent(data) ? "saved" : "");
+
+    if (!HAS_IDB) {
+      notice("This browser has no local storage available, so data won't persist " +
+             "across reloads. Use Settings → Export to save your work.", "info");
+    }
   }
-  refreshButtons();
-  updateBanner();
-  renderManagers();
+
+  init();
 })();
 </script>
 </body>
