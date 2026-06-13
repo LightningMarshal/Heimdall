@@ -52,6 +52,11 @@
   }
   .banner .b-text { flex: 1 1 auto; font-size: 14px; }
   .banner .file-name { color: var(--muted); font-size: 13px; }
+  .save-status { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .save-status.saving { color: var(--accent); }
+  .save-status.saved { color: var(--ok); }
+  .save-status.dirty { color: var(--muted); }
+  .save-status.error { color: var(--danger); font-weight: 600; }
 
   .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 
@@ -149,12 +154,13 @@
       <div id="bannerText">No file open yet.</div>
       <div class="file-name" id="fileName"></div>
     </div>
+    <span class="save-status" id="saveStatus"></span>
+    <button id="btnRetry" style="display:none;">Retry save</button>
     <button id="btnReload" disabled>Reload latest</button>
   </div>
 
   <div class="toolbar">
     <button id="btnOpen" class="primary">Open data folder</button>
-    <button id="btnSave" disabled>Save</button>
   </div>
 
   <div class="notice" id="notice"></div>
@@ -164,7 +170,8 @@
       <h2>Could not load this file safely</h2>
       <p id="guardMsg"></p>
       <p>The existing file was <strong>not overwritten</strong>. You can load a backup
-        copy instead, review it, then Save to restore <code>heimdall-data.json</code>.</p>
+        copy instead; once loaded it is saved automatically to restore
+        <code>heimdall-data.json</code>.</p>
       <button id="btnLoadBackup" class="primary">Load a backup file…</button>
     </div>
   </div>
@@ -248,15 +255,17 @@
 
   // ---- Session state (in-memory only) ----------------------------------
   var dataFileHandle = null;   // FileSystemFileHandle for heimdall-data.json
-  var dirHandle = null;        // FileSystemDirectoryHandle for backups (lazy)
+  var dirHandle = null;        // FileSystemDirectoryHandle for backups
   var userName = null;         // asked once per session
   var data = null;             // parsed Heimdall data
   var loadBlocked = false;     // true when current file is malformed
+  var saveTimer = null;        // debounce handle for auto-save
 
   // ---- Elements --------------------------------------------------------
   var el = function (id) { return document.getElementById(id); };
   var bannerText = el("bannerText"), fileNameEl = el("fileName");
-  var btnReload = el("btnReload"), btnOpen = el("btnOpen"), btnSave = el("btnSave");
+  var btnReload = el("btnReload"), btnOpen = el("btnOpen");
+  var saveStatus = el("saveStatus"), btnRetry = el("btnRetry");
   var btnExport = el("btnExport"), btnImport = el("btnImport");
   var noticeEl = el("notice");
   var guardEl = el("guard"), guardMsg = el("guardMsg"), btnLoadBackup = el("btnLoadBackup");
@@ -373,11 +382,21 @@
     guardEl.className = "guard";
   }
 
+  // Editing is allowed once a folder is open (Chromium) or always in memory
+  // mode (no File System Access), but never while the file is malformed.
+  function canEdit() {
+    return !loadBlocked && (!!dataFileHandle || !DIR_API);
+  }
+
   function refreshButtons() {
     btnOpen.disabled = !DIR_API;
     btnReload.disabled = !dataFileHandle;
-    // Save can acquire a folder on demand, so it only needs data + the API.
-    btnSave.disabled = !DIR_API || !data || loadBlocked;
+    var editable = canEdit();
+    mName.disabled = !editable;
+    mTitle.disabled = !editable;
+    mActive.disabled = !editable;
+    btnAddManager.disabled = !editable;
+    if (btnImport) btnImport.disabled = !editable;
   }
 
   function updateBanner() {
@@ -396,6 +415,28 @@
     appVersionEl.textContent = (data && data.settings && data.settings.appVersion) || APP_VERSION;
   }
 
+  // ---- Save status indicator (replaces the manual Save button) ---------
+  function setSaveStatus(state) {
+    var text = "";
+    if (state === "dirty")       text = "Unsaved changes…";
+    else if (state === "saving") text = "Saving…";
+    else if (state === "saved")  text = "All changes saved";
+    else if (state === "error")  text = "Save failed";
+    saveStatus.textContent = text;
+    saveStatus.className = "save-status" + (state ? " " + state : "");
+    btnRetry.style.display = (state === "error") ? "" : "none";
+  }
+
+  // ---- Auto-save -------------------------------------------------------
+  // Debounce writes so a burst of edits coalesces into one save. Only runs
+  // when a folder is open; memory mode (no File System Access) uses Export.
+  function scheduleSave() {
+    if (!dataFileHandle) return;
+    setSaveStatus("dirty");
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { saveTimer = null; persist(); }, 600);
+  }
+
   function renderManagers() {
     mgrRows.innerHTML = "";
     var list = (data && data.managers) || [];
@@ -405,7 +446,9 @@
       var td = document.createElement("td");
       td.colSpan = 4;
       td.className = "empty";
-      td.textContent = data ? "No managers yet." : "Open or import a data file to begin.";
+      td.textContent = canEdit()
+        ? "No managers yet."
+        : "Open a data folder to begin — your changes then save automatically.";
       tr.appendChild(td);
       mgrRows.appendChild(tr);
       return;
@@ -505,20 +548,6 @@
     refreshButtons();
   }
 
-  // Ensure we have a writable target file. If none yet (e.g. right after an
-  // Import), prompt once for a folder. Returns true when a target is ready.
-  async function ensureWritableTarget() {
-    if (dataFileHandle) return true;
-    if (!DIR_API) return false;
-    try {
-      return await acquireFolder();
-    } catch (e) {
-      if (e && e.name === "AbortError") return false;
-      notice("Could not open folder: " + (e && e.message ? e.message : e), "err");
-      return false;
-    }
-  }
-
   async function loadFromHandle() {
     var text = await readHandleText(dataFileHandle);
     if (text.trim() === "") {
@@ -550,6 +579,8 @@
   }
 
   function afterLoad() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    setSaveStatus(""); // in sync with disk after a fresh load
     updateBanner();
     renderManagers();
     refreshButtons();
@@ -589,46 +620,42 @@
     }
   }
 
-  async function saveAll() {
-    if (loadBlocked) { notice("This file is malformed — load a backup before saving.", "err"); return; }
-    if (!data) { notice("Nothing to save yet.", "err"); return; }
-    if (!(await ensureWritableTarget())) {
-      notice("Pick a folder to save into first.", "err");
-      return;
-    }
-
-    var who = await ensureName();
-    if (!who) { notice("Save cancelled — a name is needed for attribution.", "err"); return; }
-
-    if (!(await verifyPermission(dataFileHandle, true))) {
-      notice("Write permission was not granted.", "err");
-      return;
-    }
-
+  // Prompt-free writer used by the auto-save scheduler and the Retry button.
+  // Assumes a folder/target is already open and the user's name is known
+  // (both are established within the gesture that triggered the edit).
+  async function persist() {
+    if (!dataFileHandle || !data || loadBlocked) return;
+    setSaveStatus("saving");
+    var who = userName || (data.settings && data.settings.lastSavedBy) || "Unknown";
     data.settings.lastSavedBy = who;
     data.settings.lastSavedAt = new Date().toISOString();
     var text = JSON.stringify(data, null, 2);
-
     try {
+      if (!(await verifyPermission(dataFileHandle, true))) {
+        throw new Error("write permission not granted");
+      }
       await writeText(dataFileHandle, text);
-    } catch (e) {
-      notice("Save failed: " + (e && e.message ? e.message : e), "err");
-      return;
-    }
-    try {
       await writeBackup(text);
-    } catch (e) {
-      notice("Saved heimdall-data.json, but backup failed: " + (e && e.message ? e.message : e), "err");
       updateBanner();
-      return;
+      setSaveStatus("saved");
+    } catch (e) {
+      updateBanner();
+      setSaveStatus("error");
+      notice("Auto-save failed: " + (e && e.message ? e.message : e) +
+             " — your changes are still in memory. Click Retry save.", "err");
     }
-    updateBanner();
-    notice("Saved (with backup).", "ok");
   }
 
   // ---- Export / Import (universal fallback) ----------------------------
-  function exportJson() {
+  async function exportJson() {
     var src = data || defaultData();
+    // Stamp attribution so exported files (esp. in memory mode) carry it.
+    var who = await ensureName();
+    if (who) {
+      src.settings.lastSavedBy = who;
+      src.settings.lastSavedAt = new Date().toISOString();
+      updateBanner();
+    }
     var text = JSON.stringify(src, null, 2);
     var blob = new Blob([text], { type: "application/json" });
     var url = URL.createObjectURL(blob);
@@ -665,7 +692,13 @@
     loadBlocked = false;
     hideGuard();
     afterLoad();
-    notice("Imported into the session — click Save to write it to your data folder.", "info");
+    if (dataFileHandle) {
+      await ensureName();
+      scheduleSave(); // auto-save imported data into the open folder
+      notice("Imported — saving to your data folder.", "info");
+    } else {
+      notice("Imported into the session. Use Settings → Export JSON to save.", "info");
+    }
   }
 
   // ---- Malformed-file recovery: load a backup --------------------------
@@ -693,7 +726,13 @@
       loadBlocked = false;
       hideGuard();
       afterLoad();
-      notice("Loaded from backup. Review it, then Save to restore heimdall-data.json.", "ok");
+      if (dataFileHandle) {
+        await ensureName();
+        scheduleSave(); // auto-restore heimdall-data.json from the backup
+        notice("Loaded from backup — restoring heimdall-data.json.", "ok");
+      } else {
+        notice("Loaded from backup into the session.", "ok");
+      }
     } catch (e) {
       if (e && e.name === "AbortError") return;
       notice("Could not load backup: " + (e && e.message ? e.message : e), "err");
@@ -702,15 +741,18 @@
 
   // ---- Managers: add (Phase 0 wires add/list only) ---------------------
   async function addManager() {
-    if (loadBlocked) { notice("Resolve the malformed file before adding data.", "err"); return; }
-    if (!data) {
-      // Allow building in memory even before a file is opened (then Export/Save).
-      data = defaultData();
+    if (!canEdit()) {
+      notice(DIR_API ? "Open a data folder first." : "Cannot edit a malformed file.", "err");
+      return;
     }
     var name = mName.value.trim();
     if (!name) { notice("Manager name is required.", "err"); mName.focus(); return; }
 
-    await ensureName(); // first action: ask for the user's name once
+    // Memory mode (no File System Access) builds in memory; otherwise a folder
+    // is already open and loaded by the time editing is enabled.
+    if (!data) data = defaultData();
+
+    await ensureName(); // first action: ask for the user's name once (in-gesture)
 
     data.managers.push({
       id: genId(),
@@ -723,14 +765,18 @@
     mActive.checked = true;
     renderManagers();
     refreshButtons();
-    notice("Manager added (in memory). Click Save to persist.", "info");
+    if (dataFileHandle) {
+      scheduleSave(); // auto-save (debounced)
+    } else {
+      notice("Manager added (in memory). Use Settings → Export JSON to save.", "info");
+    }
     mName.focus();
   }
 
   // ---- Wire up ---------------------------------------------------------
   btnOpen.addEventListener("click", openFolder);
   btnReload.addEventListener("click", reloadLatest);
-  btnSave.addEventListener("click", saveAll);
+  btnRetry.addEventListener("click", persist);
   btnExport.addEventListener("click", exportJson);
   btnImport.addEventListener("click", importJson);
   btnLoadBackup.addEventListener("click", loadBackupFile);
