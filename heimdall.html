@@ -80,6 +80,18 @@
   }
   .panel h2 { margin: 0 0 12px; font-size: 17px; }
 
+  details.panel > summary {
+    cursor: pointer; font-size: 17px; font-weight: 600; list-style: none;
+    display: flex; align-items: center; gap: 8px;
+  }
+  details.panel > summary::-webkit-details-marker { display: none; }
+  details.panel > summary::before { content: "▸"; color: var(--muted); font-size: 13px; }
+  details.panel[open] > summary::before { content: "▾"; }
+  .settings-body { margin-top: 14px; }
+  .settings-note { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .settings-meta { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+  .settings-meta span { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }
+
   .notice { font-size: 14px; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; display: none; }
   .notice.show { display: block; }
   .notice.info { background: var(--accent-weak); border: 1px solid #cfe0fb; }
@@ -141,10 +153,8 @@
   </div>
 
   <div class="toolbar">
-    <button id="btnOpen" class="primary">Open heimdall-data.json</button>
+    <button id="btnOpen" class="primary">Open data folder</button>
     <button id="btnSave" disabled>Save</button>
-    <button id="btnExport">Export JSON</button>
-    <button id="btnImport">Import JSON</button>
   </div>
 
   <div class="notice" id="notice"></div>
@@ -184,6 +194,21 @@
     </table>
   </div>
 
+  <details class="panel" id="settingsPanel">
+    <summary>Settings</summary>
+    <div class="settings-body">
+      <p class="settings-note">
+        Export / Import JSON is the manual-backup mechanism and the fallback for
+        browsers without the File System Access API (anything other than Edge or Chrome).
+      </p>
+      <div class="form-row">
+        <button id="btnExport">Export JSON</button>
+        <button id="btnImport">Import JSON</button>
+      </div>
+      <p class="settings-meta">App version: <span id="appVersion"></span></p>
+    </div>
+  </details>
+
   <p class="footer-note">
     Phase 0 proves the persistence loop only. Do not store sensitive content
     (incident details, customer data) in this file — reference tickets by ID or short title.
@@ -215,6 +240,10 @@
   var APP_VERSION = "0.1.0";
   var MAX_BACKUPS = 10;
   var BACKUP_RE = /^heimdall-data\.backup-\d{8}-\d{4}\.json$/;
+  var DATA_FILE = "heimdall-data.json";
+  // Primary persistence path uses the directory picker; showOpenFilePicker is
+  // only needed for the malformed-file "Load a backup" recovery path.
+  var DIR_API = (typeof window.showDirectoryPicker === "function");
   var FSA = (typeof window.showOpenFilePicker === "function");
 
   // ---- Session state (in-memory only) ----------------------------------
@@ -233,7 +262,7 @@
   var guardEl = el("guard"), guardMsg = el("guardMsg"), btnLoadBackup = el("btnLoadBackup");
   var mName = el("mName"), mTitle = el("mTitle"), mActive = el("mActive");
   var btnAddManager = el("btnAddManager"), mgrRows = el("mgrRows"), mgrCount = el("mgrCount");
-  var importInput = el("importInput");
+  var importInput = el("importInput"), appVersionEl = el("appVersion");
   var nameOverlay = el("nameOverlay"), nameInput = el("nameInput"),
       nameOk = el("nameOk"), nameCancel = el("nameCancel");
 
@@ -345,9 +374,10 @@
   }
 
   function refreshButtons() {
-    btnOpen.disabled = !FSA;
-    btnReload.disabled = !FSA || !dataFileHandle;
-    btnSave.disabled = !FSA || !dataFileHandle || !data || loadBlocked;
+    btnOpen.disabled = !DIR_API;
+    btnReload.disabled = !dataFileHandle;
+    // Save can acquire a folder on demand, so it only needs data + the API.
+    btnSave.disabled = !DIR_API || !data || loadBlocked;
   }
 
   function updateBanner() {
@@ -360,9 +390,10 @@
     } else if (data) {
       bannerText.textContent = "Loaded — not yet saved in this app.";
     } else {
-      bannerText.textContent = "No file open yet.";
+      bannerText.textContent = "No data folder open yet.";
     }
     fileNameEl.textContent = dataFileHandle ? ("File: " + dataFileHandle.name) : "";
+    appVersionEl.textContent = (data && data.settings && data.settings.appVersion) || APP_VERSION;
   }
 
   function renderManagers() {
@@ -447,22 +478,45 @@
     return await file.text();
   }
 
-  // Open existing heimdall-data.json and load it.
-  async function openFile() {
+  // Prompt for a folder and find-or-create heimdall-data.json inside it.
+  // Sets both dirHandle (for backups) and dataFileHandle from one grant.
+  // Returns true on success, false if the user cancelled.
+  async function acquireFolder() {
+    var dh = await window.showDirectoryPicker({ mode: "readwrite" });
+    if (!(await verifyPermission(dh, true))) {
+      notice("Write permission to the folder was not granted.", "err");
+      return false;
+    }
+    dirHandle = dh;
+    dataFileHandle = await dirHandle.getFileHandle(DATA_FILE, { create: true });
+    return true;
+  }
+
+  // Open a data folder and load heimdall-data.json (creating it if absent).
+  async function openFolder() {
     try {
-      var picked = await window.showOpenFilePicker({
-        multiple: false,
-        types: [{ description: "Heimdall data (JSON)", accept: { "application/json": [".json"] } }]
-      });
-      dataFileHandle = picked[0];
-      await verifyPermission(dataFileHandle, true);
+      if (!(await acquireFolder())) return;
       hideGuard();
       await loadFromHandle();
     } catch (e) {
       if (e && e.name === "AbortError") return; // user cancelled
-      notice("Could not open file: " + (e && e.message ? e.message : e), "err");
+      notice("Could not open folder: " + (e && e.message ? e.message : e), "err");
     }
     refreshButtons();
+  }
+
+  // Ensure we have a writable target file. If none yet (e.g. right after an
+  // Import), prompt once for a folder. Returns true when a target is ready.
+  async function ensureWritableTarget() {
+    if (dataFileHandle) return true;
+    if (!DIR_API) return false;
+    try {
+      return await acquireFolder();
+    } catch (e) {
+      if (e && e.name === "AbortError") return false;
+      notice("Could not open folder: " + (e && e.message ? e.message : e), "err");
+      return false;
+    }
   }
 
   async function loadFromHandle() {
@@ -473,7 +527,7 @@
       loadBlocked = false;
       hideGuard();
       afterLoad();
-      notice("New/empty file — initialized the Heimdall schema in memory. Add a manager, then Save.", "info");
+      notice("New data file ready — Heimdall schema initialized. Add a manager, then Save.", "info");
       return;
     }
     var parsed;
@@ -502,7 +556,7 @@
   }
 
   async function reloadLatest() {
-    if (!dataFileHandle) { notice("Open a file first.", "err"); return; }
+    if (!dataFileHandle) { notice("Open a data folder first.", "err"); return; }
     try {
       await loadFromHandle();
     } catch (e) {
@@ -510,30 +564,17 @@
     }
   }
 
-  // Acquire (lazily) a directory handle so backups can be written as siblings.
-  async function ensureDirHandle() {
-    if (dirHandle) return dirHandle;
-    if (typeof window.showDirectoryPicker !== "function") return null;
-    try {
-      dirHandle = await window.showDirectoryPicker({ mode: "readwrite" });
-      await verifyPermission(dirHandle, true);
-      return dirHandle;
-    } catch (e) {
-      if (e && e.name === "AbortError") return null;
-      throw e;
-    }
-  }
-
+  // Backups go in the same folder we opened. dirHandle is set when the folder
+  // is acquired, so no extra prompt is ever needed here.
   async function writeBackup(text) {
-    var dir = await ensureDirHandle();
-    if (!dir) {
-      notice("Saved to heimdall-data.json, but auto-backup was skipped (no folder access granted).", "info");
+    if (!dirHandle) {
+      notice("Saved heimdall-data.json, but auto-backup was skipped (no folder access).", "info");
       return;
     }
     var name = "heimdall-data.backup-" + stamp(new Date()) + ".json";
-    var fh = await dir.getFileHandle(name, { create: true });
+    var fh = await dirHandle.getFileHandle(name, { create: true });
     await writeText(fh, text);
-    await pruneBackups(dir);
+    await pruneBackups(dirHandle);
   }
 
   async function pruneBackups(dir) {
@@ -549,9 +590,12 @@
   }
 
   async function saveAll() {
-    if (!dataFileHandle) { notice("Open heimdall-data.json first.", "err"); return; }
     if (loadBlocked) { notice("This file is malformed — load a backup before saving.", "err"); return; }
     if (!data) { notice("Nothing to save yet.", "err"); return; }
+    if (!(await ensureWritableTarget())) {
+      notice("Pick a folder to save into first.", "err");
+      return;
+    }
 
     var who = await ensureName();
     if (!who) { notice("Save cancelled — a name is needed for attribution.", "err"); return; }
@@ -621,9 +665,7 @@
     loadBlocked = false;
     hideGuard();
     afterLoad();
-    notice("Imported into the session. " +
-           (dataFileHandle ? "Click Save to write it to heimdall-data.json." :
-            "Open a heimdall-data.json (or Export) to persist it."), "info");
+    notice("Imported into the session — click Save to write it to your data folder.", "info");
   }
 
   // ---- Malformed-file recovery: load a backup --------------------------
@@ -686,7 +728,7 @@
   }
 
   // ---- Wire up ---------------------------------------------------------
-  btnOpen.addEventListener("click", openFile);
+  btnOpen.addEventListener("click", openFolder);
   btnReload.addEventListener("click", reloadLatest);
   btnSave.addEventListener("click", saveAll);
   btnExport.addEventListener("click", exportJson);
@@ -698,9 +740,9 @@
   mTitle.addEventListener("keydown", function (e) { if (e.key === "Enter") addManager(); });
 
   // ---- Init ------------------------------------------------------------
-  if (!FSA) {
-    notice("This browser does not support the File System Access API. " +
-           "Use Edge or Chrome for direct save/reload, or use Import / Export JSON here.", "info");
+  if (!DIR_API) {
+    notice("This browser can't open a data folder (no File System Access API). " +
+           "Use Edge or Chrome for direct save/reload, or use Settings → Import / Export JSON here.", "info");
   }
   refreshButtons();
   updateBanner();
