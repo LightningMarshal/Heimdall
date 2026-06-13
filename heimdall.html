@@ -169,6 +169,82 @@
 
   .footer-note { color: var(--muted); font-size: 12px; margin-top: 24px; }
 
+  /* Top navigation */
+  .nav { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 18px;
+         border-bottom: 1px solid var(--border); }
+  .nav button {
+    border: none; border-bottom: 2px solid transparent; background: transparent;
+    border-radius: 0; padding: 8px 14px; color: var(--muted); font-weight: 600;
+  }
+  .nav button:hover { color: var(--text); }
+  .nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .view-head { display: flex; align-items: center; justify-content: space-between;
+               gap: 12px; margin-bottom: 14px; }
+  .view-head h2 { margin: 0; font-size: 19px; }
+
+  /* Workload board cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; box-shadow: 0 1px 2px rgba(16,24,40,.04);
+  }
+  .card .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .card .m-name { font-size: 17px; font-weight: 600; }
+  .card .m-title { color: var(--muted); font-size: 13px; }
+  .card .heat {
+    display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px;
+    font-weight: 700; white-space: nowrap;
+  }
+  .heat-light       { background: #e7f6ee; color: #1f8a51; }
+  .heat-balanced    { background: #fdf7e0; color: #8a6d12; }
+  .heat-heavy       { background: #fdf0e2; color: #b4630f; }
+  .heat-overloaded  { background: #fde6e3; color: #c2392c; }
+  .card .score { font-size: 12px; color: var(--muted); margin-top: 2px; text-align: right; }
+  .card .counts { list-style: none; margin: 12px 0 10px; padding: 0; }
+  .card .counts li { display: flex; justify-content: space-between; font-size: 14px; padding: 3px 0; }
+  .card .counts li.pop { color: var(--danger); font-weight: 600; }
+  .card .counts li .n { font-variant-numeric: tabular-nums; }
+  .card .card-actions { display: flex; gap: 6px; }
+
+  /* Project cards */
+  .pcard {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(16,24,40,.04);
+  }
+  .pcard .p-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .pcard .p-name { font-size: 16px; font-weight: 600; }
+  .pcard .p-meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .pcard .p-team { margin-top: 10px; font-size: 14px; }
+  .pcard .p-team .lead { font-weight: 600; }
+  .pcard .p-actions { display: flex; gap: 6px; }
+  .assign-box { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+
+  /* Filters */
+  .filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px;
+             background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+  .filters label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  .filters select, .filters input { font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; }
+  td.age.old { color: var(--danger); font-weight: 600; }
+
+  /* Settings weighting editor */
+  .weights-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                  gap: 10px; margin: 4px 0 14px; }
+  .weights-grid label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  .weights-grid input { font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; width: 100%; }
+  .bands-edit { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 14px; }
+  .bands-edit .band-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .bands-edit .band-row input { font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; }
+  .bands-edit .band-row input.lab { width: 130px; }
+  .bands-edit .band-row input.num { width: 80px; }
+
+  /* 1:1 Prep */
+  .ooo-section { margin-bottom: 18px; }
+  .ooo-section h3 { font-size: 15px; margin: 0 0 8px; }
+  .ooo-list { list-style: none; margin: 0; padding: 0; }
+  .ooo-list li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .ooo-empty { color: var(--muted); font-size: 14px; }
+
   /* Name modal */
   .overlay {
     position: fixed; inset: 0; background: rgba(16,24,40,.4);
@@ -221,69 +297,93 @@
     </div>
   </div>
 
-  <div class="panel">
-    <h2>Managers <span class="count" id="mgrCount"></span></h2>
-    <div class="form-row">
-      <div class="field">
-        <label for="mName">Name</label>
-        <input type="text" id="mName" placeholder="e.g. Jordan Lee" autocomplete="off">
-      </div>
-      <div class="field">
-        <label for="mTitle">Title (optional)</label>
-        <input type="text" id="mTitle" placeholder="e.g. Senior Manager" autocomplete="off">
-      </div>
-      <div class="field check">
-        <input type="checkbox" id="mActive" checked>
-        <label for="mActive" style="font-size:14px;color:var(--text);">Active</label>
-      </div>
-      <button id="btnAddManager">Add manager</button>
+  <nav class="nav" id="nav">
+    <button data-view="board" class="active">Workload Board</button>
+    <button data-view="projects">Projects</button>
+    <button data-view="workitems">Work Items</button>
+    <button data-view="oneonone">1:1 Prep</button>
+    <button data-view="settings">Settings</button>
+  </nav>
+
+  <section class="view" id="view-board">
+    <div class="view-head">
+      <h2>Workload board <span class="count" id="mgrCount"></span></h2>
+      <button id="btnAddManager" class="primary">Add manager</button>
+    </div>
+    <div id="boardCards" class="cards"></div>
+  </section>
+
+  <section class="view" id="view-projects" hidden>
+    <div class="view-head">
+      <h2>Projects <span class="count" id="projCount"></span></h2>
+      <button id="btnAddProject" class="primary">Add project</button>
+    </div>
+    <div id="projList"></div>
+  </section>
+
+  <section class="view" id="view-workitems" hidden>
+    <div class="view-head">
+      <h2>Work items <span class="count" id="wiCount"></span></h2>
+      <button id="btnAddWorkItem" class="primary">Add work item</button>
+    </div>
+    <div class="filters" id="wiFilters">
+      <label>Type
+        <select id="fType"><option value="">All</option></select>
+      </label>
+      <label>Manager
+        <select id="fManager"><option value="">All</option></select>
+      </label>
+      <label>Status
+        <select id="fStatus"><option value="">All</option></select>
+      </label>
+      <label>Opened from <input type="date" id="fFrom"></label>
+      <label>to <input type="date" id="fTo"></label>
+      <button id="fClear" class="mini">Clear</button>
     </div>
     <table>
       <thead>
-        <tr><th>Name</th><th>Title</th><th>Active</th><th>ID</th><th>Actions</th></tr>
-      </thead>
-      <tbody id="mgrRows"></tbody>
-    </table>
-  </div>
-
-  <div class="panel">
-    <h2>Projects <span class="count" id="projCount"></span>
-      <button id="btnAddProject" style="margin-left:10px;">Add project</button></h2>
-    <table>
-      <thead>
-        <tr><th>Name</th><th>Status</th><th>Priority</th><th>Target</th><th>Team</th><th>Actions</th></tr>
-      </thead>
-      <tbody id="projRows"></tbody>
-    </table>
-  </div>
-
-  <div class="panel">
-    <h2>Work items <span class="count" id="wiCount"></span>
-      <button id="btnAddWorkItem" style="margin-left:10px;">Add work item</button></h2>
-    <table>
-      <thead>
         <tr><th>Type</th><th>Title</th><th>Owner</th><th>Status</th><th>Priority</th>
-            <th>Opened</th><th>Due</th><th>Actions</th></tr>
+            <th>Opened</th><th>Age</th><th>Due</th><th>Roll-off</th><th>Actions</th></tr>
       </thead>
       <tbody id="wiRows"></tbody>
     </table>
-  </div>
+  </section>
 
-  <details class="panel" id="settingsPanel">
-    <summary>Settings</summary>
-    <div class="settings-body">
+  <section class="view" id="view-oneonone" hidden>
+    <div class="view-head"><h2>1:1 Prep</h2></div>
+    <div class="form-row">
+      <div class="field">
+        <label for="oooManager">Manager</label>
+        <select id="oooManager"></select>
+      </div>
+      <button id="btnCopySummary">Copy summary</button>
+      <button id="btnExportSummary">Export summary</button>
+      <button id="btnPrintSummary">Print</button>
+    </div>
+    <div id="oooBody"></div>
+  </section>
+
+  <section class="view" id="view-settings" hidden>
+    <div class="view-head"><h2>Settings</h2></div>
+    <div class="panel">
+      <p class="settings-sub">Workload weighting</p>
+      <p class="settings-note">Tune the score per item, the effort multipliers, and the heat
+        bands. Only active projects and open / in-progress work items count toward load.</p>
+      <div id="weightsBody"></div>
+      <button id="btnSaveSettings" class="primary">Save weighting</button>
+      <button id="btnResetSettings" class="mini">Reset to defaults</button>
+    </div>
+    <div class="panel">
       <p class="settings-sub">Backup &amp; portability</p>
-      <p class="settings-note">
-        Export downloads the current data as a JSON file (a manual backup, and the way to
-        share with anyone not using the shared-file sync). Import loads a JSON file back in.
-      </p>
+      <p class="settings-note">Export downloads the current data as JSON (a manual backup, and
+        the way to share with anyone not using shared-file sync). Import loads a JSON file back in.</p>
       <div class="form-row">
         <button id="btnExport">Export JSON</button>
         <button id="btnImport">Import JSON</button>
       </div>
       <p class="settings-meta">App version: <span id="appVersion"></span></p>
     </div>
-  </details>
+  </section>
 
   <p class="footer-note">
     Do not store sensitive content (incident details, customer data) — reference tickets by
@@ -325,7 +425,7 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.2.0";
+  var APP_VERSION = "0.3.0";
   var MAX_BACKUPS = 10;
   var BACKUP_RE = /^heimdall-data\.backup-\d{8}-\d{4}\.json$/;
   var DATA_FILE = "heimdall-data.json";
@@ -357,10 +457,17 @@
   var noticeEl = el("notice");
   var guardEl = el("guard"), guardMsg = el("guardMsg");
   var btnLoadBackup = el("btnLoadBackup"), btnGuardUnlink = el("btnGuardUnlink");
-  var mName = el("mName"), mTitle = el("mTitle"), mActive = el("mActive");
-  var btnAddManager = el("btnAddManager"), mgrRows = el("mgrRows"), mgrCount = el("mgrCount");
-  var btnAddProject = el("btnAddProject"), projRows = el("projRows"), projCount = el("projCount");
+  var navEl = el("nav");
+  var btnAddManager = el("btnAddManager"), boardCards = el("boardCards"), mgrCount = el("mgrCount");
+  var btnAddProject = el("btnAddProject"), projList = el("projList"), projCount = el("projCount");
   var btnAddWorkItem = el("btnAddWorkItem"), wiRows = el("wiRows"), wiCount = el("wiCount");
+  var fType = el("fType"), fManager = el("fManager"), fStatus = el("fStatus"),
+      fFrom = el("fFrom"), fTo = el("fTo"), fClear = el("fClear");
+  var oooManager = el("oooManager"), oooBody = el("oooBody");
+  var btnCopySummary = el("btnCopySummary"), btnExportSummary = el("btnExportSummary"),
+      btnPrintSummary = el("btnPrintSummary");
+  var weightsBody = el("weightsBody"), btnSaveSettings = el("btnSaveSettings"),
+      btnResetSettings = el("btnResetSettings");
   var importInput = el("importInput"), appVersionEl = el("appVersion");
   var nameOverlay = el("nameOverlay"), nameInput = el("nameInput"),
       nameOk = el("nameOk"), nameCancel = el("nameCancel");
@@ -561,91 +668,271 @@
     btnRetry.style.display = (state === "error") ? "" : "none";
   }
 
+  // ---- View switching --------------------------------------------------
+  var currentView = "board";
+  var VIEWS = ["board", "projects", "workitems", "oneonone", "settings"];
+  function showView(name) {
+    currentView = name;
+    VIEWS.forEach(function (v) { el("view-" + v).hidden = (v !== name); });
+    var nbtns = navEl.querySelectorAll("button");
+    for (var i = 0; i < nbtns.length; i++) {
+      nbtns[i].classList.toggle("active", nbtns[i].getAttribute("data-view") === name);
+    }
+    renderCurrent();
+  }
+  function renderCurrent() {
+    if (currentView === "board") renderBoard();
+    else if (currentView === "projects") renderProjectsView();
+    else if (currentView === "workitems") renderWorkItemsView();
+    else if (currentView === "oneonone") render1on1();
+    else if (currentView === "settings") renderSettings();
+  }
   function renderAll() {
-    renderManagers();
-    renderProjects();
-    renderWorkItems();
+    refreshSelects();
+    renderCurrent();
   }
 
   function emptyRow(tbody, cols, msg) {
     var tr = document.createElement("tr");
     var td = document.createElement("td");
-    td.colSpan = cols;
-    td.className = "empty";
-    td.textContent = msg;
-    tr.appendChild(td);
-    tbody.appendChild(tr);
+    td.colSpan = cols; td.className = "empty"; td.textContent = msg;
+    tr.appendChild(td); tbody.appendChild(tr);
+  }
+  function emptyP(container, msg) {
+    container.innerHTML = "";
+    var p = document.createElement("p"); p.className = "empty"; p.textContent = msg;
+    container.appendChild(p);
   }
 
-  function renderManagers() {
-    mgrRows.innerHTML = "";
+  // Keep filter / picker selects in sync with the current data.
+  function fillSelectOpts(sel, opts, keep) {
+    var prev = keep ? sel.value : "";
+    sel.innerHTML = "";
+    opts.forEach(function (o) {
+      var op = document.createElement("option");
+      op.value = o.value; op.textContent = o.label; sel.appendChild(op);
+    });
+    if (keep) {
+      var has = opts.some(function (o) { return o.value === prev; });
+      sel.value = has ? prev : (opts[0] ? opts[0].value : "");
+    }
+  }
+  function mgrOptList(activeOnly, blankLabel) {
+    var opts = [{ value: "", label: blankLabel }];
+    data.managers.forEach(function (m) {
+      if (activeOnly && !m.active) return;
+      opts.push({ value: m.id, label: m.name + (m.active ? "" : " (archived)") });
+    });
+    return opts;
+  }
+  function refreshSelects() {
+    fillSelectOpts(fType, [{ value: "", label: "All" }].concat(
+      WORK_TYPES.map(function (v) { return { value: v, label: v }; })), true);
+    fillSelectOpts(fStatus, [{ value: "", label: "All" }].concat(
+      WORK_STATUS.map(function (v) { return { value: v, label: v }; })), true);
+    fillSelectOpts(fManager, mgrOptList(false, "All"), true);
+    fillSelectOpts(oooManager, mgrOptList(true, "— select a manager —"), true);
+  }
+
+  // ---- Workload weighting (brief §6) -----------------------------------
+  function round1(n) { return Math.round(n * 10) / 10; }
+  function managerScore(managerId) {
+    var w = data.settings.weights || {}, eff = data.settings.effort || {};
+    var score = 0, c = { led: 0, supporting: 0, escalation: 0, ditl: 0, oneoff: 0, other: 0 };
+    data.assignments.forEach(function (a) {
+      if (a.archived || a.managerId !== managerId) return;
+      var p = findById(data.projects, a.projectId);
+      if (!p || p.status !== "active") return; // only active projects count
+      var base = (a.role === "lead") ? (w.projectLead || 0) : (w.projectContributor || 0);
+      var mult = (eff[a.effort] != null) ? eff[a.effort] : 1;
+      score += base * mult;
+      if (a.role === "lead") c.led++; else c.supporting++;
+    });
+    data.workItems.forEach(function (wi) {
+      if (wi.archived || wi.managerId !== managerId) return;
+      if (wi.status !== "open" && wi.status !== "in-progress") return; // only live items
+      if (wi.type === "escalation") { score += (w.escalation || 0); c.escalation++; }
+      else if (wi.type === "ditl") { score += (w.ditl || 0); c.ditl++; }
+      else if (wi.type === "oneoff") { score += (w.oneoff || 0); c.oneoff++; }
+      else { score += (w.other || 0); c.other++; }
+    });
+    return { score: score, counts: c };
+  }
+  function bandFor(score) {
+    var bands = data.settings.bands || [];
+    for (var i = 0; i < bands.length; i++) {
+      var b = bands[i];
+      if (score >= b.min && (b.max == null || score <= b.max)) return b;
+    }
+    return bands.length ? bands[bands.length - 1] : { label: "—" };
+  }
+  function heatClass(label) {
+    return "heat-" + String(label || "").toLowerCase().replace(/[^a-z]/g, "");
+  }
+
+  // ---- Workload board view ---------------------------------------------
+  function countLi(label, n, pop) {
+    var li = document.createElement("li");
+    if (pop) li.className = "pop";
+    var a = document.createElement("span"); a.textContent = label;
+    var b = document.createElement("span"); b.className = "n"; b.textContent = n;
+    li.appendChild(a); li.appendChild(b);
+    return li;
+  }
+  function renderBoard() {
     var list = (data && data.managers) || [];
     mgrCount.textContent = list.length ? ("(" + list.length + ")") : "";
-    if (!list.length) {
-      emptyRow(mgrRows, 5, "No managers yet — add one above and it saves automatically.");
-      return;
-    }
+    if (!list.length) { emptyP(boardCards, "No managers yet — use “Add manager”."); return; }
+    boardCards.innerHTML = "";
     list.forEach(function (m) {
-      var tr = document.createElement("tr");
-      if (!m.active) tr.className = "archived";
-      tr.appendChild(cell(m.name || ""));
-      tr.appendChild(cell(m.title || "—"));
-      tr.appendChild(cell(m.active ? "Yes" : "No"));
-      var idTd = cell(m.id || ""); idTd.className = "id"; tr.appendChild(idTd);
-      var act = document.createElement("td"); act.className = "actions";
+      var card = document.createElement("div"); card.className = "card";
+      var top = document.createElement("div"); top.className = "card-top";
+      var left = document.createElement("div");
+      var nm = document.createElement("div"); nm.className = "m-name"; nm.textContent = m.name; left.appendChild(nm);
+      if (m.title) { var ti = document.createElement("div"); ti.className = "m-title"; ti.textContent = m.title; left.appendChild(ti); }
+      top.appendChild(left);
+      if (m.active) {
+        var sc = managerScore(m.id), b = bandFor(sc.score);
+        var heat = document.createElement("span"); heat.className = "heat " + heatClass(b.label); heat.textContent = b.label;
+        top.appendChild(heat);
+        card.appendChild(top);
+        var score = document.createElement("div"); score.className = "score"; score.textContent = "score " + round1(sc.score);
+        card.appendChild(score);
+        var ul = document.createElement("ul"); ul.className = "counts";
+        ul.appendChild(countLi("Projects led", sc.counts.led));
+        ul.appendChild(countLi("Supporting", sc.counts.supporting));
+        ul.appendChild(countLi("Escalations", sc.counts.escalation, sc.counts.escalation > 0));
+        ul.appendChild(countLi("DITL", sc.counts.ditl));
+        ul.appendChild(countLi("One-offs", sc.counts.oneoff));
+        if (sc.counts.other) ul.appendChild(countLi("Other", sc.counts.other));
+        card.appendChild(ul);
+      } else {
+        var arch = document.createElement("span"); arch.className = "heat"; arch.style.background = "#eef0f3"; arch.style.color = "#6b7280"; arch.textContent = "Archived";
+        top.appendChild(arch);
+        card.appendChild(top);
+      }
+      var act = document.createElement("div"); act.className = "card-actions";
       act.appendChild(miniBtn("Edit", function () { editManager(m.id); }));
       act.appendChild(miniBtn(m.active ? "Archive" : "Restore", function () { toggleManagerActive(m.id); }));
-      tr.appendChild(act);
-      mgrRows.appendChild(tr);
+      card.appendChild(act);
+      boardCards.appendChild(card);
     });
   }
 
-  function renderProjects() {
-    projRows.innerHTML = "";
+  // ---- Projects view (cards; lead highlighted) -------------------------
+  function teamLineFrag(live) {
+    var span = document.createElement("span");
+    if (!live.length) { span.className = "ooo-empty"; span.textContent = "No one assigned."; return span; }
+    var ordered = live.filter(function (a) { return a.role === "lead"; })
+                      .concat(live.filter(function (a) { return a.role !== "lead"; }));
+    ordered.forEach(function (a, i) {
+      if (i) span.appendChild(document.createTextNode(", "));
+      var s = document.createElement("span");
+      if (a.role === "lead") { s.className = "lead"; s.textContent = managerName(a.managerId) + " (lead, " + a.effort + ")"; }
+      else { s.textContent = managerName(a.managerId) + " (" + a.effort + ")"; }
+      span.appendChild(s);
+    });
+    return span;
+  }
+  function assignEditor(p) {
+    var box = document.createElement("div"); box.className = "assign-box";
+    var h = document.createElement("h3"); h.textContent = "Team on “" + (p.name || "project") + "”"; box.appendChild(h);
+    var live = activeAssignments(p.id);
+    var ul = document.createElement("ul"); ul.className = "assign-list";
+    if (!live.length) {
+      var li0 = document.createElement("li"); li0.className = "ooo-empty"; li0.textContent = "No one assigned yet."; ul.appendChild(li0);
+    } else {
+      live.forEach(function (a) {
+        var li = document.createElement("li");
+        var who = document.createElement("span"); who.className = "who"; who.textContent = managerName(a.managerId); li.appendChild(who);
+        li.appendChild(pill(a.role, a.role));
+        var eff = document.createElement("span"); eff.textContent = a.effort; li.appendChild(eff);
+        li.appendChild(miniBtn("Remove", function () { archiveAssignment(a.id); }));
+        ul.appendChild(li);
+      });
+    }
+    box.appendChild(ul);
+    box.appendChild(miniBtn("Assign a manager", function () { addAssignment(p.id); }));
+    return box;
+  }
+  function renderProjectsView() {
     var list = (data && data.projects) || [];
     projCount.textContent = list.length ? ("(" + list.length + ")") : "";
-    if (!list.length) {
-      emptyRow(projRows, 6, "No projects yet — use “Add project”.");
-      return;
-    }
+    if (!list.length) { emptyP(projList, "No projects yet — use “Add project”."); return; }
+    projList.innerHTML = "";
     list.forEach(function (p) {
-      var tr = document.createElement("tr");
-      if (p.status === "complete") tr.className = "archived";
-      tr.appendChild(cell(p.name || ""));
-      tr.appendChild(cell(p.status || "active"));
-      tr.appendChild(cell(p.priority || "med"));
-      tr.appendChild(cell(p.targetDate || "—"));
+      var card = document.createElement("div"); card.className = "pcard";
+      if (p.status === "complete") card.style.opacity = ".7";
+      var top = document.createElement("div"); top.className = "p-top";
+      var left = document.createElement("div");
+      var nm = document.createElement("div"); nm.className = "p-name"; nm.textContent = p.name; left.appendChild(nm);
+      var meta = document.createElement("div"); meta.className = "p-meta";
+      meta.textContent = [(p.status || "active"), (p.priority || "med") + " priority",
+        p.targetDate ? ("target " + p.targetDate) : null].filter(Boolean).join(" · ");
+      left.appendChild(meta);
+      top.appendChild(left);
       var live = activeAssignments(p.id);
-      tr.appendChild(cell(live.length ? teamSummary(live) : "—"));
-      var act = document.createElement("td"); act.className = "actions";
+      var act = document.createElement("div"); act.className = "p-actions";
       act.appendChild(miniBtn("Edit", function () { editProject(p.id); }));
-      act.appendChild(miniBtn("Team (" + live.length + ")", function () { toggleAssignEditor(p.id); }));
-      tr.appendChild(act);
-      projRows.appendChild(tr);
-      if (expandedProject === p.id) projRows.appendChild(assignEditorRow(p));
+      act.appendChild(miniBtn(expandedProject === p.id ? "Hide team" : ("Team (" + live.length + ")"),
+        function () { toggleAssignEditor(p.id); }));
+      top.appendChild(act);
+      card.appendChild(top);
+      var team = document.createElement("div"); team.className = "p-team"; team.appendChild(teamLineFrag(live));
+      card.appendChild(team);
+      if (expandedProject === p.id) card.appendChild(assignEditor(p));
+      projList.appendChild(card);
     });
   }
 
-  function renderWorkItems() {
+  // ---- Work Items Queue view (filters + aging) -------------------------
+  function daysSince(iso) {
+    if (!iso) return null;
+    var t = Date.parse(iso); if (isNaN(t)) return null;
+    return Math.floor((Date.now() - t) / 86400000);
+  }
+  function ageText(w) {
+    if (w.status === "done") return "—";
+    var d = daysSince(w.openedDate);
+    return (d == null) ? "—" : (d + "d");
+  }
+  function isStale(w) {
+    if (w.archived || w.status === "done") return false;
+    var d = daysSince(w.openedDate);
+    return d != null && d >= 14;
+  }
+  function applyWiFilters(all) {
+    var t = fType.value, m = fManager.value, s = fStatus.value, from = fFrom.value, to = fTo.value;
+    return all.filter(function (w) {
+      if (t && w.type !== t) return false;
+      if (m && w.managerId !== m) return false;
+      if (s && (w.status || "open") !== s) return false;
+      if (from && (w.openedDate || "") < from) return false;
+      if (to && (w.openedDate || "") > to) return false;
+      return true;
+    });
+  }
+  function renderWorkItemsView() {
     wiRows.innerHTML = "";
-    var list = (data && data.workItems) || [];
-    wiCount.textContent = list.length ? ("(" + list.length + ")") : "";
+    var all = (data && data.workItems) || [];
+    wiCount.textContent = all.length ? ("(" + all.length + ")") : "";
+    var list = applyWiFilters(all);
     if (!list.length) {
-      emptyRow(wiRows, 8, "No work items yet — use “Add work item”.");
+      emptyRow(wiRows, 10, all.length ? "No work items match the filters." : "No work items yet — use “Add work item”.");
       return;
     }
     list.forEach(function (w) {
       var tr = document.createElement("tr");
       if (w.archived || w.status === "done") tr.className = "archived";
-      var typeTd = document.createElement("td");
-      typeTd.appendChild(pill(w.type || "other", w.type || "other"));
-      tr.appendChild(typeTd);
+      var typeTd = document.createElement("td"); typeTd.appendChild(pill(w.type || "other", w.type || "other")); tr.appendChild(typeTd);
       tr.appendChild(cell(w.title || ""));
       tr.appendChild(cell(managerName(w.managerId)));
       tr.appendChild(cell(w.status || "open"));
       tr.appendChild(cell(w.priority || "med"));
       tr.appendChild(cell(w.openedDate || "—"));
+      var ageTd = cell(ageText(w)); ageTd.className = isStale(w) ? "age old" : "age"; tr.appendChild(ageTd);
       tr.appendChild(cell(w.dueDate || "—"));
+      tr.appendChild(cell(w.rollOffDate || "—"));
       var act = document.createElement("td"); act.className = "actions";
       act.appendChild(miniBtn("Edit", function () { editWorkItem(w.id); }));
       if (w.status !== "done") act.appendChild(miniBtn("Done", function () { markWorkItemDone(w.id); }));
@@ -653,6 +940,161 @@
       tr.appendChild(act);
       wiRows.appendChild(tr);
     });
+  }
+
+  // ---- 1:1 Prep view ---------------------------------------------------
+  function cap(s) { s = s || ""; return s.charAt(0).toUpperCase() + s.slice(1); }
+  function soon(iso) { // past, or within the next 30 days
+    var t = Date.parse(iso); if (isNaN(t)) return false;
+    return (t - Date.now()) / 86400000 <= 30;
+  }
+  function oooData(id) {
+    var current = [], wins = [], roll = [];
+    data.assignments.forEach(function (a) {
+      if (a.archived || a.managerId !== id) return;
+      var p = findById(data.projects, a.projectId); if (!p) return;
+      if (p.status === "active") current.push("Project: " + p.name + " — " + a.role + " (" + a.effort + ")");
+      if (a.endDate && soon(a.endDate)) roll.push("Assignment on " + p.name + " rolls off " + a.endDate);
+    });
+    data.workItems.forEach(function (w) {
+      if (w.managerId !== id) return;
+      if (!w.archived && (w.status === "open" || w.status === "in-progress")) current.push(cap(w.type) + ": " + w.title + " [" + w.status + "]");
+      if (w.status === "done" && w.completedDate) wins.push(cap(w.type) + ": " + w.title + " (done " + w.completedDate + ")");
+      if (!w.archived && w.status !== "done" && w.rollOffDate && soon(w.rollOffDate)) roll.push(cap(w.type) + ": " + w.title + " rolls off " + w.rollOffDate);
+    });
+    wins.sort().reverse();
+    return { current: current, wins: wins, roll: roll };
+  }
+  function oooSection(title, items, emptyMsg) {
+    var sec = document.createElement("div"); sec.className = "ooo-section";
+    var h = document.createElement("h3"); h.textContent = title; sec.appendChild(h);
+    if (!items.length) { var e = document.createElement("p"); e.className = "ooo-empty"; e.textContent = emptyMsg; sec.appendChild(e); return sec; }
+    var ul = document.createElement("ul"); ul.className = "ooo-list";
+    items.forEach(function (it) { var li = document.createElement("li"); li.textContent = it; ul.appendChild(li); });
+    sec.appendChild(ul); return sec;
+  }
+  function render1on1() {
+    var id = oooManager.value;
+    if (!id) { emptyP(oooBody, "Pick a manager to see their current load, recent wins, and what is rolling off."); return; }
+    oooBody.innerHTML = "";
+    var sc = managerScore(id), b = bandFor(sc.score);
+    var head = document.createElement("p");
+    head.innerHTML = "";
+    head.textContent = "Workload: " + b.label + " (score " + round1(sc.score) + ")";
+    oooBody.appendChild(head);
+    var d = oooData(id);
+    oooBody.appendChild(oooSection("Currently carrying", d.current, "Nothing active right now."));
+    oooBody.appendChild(oooSection("Recently completed (wins)", d.wins, "No completed items recorded yet."));
+    oooBody.appendChild(oooSection("Rolling off soon / overdue", d.roll, "Nothing rolling off in the next 30 days."));
+  }
+  function oooSummaryText(id) {
+    var m = findById(data.managers, id); if (!m) return "";
+    var sc = managerScore(id), b = bandFor(sc.score), d = oooData(id);
+    function block(title, items) {
+      return title + "\n" + (items.length ? items.map(function (x) { return "  - " + x; }).join("\n") : "  (none)") + "\n";
+    }
+    return "1:1 Prep — " + m.name + (m.title ? " (" + m.title + ")" : "") + "\n" +
+           "Generated " + new Date().toLocaleString() + "\n" +
+           "Workload: " + b.label + " (score " + round1(sc.score) + ")\n\n" +
+           block("Currently carrying:", d.current) + "\n" +
+           block("Recently completed (wins):", d.wins) + "\n" +
+           block("Rolling off soon / overdue:", d.roll);
+  }
+  async function copySummary() {
+    var id = oooManager.value;
+    if (!id) { notice("Pick a manager first.", "err"); return; }
+    var text = oooSummaryText(id);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); }
+      else { fallbackCopy(text); }
+      notice("Summary copied to the clipboard.", "ok");
+    } catch (e) { fallbackCopy(text); notice("Summary copied.", "ok"); }
+  }
+  function fallbackCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    ta.remove();
+  }
+  function exportSummary() {
+    var id = oooManager.value;
+    if (!id) { notice("Pick a manager first.", "err"); return; }
+    var m = findById(data.managers, id);
+    var text = oooSummaryText(id);
+    var blob = new Blob([text], { type: "text/plain" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = "1on1-" + (m.name || "manager").replace(/[^a-z0-9]+/gi, "-").toLowerCase() + ".txt";
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    notice("Summary exported.", "ok");
+  }
+
+  // ---- Settings view (editable weighting) ------------------------------
+  function numField(id, labelText, value) {
+    var wrap = document.createElement("label");
+    var span = document.createElement("span"); span.textContent = labelText; wrap.appendChild(span);
+    var inp = document.createElement("input"); inp.type = "number"; inp.step = "any"; inp.id = id;
+    inp.value = (value == null ? "" : value); wrap.appendChild(inp);
+    return wrap;
+  }
+  function settingsSubLabel(text) {
+    var p = document.createElement("p"); p.className = "settings-sub"; p.textContent = text; return p;
+  }
+  function renderSettings() {
+    var w = data.settings.weights || {}, eff = data.settings.effort || {}, bands = data.settings.bands || [];
+    weightsBody.innerHTML = "";
+
+    weightsBody.appendChild(settingsSubLabel("Item weights"));
+    var grid = document.createElement("div"); grid.className = "weights-grid";
+    [["projectLead", "Project — lead"], ["projectContributor", "Project — contributor"],
+     ["escalation", "Escalation"], ["ditl", "DITL"], ["oneoff", "One-off"], ["other", "Other"]]
+      .forEach(function (p) { grid.appendChild(numField("w_" + p[0], p[1], w[p[0]])); });
+    weightsBody.appendChild(grid);
+
+    weightsBody.appendChild(settingsSubLabel("Effort multipliers"));
+    var eg = document.createElement("div"); eg.className = "weights-grid";
+    [["light", "Light ×"], ["medium", "Medium ×"], ["heavy", "Heavy ×"]]
+      .forEach(function (p) { eg.appendChild(numField("e_" + p[0], p[1], eff[p[0]])); });
+    weightsBody.appendChild(eg);
+
+    weightsBody.appendChild(settingsSubLabel("Heat bands (min–max score; blank max = no upper limit)"));
+    var bb = document.createElement("div"); bb.className = "bands-edit";
+    bands.forEach(function (b, i) {
+      var row = document.createElement("div"); row.className = "band-row";
+      var lab = document.createElement("input"); lab.className = "lab"; lab.id = "b_lab_" + i; lab.value = b.label; row.appendChild(lab);
+      var mn = document.createElement("input"); mn.className = "num"; mn.type = "number"; mn.id = "b_min_" + i; mn.value = b.min; row.appendChild(mn);
+      var dash = document.createElement("span"); dash.textContent = "to"; row.appendChild(dash);
+      var mx = document.createElement("input"); mx.className = "num"; mx.type = "number"; mx.id = "b_max_" + i; mx.value = (b.max == null ? "" : b.max); row.appendChild(mx);
+      bb.appendChild(row);
+    });
+    weightsBody.appendChild(bb);
+  }
+  function saveSettings() {
+    var w = data.settings.weights, eff = data.settings.effort, bands = data.settings.bands;
+    ["projectLead", "projectContributor", "escalation", "ditl", "oneoff", "other"].forEach(function (k) {
+      var v = parseFloat(el("w_" + k).value); if (!isNaN(v)) w[k] = v;
+    });
+    ["light", "medium", "heavy"].forEach(function (k) {
+      var v = parseFloat(el("e_" + k).value); if (!isNaN(v)) eff[k] = v;
+    });
+    bands.forEach(function (b, i) {
+      var lab = el("b_lab_" + i).value.trim(); if (lab) b.label = lab;
+      var mn = parseFloat(el("b_min_" + i).value); if (!isNaN(mn)) b.min = mn;
+      var mxRaw = el("b_max_" + i).value.trim();
+      b.max = (mxRaw === "") ? null : parseFloat(mxRaw);
+    });
+    commit();
+    notice("Weighting saved.", "ok");
+  }
+  function resetSettings() {
+    var d = defaultData();
+    data.settings.weights = d.settings.weights;
+    data.settings.effort = d.settings.effort;
+    data.settings.bands = d.settings.bands;
+    renderSettings();
+    commit();
+    notice("Weighting reset to defaults.", "ok");
   }
 
   function cell(text) {
@@ -860,46 +1302,7 @@
   // ---- Assignments (managed per project) -------------------------------
   function toggleAssignEditor(projectId) {
     expandedProject = (expandedProject === projectId) ? null : projectId;
-    renderProjects();
-  }
-  function assignEditorRow(p) {
-    var tr = document.createElement("tr");
-    tr.className = "assign-row";
-    var td = document.createElement("td");
-    td.colSpan = 6;
-    var box = document.createElement("div");
-    box.className = "assign-box";
-    var h = document.createElement("h3");
-    h.textContent = "Team on “" + (p.name || "project") + "”";
-    box.appendChild(h);
-
-    var list = activeAssignments(p.id);
-    var ul = document.createElement("ul");
-    ul.className = "assign-list";
-    if (!list.length) {
-      var li0 = document.createElement("li");
-      li0.className = "who"; li0.textContent = "No one assigned yet.";
-      ul.appendChild(li0);
-    } else {
-      list.forEach(function (a) {
-        var li = document.createElement("li");
-        var who = document.createElement("span");
-        who.className = "who";
-        who.textContent = managerName(a.managerId);
-        li.appendChild(who);
-        li.appendChild(pill(a.role, a.role));
-        var eff = document.createElement("span");
-        eff.textContent = a.effort;
-        li.appendChild(eff);
-        li.appendChild(miniBtn("Remove", function () { archiveAssignment(a.id); }));
-        ul.appendChild(li);
-      });
-    }
-    box.appendChild(ul);
-    box.appendChild(miniBtn("Assign a manager", function () { addAssignment(p.id); }));
-    td.appendChild(box);
-    tr.appendChild(td);
-    return tr;
+    renderProjectsView();
   }
   async function addAssignment(projectId) {
     if (!data.managers.length) { notice("Add a manager first.", "err"); return; }
@@ -1322,25 +1725,17 @@
     }
   }
 
-  // ---- Managers: add (Phase 0 wires add/list only) ---------------------
+  // ---- Managers: add ---------------------------------------------------
   async function addManager() {
-    var name = mName.value.trim();
-    if (!name) { notice("Manager name is required.", "err"); mName.focus(); return; }
-    if (!data) data = defaultData();
-
     await ensureName(); // first edit: ask once (then remembered)
-
-    data.managers.push({
-      id: genId(),
-      name: name,
-      title: mTitle.value.trim() || null,
-      active: !!mActive.checked
-    });
-    mName.value = "";
-    mTitle.value = "";
-    mActive.checked = true;
+    var v = await openForm("Add manager", [
+      { key: "name", label: "Name", type: "text", required: true },
+      { key: "title", label: "Title", type: "text" },
+      { key: "active", label: "Active", type: "checkbox" }
+    ], { active: true });
+    if (!v) return;
+    data.managers.push({ id: genId(), name: v.name, title: v.title, active: v.active });
     commit();
-    mName.focus();
   }
 
   // ---- Wire up ---------------------------------------------------------
@@ -1357,8 +1752,28 @@
   btnReconnect.addEventListener("click", reconnectSharedFile);
   btnUnlink.addEventListener("click", unlinkSharedFile);
   importInput.addEventListener("change", onImportFile);
-  mName.addEventListener("keydown", function (e) { if (e.key === "Enter") addManager(); });
-  mTitle.addEventListener("keydown", function (e) { if (e.key === "Enter") addManager(); });
+
+  // Top navigation.
+  navEl.addEventListener("click", function (e) {
+    var v = e.target && e.target.getAttribute && e.target.getAttribute("data-view");
+    if (v) showView(v);
+  });
+  // Work-item filters.
+  [fType, fManager, fStatus, fFrom, fTo].forEach(function (s) {
+    s.addEventListener("change", renderWorkItemsView);
+  });
+  fClear.addEventListener("click", function () {
+    fType.value = ""; fManager.value = ""; fStatus.value = ""; fFrom.value = ""; fTo.value = "";
+    renderWorkItemsView();
+  });
+  // 1:1 Prep.
+  oooManager.addEventListener("change", render1on1);
+  btnCopySummary.addEventListener("click", copySummary);
+  btnExportSummary.addEventListener("click", exportSummary);
+  btnPrintSummary.addEventListener("click", function () { window.print(); });
+  // Settings.
+  btnSaveSettings.addEventListener("click", saveSettings);
+  btnResetSettings.addEventListener("click", resetSettings);
 
   // Pull teammates' changes automatically when returning to the tab.
   document.addEventListener("visibilitychange", function () {
