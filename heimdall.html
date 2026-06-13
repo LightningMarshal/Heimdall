@@ -10,286 +10,290 @@
   - style-src  'unsafe-inline' : required so the inlined <style> applies from file://
   - img-src 'self' data:      : allow same-origin and data: images only
   - connect-src 'none'         : no fetch/XHR/WebSocket anywhere
-  IndexedDB and the File System Access API are not network connections, so they
-  are unaffected by connect-src.
+  IndexedDB and the File System Access API are not network connections.
 -->
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'">
 <title>Heimdall — Team Workload Tracker</title>
 <style>
   :root {
-    --bg: #f6f7f9;
-    --panel: #ffffff;
-    --border: #e2e5ea;
-    --text: #1d2229;
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --surface-2: #fafbfc;
+    --border: #e7e9ee;
+    --border-strong: #d6d9e0;
+    --text: #161922;
     --muted: #6b7280;
-    --accent: #2f6feb;
-    --accent-weak: #e8f0fe;
-    --danger: #c2392c;
-    --danger-weak: #fdecea;
-    --ok: #1f8a51;
-    --radius: 10px;
+    --faint: #9ca3af;
+    --accent: #4f46e5;
+    --accent-hover: #4338ca;
+    --accent-weak: #eef0fe;
+    --danger: #dc2626;
+    --danger-weak: #fdecec;
+    --ok: #16a34a;
+    --radius: 14px;
+    --radius-sm: 9px;
+    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.04);
+    --shadow-lg: 0 10px 30px rgba(16,24,40,.12);
+    /* type taxonomy */
+    --t-escalation: #dc2626; --t-escalation-bg: #fdecec;
+    --t-ditl: #2563eb;       --t-ditl-bg: #e8f0fe;
+    --t-oneoff: #d97706;     --t-oneoff-bg: #fdf3e2;
+    --t-other: #6b7280;      --t-other-bg: #eef0f3;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
-    line-height: 1.45;
+    line-height: 1.5;
     font-size: 15px;
+    -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 920px; margin: 0 auto; padding: 24px 20px 64px; }
-  header h1 { font-size: 24px; margin: 0 0 2px; }
-  header .sub { color: var(--muted); margin: 0 0 4px; }
-  .target-note { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 22px 22px 80px; }
+  a { color: var(--accent); }
 
+  /* App bar */
+  .appbar { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .appbar h1 { font-size: 22px; margin: 0; letter-spacing: -.02em; }
+  .appbar .tag { color: var(--muted); font-size: 13px; }
+
+  /* Sync banner */
   .banner {
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    background: var(--accent-weak);
-    border: 1px solid #cfe0fb;
-    border-radius: var(--radius);
-    padding: 10px 14px; margin-bottom: 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 9px 14px; margin: 12px 0 18px; box-shadow: var(--shadow);
   }
-  .banner .b-text { flex: 1 1 auto; font-size: 14px; }
-  .banner .sync-line { color: var(--muted); font-size: 13px; }
-  .save-status { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .banner .b-text { flex: 1 1 auto; font-size: 13px; }
+  .banner .sync-line { color: var(--muted); font-size: 12px; }
+  .save-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
   .save-status.saving { color: var(--accent); }
   .save-status.saved { color: var(--ok); }
-  .save-status.dirty { color: var(--muted); }
   .save-status.error { color: var(--danger); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+  .dot.on { background: var(--ok); } .dot.off { background: var(--faint); } .dot.warn { background: #d97706; }
 
-  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
-  .toolbar .note { color: var(--muted); font-size: 13px; }
-
-  button {
-    font: inherit;
-    background: var(--panel);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 14px;
-    cursor: pointer;
-    transition: background .12s ease, border-color .12s ease, box-shadow .12s ease;
+  /* Nav */
+  .nav { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 22px; }
+  .nav button {
+    border: 1px solid transparent; background: transparent; color: var(--muted);
+    border-radius: 999px; padding: 7px 16px; font-weight: 600; font-size: 14px; cursor: pointer;
+    transition: background .12s, color .12s;
   }
-  button:hover { border-color: #c4c9d2; }
+  .nav button:hover { background: var(--surface); color: var(--text); }
+  .nav button.active { background: var(--accent); color: #fff; }
+
+  /* Buttons */
+  button {
+    font: inherit; background: var(--surface); color: var(--text);
+    border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+    padding: 8px 14px; cursor: pointer;
+    transition: background .12s, border-color .12s, box-shadow .12s, transform .05s;
+  }
+  button:hover { border-color: var(--faint); }
+  button:active { transform: translateY(1px); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button.primary:hover { background: #275fcf; }
+  button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  button.mini { padding: 4px 10px; font-size: 13px; border-radius: 7px; }
+  button.ghost { background: transparent; border-color: transparent; color: var(--accent); padding: 6px 8px; }
+  button.ghost:hover { background: var(--accent-weak); }
+  button.danger { color: var(--danger); border-color: #f0c8c8; }
+  button.danger:hover { background: var(--danger-weak); }
   button:disabled { opacity: .5; cursor: not-allowed; }
 
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 18px;
-    margin-bottom: 16px;
-    box-shadow: 0 1px 2px rgba(16,24,40,.04);
-  }
-  .panel h2 { margin: 0 0 12px; font-size: 17px; }
+  .view-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .view-head h2 { margin: 0; font-size: 20px; letter-spacing: -.01em; }
+  .count { color: var(--faint); font-size: 14px; font-weight: 500; margin-left: 6px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 24px; text-align: center;
+           background: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--radius); }
 
-  details.panel > summary {
-    cursor: pointer; font-size: 17px; font-weight: 600; list-style: none;
-    display: flex; align-items: center; gap: 8px;
-  }
-  details.panel > summary::-webkit-details-marker { display: none; }
-  details.panel > summary::before { content: "▸"; color: var(--muted); font-size: 13px; }
-  details.panel[open] > summary::before { content: "▾"; }
-  .settings-body { margin-top: 14px; }
-  .settings-note { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
-  .settings-sub { font-size: 13px; font-weight: 600; margin: 18px 0 8px; }
-  .settings-meta { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
-  .settings-meta span { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }
+  /* Cards / panels */
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+           padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .panel h3.sec { margin: 0 0 4px; font-size: 15px; }
+  .panel p.hint { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
 
-  .notice { font-size: 14px; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; display: none; }
+  /* Workload board */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr)); gap: 16px; }
+  .mcard {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px; box-shadow: var(--shadow); cursor: pointer;
+    transition: transform .12s, box-shadow .12s, border-color .12s;
+  }
+  .mcard:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: var(--border-strong); }
+  .mcard .m-name { font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+  .mcard .m-sub { color: var(--muted); font-size: 13px; margin-top: 1px; }
+  .mcard .m-heat-row { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 10px; }
+  .heat { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: 999px;
+          font-size: 12px; font-weight: 700; }
+  .heat::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .9; }
+  .heat-light      { background: #e7f7ee; color: #15803d; }
+  .heat-balanced   { background: #fbf3df; color: #a16207; }
+  .heat-heavy      { background: #fdeede; color: #c2410c; }
+  .heat-overloaded { background: #fde4e4; color: #b91c1c; }
+  .heat-na         { background: #eef0f3; color: #6b7280; }
+  .mcard .m-score { font-variant-numeric: tabular-nums; color: var(--faint); font-size: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 3px 9px;
+          border-radius: 7px; background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); }
+  .chip b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .chip.alert { background: var(--danger-weak); border-color: #f3c6c1; color: var(--danger); }
+  .chip.alert b { color: var(--danger); }
+
+  /* Pills (type taxonomy) */
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.escalation { background: var(--t-escalation-bg); color: var(--t-escalation); }
+  .pill.ditl       { background: var(--t-ditl-bg); color: var(--t-ditl); }
+  .pill.oneoff     { background: var(--t-oneoff-bg); color: var(--t-oneoff); }
+  .pill.other      { background: var(--t-other-bg); color: var(--t-other); }
+  .pill.lead       { background: var(--accent-weak); color: var(--accent); }
+  .pill.contributor{ background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+  .pill.status     { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+
+  /* Project cards */
+  .pcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+           padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow); }
+  .pcard .p-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .pcard .p-name { font-size: 16px; font-weight: 650; }
+  .pcard .p-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; color: var(--muted); font-size: 13px; }
+  .pcard .p-team { margin-top: 12px; font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .pcard .p-team .lead-tag { font-weight: 650; }
+  .pcard .p-link a { font-size: 13px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border);
+          border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  thead th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+             background: var(--surface-2); }
+  tbody tr:last-child td { border-bottom: none; }
+  tr.archived td { opacity: .5; }
+  td.actions { white-space: nowrap; text-align: right; }
+  td.actions button + button { margin-left: 4px; }
+  td.age.old { color: var(--danger); font-weight: 600; }
+
+  /* Filters */
+  .filters { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px;
+             background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+             padding: 14px 16px; box-shadow: var(--shadow); }
+  .filters label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  .filters select, .filters input { font: inherit; padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: 8px; }
+
+  /* Reports */
+  .summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 12px; margin-bottom: 18px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+  .stat .v { font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+  .stat .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 4px 0 14px; font-size: 12px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .bucket { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .bucket .lab { width: 110px; font-size: 13px; color: var(--muted); flex: 0 0 auto; text-align: right; }
+  .bucket .track { flex: 1 1 auto; background: var(--surface-2); border-radius: 7px; height: 22px; overflow: hidden; display: flex; }
+  .bucket .seg { height: 100%; }
+  .bucket .n { width: 34px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+
+  /* Forms (modal + generic) */
+  .overlay { position: fixed; inset: 0; background: rgba(16,24,40,.45); display: none; align-items: center;
+             justify-content: center; padding: 20px; z-index: 50; }
+  .overlay.show { display: flex; }
+  .modal { background: var(--surface); border-radius: var(--radius); padding: 24px; width: 100%;
+           max-width: 420px; box-shadow: var(--shadow-lg); }
+  .modal.wide { max-width: 540px; max-height: 90vh; overflow-y: auto; }
+  .modal h3 { margin: 0 0 14px; font-size: 18px; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .ff { display: flex; flex-direction: column; gap: 5px; margin-bottom: 13px; }
+  .ff > label { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .ff input, .ff select, .ff textarea { font: inherit; padding: 9px 11px; border: 1px solid var(--border-strong);
+                                         border-radius: 8px; width: 100%; }
+  .ff textarea { min-height: 62px; resize: vertical; }
+  .ff.check { flex-direction: row; align-items: center; gap: 8px; }
+  .ff.check input { width: auto; }
+  .ff.check label { font-weight: 500; color: var(--text); }
+
+  /* Team builder */
+  .team-build { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; background: var(--surface-2); }
+  .team-build h4 { margin: 0 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .trow { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .trow select { font: inherit; padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: 8px; }
+  .trow .who { flex: 1 1 130px; }
+
+  /* Manager detail drawer */
+  .drawer-overlay { position: fixed; inset: 0; background: rgba(16,24,40,.4); display: none; z-index: 60; }
+  .drawer-overlay.show { display: block; }
+  .drawer { position: fixed; top: 0; right: 0; height: 100%; width: 440px; max-width: 92vw;
+            background: var(--surface); box-shadow: var(--shadow-lg); overflow-y: auto;
+            transform: translateX(100%); transition: transform .2s ease; }
+  .drawer-overlay.show .drawer { transform: translateX(0); }
+  .drawer-inner { padding: 22px; }
+  .drawer .d-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .drawer .d-name { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+  .drawer .d-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .drawer .d-close { font-size: 20px; line-height: 1; padding: 4px 10px; }
+  .drawer .d-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 20px; }
+  .drawer .d-sec { margin-bottom: 20px; }
+  .drawer .d-sec h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+  .drawer .d-list { list-style: none; margin: 0; padding: 0; }
+  .drawer .d-list li { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px;
+                       display: flex; gap: 8px; align-items: center; }
+  .drawer .d-list li .grow { flex: 1 1 auto; }
+  .drawer .d-empty { color: var(--faint); font-size: 13px; }
+
+  .footer-note { color: var(--faint); font-size: 12px; margin-top: 28px; }
+
+  @media print {
+    .appbar, .banner, .nav, .notice, .footer-note, .drawer .d-actions, .drawer .d-close { display: none !important; }
+    .drawer-overlay { position: static; background: none; }
+    .drawer { position: static; width: auto; box-shadow: none; transform: none; }
+    body { background: #fff; }
+  }
+
+  .notice { font-size: 14px; padding: 11px 15px; border-radius: var(--radius-sm); margin-bottom: 16px; display: none; }
   .notice.show { display: block; }
-  .notice.info { background: var(--accent-weak); border: 1px solid #cfe0fb; }
-  .notice.ok { background: #e7f6ee; border: 1px solid #bfe6cf; color: var(--ok); }
+  .notice.info { background: var(--accent-weak); border: 1px solid #d4d8fb; }
+  .notice.ok { background: #e7f7ee; border: 1px solid #c2e8d2; color: #15803d; }
   .notice.err { background: var(--danger-weak); border: 1px solid #f3c6c1; color: var(--danger); }
 
-  .guard { display: none; }
+  .guard { display: none; margin-bottom: 16px; }
   .guard.show { display: block; }
   .guard .panel { border-color: #f3c6c1; background: #fff7f6; }
   .guard .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-  .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px; }
-  .field { display: flex; flex-direction: column; gap: 4px; }
-  .field label { font-size: 12px; color: var(--muted); }
-  .field input[type="text"] {
-    font: inherit; padding: 8px 10px; border: 1px solid var(--border);
-    border-radius: 8px; min-width: 200px;
-  }
-  .field.check { flex-direction: row; align-items: center; gap: 6px; padding-bottom: 9px; }
-
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 14px; }
-  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
-  td.id { color: var(--muted); font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 12px; }
-  .empty { color: var(--muted); font-size: 14px; padding: 6px 2px; }
-  .count { color: var(--muted); font-size: 13px; margin-left: 6px; }
-
-  /* Small inline action buttons in table rows */
-  button.mini { padding: 4px 9px; font-size: 13px; border-radius: 6px; }
-  td.actions { white-space: nowrap; }
-  td.actions button + button { margin-left: 5px; }
-  tr.archived td { opacity: .55; }
-
-  /* Type / status pills (light taxonomy; full design is Phase 2) */
-  .pill {
-    display: inline-block; padding: 1px 9px; border-radius: 999px;
-    font-size: 12px; font-weight: 600; border: 1px solid transparent; white-space: nowrap;
-  }
-  .pill.escalation { background: var(--danger-weak); color: var(--danger); border-color: #f3c6c1; }
-  .pill.ditl       { background: #e8f0fe; color: #2456c7; border-color: #cfe0fb; }
-  .pill.oneoff     { background: #fdf3e2; color: #9a6a16; border-color: #f0dcb8; }
-  .pill.other      { background: #eef0f3; color: #4b5563; border-color: #dde1e7; }
-  .pill.lead       { background: #eceefe; color: #3a3fb1; border-color: #d6d9f7; }
-  .pill.contributor{ background: #eef0f3; color: #4b5563; border-color: #dde1e7; }
-
-  /* Per-project assignment editor (expandable row) */
-  tr.assign-row > td { background: #fafbfc; padding: 0; }
-  .assign-box { padding: 12px 14px; }
-  .assign-box h3 { margin: 0 0 8px; font-size: 14px; }
-  .assign-list { list-style: none; margin: 0 0 10px; padding: 0; }
-  .assign-list li {
-    display: flex; align-items: center; gap: 8px; padding: 5px 0;
-    border-bottom: 1px solid var(--border); font-size: 14px;
-  }
-  .assign-list li .who { flex: 1 1 auto; }
-
-  /* Generic form modal */
-  .modal-form { max-width: 460px; max-height: 88vh; overflow-y: auto; }
-  .modal-form .ff { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-  .modal-form .ff > label { font-size: 12px; color: var(--muted); }
-  .modal-form .ff input, .modal-form .ff select, .modal-form .ff textarea {
-    font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; width: 100%;
-  }
-  .modal-form .ff textarea { min-height: 60px; resize: vertical; }
-  .modal-form .ff.check { flex-direction: row; align-items: center; gap: 8px; }
-  .modal-form .ff.check input { width: auto; }
-
-  .footer-note { color: var(--muted); font-size: 12px; margin-top: 24px; }
-
-  /* Top navigation */
-  .nav { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 18px;
-         border-bottom: 1px solid var(--border); }
-  .nav button {
-    border: none; border-bottom: 2px solid transparent; background: transparent;
-    border-radius: 0; padding: 8px 14px; color: var(--muted); font-weight: 600;
-  }
-  .nav button:hover { color: var(--text); }
-  .nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-  .view-head { display: flex; align-items: center; justify-content: space-between;
-               gap: 12px; margin-bottom: 14px; }
-  .view-head h2 { margin: 0; font-size: 19px; }
-
-  /* Workload board cards */
-  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-  .card {
-    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 16px; box-shadow: 0 1px 2px rgba(16,24,40,.04);
-  }
-  .card .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-  .card .m-name { font-size: 17px; font-weight: 600; }
-  .card .m-title { color: var(--muted); font-size: 13px; }
-  .card .heat {
-    display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px;
-    font-weight: 700; white-space: nowrap;
-  }
-  .heat-light       { background: #e7f6ee; color: #1f8a51; }
-  .heat-balanced    { background: #fdf7e0; color: #8a6d12; }
-  .heat-heavy       { background: #fdf0e2; color: #b4630f; }
-  .heat-overloaded  { background: #fde6e3; color: #c2392c; }
-  .card .score { font-size: 12px; color: var(--muted); margin-top: 2px; text-align: right; }
-  .card .counts { list-style: none; margin: 12px 0 10px; padding: 0; }
-  .card .counts li { display: flex; justify-content: space-between; font-size: 14px; padding: 3px 0; }
-  .card .counts li.pop { color: var(--danger); font-weight: 600; }
-  .card .counts li .n { font-variant-numeric: tabular-nums; }
-  .card .card-actions { display: flex; gap: 6px; }
-
-  /* Project cards */
-  .pcard {
-    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(16,24,40,.04);
-  }
-  .pcard .p-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-  .pcard .p-name { font-size: 16px; font-weight: 600; }
-  .pcard .p-meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
-  .pcard .p-team { margin-top: 10px; font-size: 14px; }
-  .pcard .p-team .lead { font-weight: 600; }
-  .pcard .p-actions { display: flex; gap: 6px; }
-  .assign-box { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
-
-  /* Filters */
-  .filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px;
-             background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
-  .filters label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
-  .filters select, .filters input { font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; }
-  td.age.old { color: var(--danger); font-weight: 600; }
-
-  /* Settings weighting editor */
-  .weights-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-                  gap: 10px; margin: 4px 0 14px; }
-  .weights-grid label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
-  .weights-grid input { font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; width: 100%; }
-  .bands-edit { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 14px; }
-  .bands-edit .band-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .bands-edit .band-row input { font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; }
-  .bands-edit .band-row input.lab { width: 130px; }
-  .bands-edit .band-row input.num { width: 80px; }
-
-  /* 1:1 Prep */
-  .ooo-section { margin-bottom: 18px; }
-  .ooo-section h3 { font-size: 15px; margin: 0 0 8px; }
-  .ooo-list { list-style: none; margin: 0; padding: 0; }
-  .ooo-list li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
-  .ooo-empty { color: var(--muted); font-size: 14px; }
-
-  /* Name modal */
-  .overlay {
-    position: fixed; inset: 0; background: rgba(16,24,40,.4);
-    display: none; align-items: center; justify-content: center; padding: 20px;
-  }
-  .overlay.show { display: flex; }
-  .modal {
-    background: var(--panel); border-radius: var(--radius); padding: 22px;
-    width: 100%; max-width: 380px; box-shadow: 0 12px 40px rgba(16,24,40,.25);
-  }
-  .modal h3 { margin: 0 0 6px; font-size: 17px; }
-  .modal p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
-  .modal input[type="text"] { width: 100%; font: inherit; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; }
-  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
+  <div class="appbar">
     <h1>Heimdall</h1>
-    <p class="sub">Team Workload Tracker</p>
-    <p class="target-note">Works in any modern browser. Your data is saved automatically on this
-      device. Live team sync (a shared file) is available in Microsoft Edge or Chrome.</p>
-  </header>
+    <span class="tag">Team Workload Tracker</span>
+  </div>
 
   <div class="banner">
     <div class="b-text">
       <div id="bannerText">Loading…</div>
-      <div class="sync-line" id="syncLine"></div>
+      <div class="sync-line"><span class="dot off" id="syncDot"></span><span id="syncLine"></span></div>
     </div>
     <span class="save-status" id="saveStatus"></span>
-    <button id="btnRetry" style="display:none;">Retry sync</button>
-    <button id="btnReload" style="display:none;">Reload latest</button>
+    <button id="btnRetry" class="mini" style="display:none;">Retry sync</button>
+    <button id="btnReload" class="mini" style="display:none;">Reload latest</button>
   </div>
 
-  <div class="toolbar" id="toolbar"></div>
+  <nav class="nav" id="nav">
+    <button data-view="board" class="active">Board</button>
+    <button data-view="projects">Projects</button>
+    <button data-view="workitems">Work Items</button>
+    <button data-view="reports">Reports</button>
+    <button data-view="settings">Settings</button>
+  </nav>
 
   <div class="notice" id="notice"></div>
 
   <div class="guard" id="guard">
     <div class="panel">
-      <h2>The shared file could not be read safely</h2>
+      <h3 class="sec">The shared file could not be read safely</h3>
       <p id="guardMsg"></p>
-      <p>It was <strong>not overwritten</strong>, and your local data is untouched and still
-        editable. You can load a backup copy to restore it, or unlink the shared file.</p>
+      <p class="hint">It was <strong>not overwritten</strong>, and your local data is untouched and still
+        editable. Load a backup to restore it, or unlink the shared file.</p>
       <div class="actions">
         <button id="btnLoadBackup" class="primary">Load a backup file…</button>
         <button id="btnGuardUnlink">Unlink shared file</button>
@@ -297,14 +301,7 @@
     </div>
   </div>
 
-  <nav class="nav" id="nav">
-    <button data-view="board" class="active">Workload Board</button>
-    <button data-view="projects">Projects</button>
-    <button data-view="workitems">Work Items</button>
-    <button data-view="oneonone">1:1 Prep</button>
-    <button data-view="settings">Settings</button>
-  </nav>
-
+  <!-- BOARD -->
   <section class="view" id="view-board">
     <div class="view-head">
       <h2>Workload board <span class="count" id="mgrCount"></span></h2>
@@ -313,6 +310,7 @@
     <div id="boardCards" class="cards"></div>
   </section>
 
+  <!-- PROJECTS -->
   <section class="view" id="view-projects" hidden>
     <div class="view-head">
       <h2>Projects <span class="count" id="projCount"></span></h2>
@@ -321,21 +319,16 @@
     <div id="projList"></div>
   </section>
 
+  <!-- WORK ITEMS -->
   <section class="view" id="view-workitems" hidden>
     <div class="view-head">
       <h2>Work items <span class="count" id="wiCount"></span></h2>
       <button id="btnAddWorkItem" class="primary">Add work item</button>
     </div>
     <div class="filters" id="wiFilters">
-      <label>Type
-        <select id="fType"><option value="">All</option></select>
-      </label>
-      <label>Manager
-        <select id="fManager"><option value="">All</option></select>
-      </label>
-      <label>Status
-        <select id="fStatus"><option value="">All</option></select>
-      </label>
+      <label>Type <select id="fType"></select></label>
+      <label>Manager <select id="fManager"></select></label>
+      <label>Status <select id="fStatus"></select></label>
       <label>Opened from <input type="date" id="fFrom"></label>
       <label>to <input type="date" id="fTo"></label>
       <button id="fClear" class="mini">Clear</button>
@@ -343,58 +336,78 @@
     <table>
       <thead>
         <tr><th>Type</th><th>Title</th><th>Owner</th><th>Status</th><th>Priority</th>
-            <th>Opened</th><th>Age</th><th>Due</th><th>Roll-off</th><th>Actions</th></tr>
+            <th>Opened</th><th>Age</th><th>Due</th><th>Roll-off</th><th></th></tr>
       </thead>
       <tbody id="wiRows"></tbody>
     </table>
   </section>
 
-  <section class="view" id="view-oneonone" hidden>
-    <div class="view-head"><h2>1:1 Prep</h2></div>
-    <div class="form-row">
-      <div class="field">
-        <label for="oooManager">Manager</label>
-        <select id="oooManager"></select>
-      </div>
-      <button id="btnCopySummary">Copy summary</button>
-      <button id="btnExportSummary">Export summary</button>
-      <button id="btnPrintSummary">Print</button>
+  <!-- REPORTS -->
+  <section class="view" id="view-reports" hidden>
+    <div class="view-head">
+      <h2>Reports</h2>
+      <label style="font-size:13px;color:var(--muted);">Group by
+        <select id="repGran" style="font:inherit;padding:6px 9px;border:1px solid var(--border-strong);border-radius:8px;margin-left:6px;">
+          <option value="all">All time</option>
+          <option value="year">Yearly</option>
+          <option value="quarter">Quarterly</option>
+          <option value="month" selected>Monthly</option>
+          <option value="week">Weekly</option>
+        </select>
+      </label>
     </div>
-    <div id="oooBody"></div>
+    <div id="reportBody"></div>
   </section>
 
+  <!-- SETTINGS -->
   <section class="view" id="view-settings" hidden>
     <div class="view-head"><h2>Settings</h2></div>
+
     <div class="panel">
-      <p class="settings-sub">Workload weighting</p>
-      <p class="settings-note">Tune the score per item, the effort multipliers, and the heat
-        bands. Only active projects and open / in-progress work items count toward load.</p>
+      <h3 class="sec">Workload weighting</h3>
+      <p class="hint">Tune the score per item, the effort multipliers, and the heat bands. Only active
+        projects and open / in-progress work items count toward load.</p>
       <div id="weightsBody"></div>
-      <button id="btnSaveSettings" class="primary">Save weighting</button>
-      <button id="btnResetSettings" class="mini">Reset to defaults</button>
+      <div style="margin-top:6px;">
+        <button id="btnSaveSettings" class="primary">Save weighting</button>
+        <button id="btnResetSettings" class="mini">Reset to defaults</button>
+      </div>
     </div>
+
     <div class="panel">
-      <p class="settings-sub">Backup &amp; portability</p>
-      <p class="settings-note">Export downloads the current data as JSON (a manual backup, and
-        the way to share with anyone not using shared-file sync). Import loads a JSON file back in.</p>
-      <div class="form-row">
+      <h3 class="sec">Managers</h3>
+      <p class="hint">Edit details or archive managers here (kept out of the board to avoid accidental taps).</p>
+      <div id="settingsManagers"></div>
+    </div>
+
+    <div class="panel">
+      <h3 class="sec">Shared file &amp; sync</h3>
+      <p class="hint" id="syncHint"></p>
+      <div id="syncControls"></div>
+    </div>
+
+    <div class="panel">
+      <h3 class="sec">Backup &amp; portability</h3>
+      <p class="hint">Export downloads the current data as JSON (a manual backup and the way to share with
+        anyone not using shared-file sync). Import loads a JSON file back in.</p>
+      <div>
         <button id="btnExport">Export JSON</button>
         <button id="btnImport">Import JSON</button>
       </div>
-      <p class="settings-meta">App version: <span id="appVersion"></span></p>
+      <p class="hint" style="margin-top:12px;margin-bottom:0;">App version <span id="appVersion"></span></p>
     </div>
   </section>
 
   <p class="footer-note">
-    Do not store sensitive content (incident details, customer data) — reference tickets by
-    ID or short title, with an optional link. Data is stored locally in this browser; nothing
-    leaves your machine unless you link a shared file or export it.
+    Do not store sensitive content (incident details, customer data) — reference tickets by ID or short
+    title with an optional link. Data is stored locally in this browser; nothing leaves your machine
+    unless you link a shared file or export it.
   </p>
 </div>
 
-<!-- Generic entity form modal (built dynamically) -->
+<!-- Generic form modal -->
 <div class="overlay" id="formOverlay">
-  <div class="modal modal-form">
+  <div class="modal">
     <h3 id="formTitle"></h3>
     <div id="formBody"></div>
     <div class="actions">
@@ -404,12 +417,35 @@
   </div>
 </div>
 
+<!-- Project modal (fields + inline team builder) -->
+<div class="overlay" id="projectOverlay">
+  <div class="modal wide">
+    <h3 id="projTitle">Add project</h3>
+    <div id="projFields"></div>
+    <div class="team-build">
+      <h4>Team</h4>
+      <div id="projTeam"></div>
+      <button id="projAddMember" class="mini">+ Add team member</button>
+    </div>
+    <div class="actions">
+      <button id="projCancel">Cancel</button>
+      <button id="projOk" class="primary">Save project</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manager detail drawer -->
+<div class="drawer-overlay" id="drawerOverlay">
+  <aside class="drawer"><div class="drawer-inner" id="drawerBody"></div></aside>
+</div>
+
 <!-- Name modal -->
 <div class="overlay" id="nameOverlay">
   <div class="modal">
     <h3>What's your name?</h3>
-    <p>Used to attribute saves in the "Last saved by" banner. Asked once, then remembered.</p>
-    <input type="text" id="nameInput" placeholder="Your name" autocomplete="off">
+    <p class="hint">Used to attribute saves in the "Last saved by" banner. Asked once, then remembered.</p>
+    <input type="text" id="nameInput" placeholder="Your name" autocomplete="off"
+           style="width:100%;font:inherit;padding:9px 11px;border:1px solid var(--border-strong);border-radius:8px;">
     <div class="actions">
       <button id="nameCancel">Cancel</button>
       <button id="nameOk" class="primary">Continue</button>
@@ -417,7 +453,6 @@
   </div>
 </div>
 
-<!-- Hidden file input for Import (universal fallback) -->
 <input type="file" id="importInput" accept="application/json,.json" style="display:none">
 
 <script>
@@ -425,170 +460,142 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.3.0";
+  var APP_VERSION = "0.4.0";
   var MAX_BACKUPS = 10;
   var BACKUP_RE = /^heimdall-data\.backup-\d{8}-\d{4}\.json$/;
   var DATA_FILE = "heimdall-data.json";
   var SAVE_DEBOUNCE_MS = 600;
-  // Live shared-file sync needs the File System Access API (Chromium only).
   var DIR_API = (typeof window.showDirectoryPicker === "function");
   var FSA = (typeof window.showOpenFilePicker === "function");
   var HAS_IDB = (typeof indexedDB !== "undefined" && !!indexedDB);
 
+  var WORK_TYPES = ["escalation", "ditl", "oneoff", "other"];
+  var WORK_STATUS = ["open", "in-progress", "done"];
+  var PSTATUS = ["active", "on-hold", "complete"];
+  var PRIORITY = ["low", "med", "high"];
+  var ROLES = ["lead", "contributor"];
+  var EFFORTS = ["light", "medium", "heavy"];
+  var LABELS = {
+    type: { escalation: "Escalation", ditl: "DITL", oneoff: "One-off", other: "Other" },
+    pstatus: { active: "Active", "on-hold": "On hold", complete: "Complete" },
+    wstatus: { open: "Open", "in-progress": "In progress", done: "Done" },
+    priority: { low: "Low", med: "Med", high: "High" },
+    role: { lead: "Lead", contributor: "Contributor" },
+    effort: { light: "Light", medium: "Medium", heavy: "Heavy" }
+  };
+  var TYPE_COLOR = { escalation: "#dc2626", ditl: "#2563eb", oneoff: "#d97706", other: "#6b7280" };
+
   // ---- Session state ---------------------------------------------------
-  var data = null;             // current in-memory data (always editable)
-  var userName = null;         // persisted across sessions in IndexedDB
-  var fileHandle = null;       // FileSystemFileHandle for the shared data file
-  var dirHandle = null;        // FileSystemDirectoryHandle (for backups + reconnect)
-  var linkState = "none";      // "none" | "needs-reconnect" | "linked"
-  var fileBlocked = false;     // shared file is malformed -> pause file writes
-  var lastSaveOk = true;       // last file write succeeded (for status text)
-  var saveTimer = null;        // debounce handle for auto-save
-  var syncing = false;         // reentrancy guard for syncFromFile
-  var dbReady = false;         // IndexedDB opened successfully
-  var expandedProject = null;  // projectId whose assignment editor is open
+  var data = null, userName = null;
+  var fileHandle = null, dirHandle = null, linkState = "none";
+  var fileBlocked = false, lastSaveOk = true, saveTimer = null, syncing = false, dbReady = false;
+  var currentView = "board";
+  var openManagerId = null;     // manager drawer
+  var editingProjectId = null;  // project modal (null = new)
+  var teamDraft = [];           // [{assignmentId|null, managerId, role, effort}]
 
   // ---- Elements --------------------------------------------------------
   var el = function (id) { return document.getElementById(id); };
-  var bannerText = el("bannerText"), syncLine = el("syncLine");
-  var btnReload = el("btnReload"), btnRetry = el("btnRetry");
-  var saveStatus = el("saveStatus"), toolbar = el("toolbar");
-  var btnExport = el("btnExport"), btnImport = el("btnImport");
-  var noticeEl = el("notice");
+  var bannerText = el("bannerText"), syncLine = el("syncLine"), syncDot = el("syncDot");
+  var btnReload = el("btnReload"), btnRetry = el("btnRetry"), saveStatus = el("saveStatus");
+  var noticeEl = el("notice"), navEl = el("nav");
   var guardEl = el("guard"), guardMsg = el("guardMsg");
   var btnLoadBackup = el("btnLoadBackup"), btnGuardUnlink = el("btnGuardUnlink");
-  var navEl = el("nav");
   var btnAddManager = el("btnAddManager"), boardCards = el("boardCards"), mgrCount = el("mgrCount");
   var btnAddProject = el("btnAddProject"), projList = el("projList"), projCount = el("projCount");
   var btnAddWorkItem = el("btnAddWorkItem"), wiRows = el("wiRows"), wiCount = el("wiCount");
   var fType = el("fType"), fManager = el("fManager"), fStatus = el("fStatus"),
       fFrom = el("fFrom"), fTo = el("fTo"), fClear = el("fClear");
-  var oooManager = el("oooManager"), oooBody = el("oooBody");
-  var btnCopySummary = el("btnCopySummary"), btnExportSummary = el("btnExportSummary"),
-      btnPrintSummary = el("btnPrintSummary");
+  var repGran = el("repGran"), reportBody = el("reportBody");
   var weightsBody = el("weightsBody"), btnSaveSettings = el("btnSaveSettings"),
-      btnResetSettings = el("btnResetSettings");
-  var importInput = el("importInput"), appVersionEl = el("appVersion");
-  var nameOverlay = el("nameOverlay"), nameInput = el("nameInput"),
-      nameOk = el("nameOk"), nameCancel = el("nameCancel");
+      btnResetSettings = el("btnResetSettings"), settingsManagers = el("settingsManagers"),
+      syncHint = el("syncHint"), syncControls = el("syncControls");
+  var btnExport = el("btnExport"), btnImport = el("btnImport"), importInput = el("importInput"),
+      appVersionEl = el("appVersion");
+  var nameOverlay = el("nameOverlay"), nameInput = el("nameInput"), nameOk = el("nameOk"), nameCancel = el("nameCancel");
   var formOverlay = el("formOverlay"), formTitle = el("formTitle"), formBody = el("formBody"),
       formOk = el("formOk"), formCancel = el("formCancel");
+  var projectOverlay = el("projectOverlay"), projTitle = el("projTitle"), projFields = el("projFields"),
+      projTeam = el("projTeam"), projAddMember = el("projAddMember"), projOk = el("projOk"), projCancel = el("projCancel");
+  var drawerOverlay = el("drawerOverlay"), drawerBody = el("drawerBody");
 
-  // Toolbar buttons (built dynamically so we can show the right link control).
-  var btnLink = mkButton("btnLink", "Link shared file", "primary");
-  var btnReconnect = mkButton("btnReconnect", "Reconnect shared file", "primary");
-  var btnUnlink = mkButton("btnUnlink", "Unlink shared file", "");
-  var toolbarNote = document.createElement("span");
-  toolbarNote.className = "note";
-  function mkButton(id, label, cls) {
-    var b = document.createElement("button");
-    b.id = id; b.textContent = label;
-    if (cls) b.className = cls;
-    return b;
-  }
-
-  // ---- Default schema (full section-4 shape) ---------------------------
+  // ---- Default schema --------------------------------------------------
   function defaultData() {
     return {
-      managers: [],
-      projects: [],
-      assignments: [],
-      workItems: [],
+      managers: [], projects: [], assignments: [], workItems: [],
       settings: {
-        appVersion: APP_VERSION,
-        lastSavedBy: null,
-        lastSavedAt: null,
-        weights: {
-          projectLead: 3,
-          projectContributor: 1,
-          escalation: 4,
-          ditl: 2,
-          oneoff: 1,
-          other: 1
-        },
+        appVersion: APP_VERSION, lastSavedBy: null, lastSavedAt: null,
+        weights: { projectLead: 3, projectContributor: 1, escalation: 4, ditl: 2, oneoff: 1, other: 1 },
         effort: { light: 1, medium: 1.5, heavy: 2 },
         bands: [
-          { label: "Light",      min: 0,  max: 4 },
-          { label: "Balanced",   min: 5,  max: 9 },
-          { label: "Heavy",      min: 10, max: 14 },
-          { label: "Overloaded", min: 15, max: null }
+          { label: "Light", min: 0, max: 4 }, { label: "Balanced", min: 5, max: 9 },
+          { label: "Heavy", min: 10, max: 14 }, { label: "Overloaded", min: 15, max: null }
         ]
       }
     };
   }
 
-  // ---- Validation & normalization --------------------------------------
-  function isPlainObject(x) {
-    return x !== null && typeof x === "object" && !Array.isArray(x);
-  }
-
-  // Returns { ok:true, data } or { ok:false, error }. Lenient about missing
-  // keys (filled from defaults) but strict about wrong-typed structures.
+  // ---- Validation ------------------------------------------------------
+  function isPlainObject(x) { return x !== null && typeof x === "object" && !Array.isArray(x); }
   function validate(parsed) {
-    if (!isPlainObject(parsed)) {
-      return { ok: false, error: "top level is not a JSON object." };
-    }
+    if (!isPlainObject(parsed)) return { ok: false, error: "top level is not a JSON object." };
     var arrays = ["managers", "projects", "assignments", "workItems"];
     for (var i = 0; i < arrays.length; i++) {
-      var k = arrays[i];
-      if (k in parsed && !Array.isArray(parsed[k])) {
-        return { ok: false, error: '"' + k + '" must be an array.' };
-      }
+      if (arrays[i] in parsed && !Array.isArray(parsed[arrays[i]]))
+        return { ok: false, error: '"' + arrays[i] + '" must be an array.' };
     }
-    if ("settings" in parsed && !isPlainObject(parsed.settings)) {
+    if ("settings" in parsed && !isPlainObject(parsed.settings))
       return { ok: false, error: '"settings" must be an object.' };
-    }
     var out = defaultData();
-    arrays.forEach(function (k) {
-      if (Array.isArray(parsed[k])) out[k] = parsed[k];
-    });
+    arrays.forEach(function (k) { if (Array.isArray(parsed[k])) out[k] = parsed[k]; });
     if (isPlainObject(parsed.settings)) {
       var s = parsed.settings;
-      out.settings.appVersion  = (s.appVersion != null) ? s.appVersion : out.settings.appVersion;
+      out.settings.appVersion = (s.appVersion != null) ? s.appVersion : out.settings.appVersion;
       out.settings.lastSavedBy = (s.lastSavedBy != null) ? s.lastSavedBy : null;
       out.settings.lastSavedAt = (s.lastSavedAt != null) ? s.lastSavedAt : null;
       if (isPlainObject(s.weights)) out.settings.weights = s.weights;
-      if (isPlainObject(s.effort))  out.settings.effort = s.effort;
-      if (Array.isArray(s.bands))   out.settings.bands = s.bands;
+      if (isPlainObject(s.effort)) out.settings.effort = s.effort;
+      if (Array.isArray(s.bands)) out.settings.bands = s.bands;
     }
     return { ok: true, data: out };
   }
 
-  // ---- Helpers ---------------------------------------------------------
+  // ---- Small helpers ---------------------------------------------------
   function genId() {
-    if (window.crypto && typeof window.crypto.randomUUID === "function") {
-      return window.crypto.randomUUID();
-    }
+    if (window.crypto && typeof window.crypto.randomUUID === "function") return window.crypto.randomUUID();
     return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
   }
-
   function pad(n) { return (n < 10 ? "0" : "") + n; }
-
-  // YYYYMMDD-HHMM in local time.
   function stamp(d) {
-    return "" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
-           "-" + pad(d.getHours()) + pad(d.getMinutes());
+    return "" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes());
   }
-
   function tsValue(iso) { var t = iso ? Date.parse(iso) : NaN; return isNaN(t) ? 0 : t; }
-
+  function todayISO() { return new Date().toISOString().slice(0, 10); }
+  function cap(s) { s = s || ""; return s.charAt(0).toUpperCase() + s.slice(1); }
+  function lab(kind, v) { return (LABELS[kind] && LABELS[kind][v]) || cap(v || ""); }
+  function findById(arr, id) { for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i]; return null; }
+  function managerName(id) { var m = id && findById(data.managers, id); return m ? m.name : (id ? "(unknown)" : "—"); }
+  function activeAssignments(projectId) {
+    return data.assignments.filter(function (a) { return a.projectId === projectId && !a.archived; });
+  }
   function hasContent(d) {
-    return !!d && (d.managers.length || d.projects.length ||
-                   d.assignments.length || d.workItems.length ||
+    return !!d && (d.managers.length || d.projects.length || d.assignments.length || d.workItems.length ||
                    (d.settings && d.settings.lastSavedAt));
   }
+  function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+  function elem(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function miniBtn(label, fn, cls) { var b = elem("button", "mini" + (cls ? " " + cls : ""), label); b.addEventListener("click", fn); return b; }
+  function pill(cls, label) { return elem("span", "pill " + cls, label); }
 
   var noticeTimer = null;
   function notice(msg, kind) {
     noticeEl.textContent = msg;
     noticeEl.className = "notice show " + (kind || "info");
     if (noticeTimer) clearTimeout(noticeTimer);
-    if (kind === "ok") {
-      noticeTimer = setTimeout(function () { noticeEl.className = "notice"; }, 4000);
-    }
+    if (kind === "ok") noticeTimer = setTimeout(function () { noticeEl.className = "notice"; }, 4000);
   }
 
-  // ---- IndexedDB (the always-on local store) ---------------------------
+  // ---- IndexedDB (always-on local store) -------------------------------
   var DB_NAME = "heimdall", STORE = "kv", db = null;
   function idbOpen() {
     return new Promise(function (resolve, reject) {
@@ -600,157 +607,106 @@
   }
   function idbReq(mode, fn) {
     return new Promise(function (resolve, reject) {
-      var tx = db.transaction(STORE, mode);
-      var r = fn(tx.objectStore(STORE));
+      var tx = db.transaction(STORE, mode); var r = fn(tx.objectStore(STORE));
       tx.oncomplete = function () { resolve(r ? r.result : undefined); };
       tx.onerror = function () { reject(tx.error); };
       tx.onabort = function () { reject(tx.error); };
     });
   }
-  function idbGet(key) { return idbReq("readonly", function (s) { return s.get(key); }); }
-  function idbSet(key, val) { return idbReq("readwrite", function (s) { return s.put(val, key); }); }
-  function idbDel(key) { return idbReq("readwrite", function (s) { return s.delete(key); }); }
-
-  // Persist current data to the local store (always available, never prompts).
+  function idbGet(k) { return idbReq("readonly", function (s) { return s.get(k); }); }
+  function idbSet(k, v) { return idbReq("readwrite", function (s) { return s.put(v, k); }); }
+  function idbDel(k) { return idbReq("readwrite", function (s) { return s.delete(k); }); }
   async function saveLocal() {
     if (!dbReady) return;
-    try {
-      // Store a structured clone of plain data (deep copy via JSON).
-      await idbSet("data", JSON.parse(JSON.stringify(data)));
-    } catch (e) { /* local store best-effort; file/export remain */ }
+    try { await idbSet("data", JSON.parse(JSON.stringify(data))); } catch (e) {}
   }
 
-  // ---- Rendering / UI state -------------------------------------------
+  // ---- Banner / link UI / save status ----------------------------------
   function updateBanner() {
     var s = data && data.settings;
     if (s && s.lastSavedBy && s.lastSavedAt) {
-      var when;
-      try { when = new Date(s.lastSavedAt).toLocaleString(); }
-      catch (e) { when = s.lastSavedAt; }
+      var when; try { when = new Date(s.lastSavedAt).toLocaleString(); } catch (e) { when = s.lastSavedAt; }
       bannerText.textContent = "Last saved by " + s.lastSavedBy + " at " + when;
-    } else {
-      bannerText.textContent = "No changes saved yet.";
-    }
+    } else { bannerText.textContent = "No changes saved yet."; }
     appVersionEl.textContent = (s && s.appVersion) || APP_VERSION;
     updateLinkUI();
   }
-
-  // Reflect the shared-file link state in the toolbar + banner.
   function updateLinkUI() {
-    toolbar.innerHTML = "";
-    if (!DIR_API) {
-      toolbarNote.textContent =
-        "Live team sync requires Edge or Chrome. Your data is saved locally here; " +
-        "use Settings → Export to share it.";
-      toolbar.appendChild(toolbarNote);
-      syncLine.textContent = "Local only — saved in this browser.";
-    } else if (linkState === "linked") {
-      toolbar.appendChild(btnUnlink);
-      syncLine.textContent = "Synced with shared file (" + DATA_FILE + ").";
-    } else if (linkState === "needs-reconnect") {
-      toolbar.appendChild(btnReconnect);
-      syncLine.textContent = "Shared file remembered — click Reconnect to resume syncing.";
-    } else {
-      toolbar.appendChild(btnLink);
-      syncLine.textContent = "Local only — link a shared file to sync with your team.";
-    }
     btnReload.style.display = (linkState === "linked") ? "" : "none";
+    if (!DIR_API) { syncDot.className = "dot off"; syncLine.textContent = "Local only — saved in this browser (live sync needs Edge or Chrome)."; }
+    else if (linkState === "linked") { syncDot.className = "dot on"; syncLine.textContent = "Synced with shared file (" + DATA_FILE + ")."; }
+    else if (linkState === "needs-reconnect") { syncDot.className = "dot warn"; syncLine.textContent = "Shared file remembered — reconnect in Settings to resume syncing."; }
+    else { syncDot.className = "dot off"; syncLine.textContent = "Local only — link a shared file in Settings to sync with your team."; }
+    if (currentView === "settings") renderSyncControls();
   }
-
   function setSaveStatus(state) {
     var text = "";
-    if (state === "dirty")       text = "Unsaved changes…";
+    if (state === "dirty") text = "Unsaved changes…";
     else if (state === "saving") text = "Saving…";
-    else if (state === "saved")  text = (linkState === "linked") ? "Saved & synced" : "Saved locally";
-    else if (state === "error")  text = "Saved locally · sync failed";
+    else if (state === "saved") text = (linkState === "linked") ? "Saved & synced" : "Saved locally";
+    else if (state === "error") text = "Saved locally · sync failed";
     saveStatus.textContent = text;
     saveStatus.className = "save-status" + (state ? " " + state : "");
     btnRetry.style.display = (state === "error") ? "" : "none";
   }
 
   // ---- View switching --------------------------------------------------
-  var currentView = "board";
-  var VIEWS = ["board", "projects", "workitems", "oneonone", "settings"];
+  var VIEWS = ["board", "projects", "workitems", "reports", "settings"];
   function showView(name) {
     currentView = name;
     VIEWS.forEach(function (v) { el("view-" + v).hidden = (v !== name); });
-    var nbtns = navEl.querySelectorAll("button");
-    for (var i = 0; i < nbtns.length; i++) {
-      nbtns[i].classList.toggle("active", nbtns[i].getAttribute("data-view") === name);
-    }
+    var nb = navEl.querySelectorAll("button");
+    for (var i = 0; i < nb.length; i++) nb[i].classList.toggle("active", nb[i].getAttribute("data-view") === name);
     renderCurrent();
   }
   function renderCurrent() {
     if (currentView === "board") renderBoard();
     else if (currentView === "projects") renderProjectsView();
     else if (currentView === "workitems") renderWorkItemsView();
-    else if (currentView === "oneonone") render1on1();
+    else if (currentView === "reports") renderReports();
     else if (currentView === "settings") renderSettings();
   }
-  function renderAll() {
-    refreshSelects();
-    renderCurrent();
-  }
+  function renderAll() { refreshSelects(); renderCurrent(); if (openManagerId) renderDrawer(); }
 
-  function emptyRow(tbody, cols, msg) {
-    var tr = document.createElement("tr");
-    var td = document.createElement("td");
-    td.colSpan = cols; td.className = "empty"; td.textContent = msg;
-    tr.appendChild(td); tbody.appendChild(tr);
-  }
-  function emptyP(container, msg) {
-    container.innerHTML = "";
-    var p = document.createElement("p"); p.className = "empty"; p.textContent = msg;
-    container.appendChild(p);
-  }
-
-  // Keep filter / picker selects in sync with the current data.
+  // ---- Selects ---------------------------------------------------------
   function fillSelectOpts(sel, opts, keep) {
     var prev = keep ? sel.value : "";
-    sel.innerHTML = "";
-    opts.forEach(function (o) {
-      var op = document.createElement("option");
-      op.value = o.value; op.textContent = o.label; sel.appendChild(op);
-    });
-    if (keep) {
-      var has = opts.some(function (o) { return o.value === prev; });
-      sel.value = has ? prev : (opts[0] ? opts[0].value : "");
-    }
+    clear(sel);
+    opts.forEach(function (o) { var op = elem("option", null, o.label); op.value = o.value; sel.appendChild(op); });
+    if (keep) { var has = opts.some(function (o) { return o.value === prev; }); sel.value = has ? prev : (opts[0] ? opts[0].value : ""); }
   }
-  function mgrOptList(activeOnly, blankLabel) {
-    var opts = [{ value: "", label: blankLabel }];
-    data.managers.forEach(function (m) {
-      if (activeOnly && !m.active) return;
-      opts.push({ value: m.id, label: m.name + (m.active ? "" : " (archived)") });
-    });
-    return opts;
+  function enumOpts(arr, kind, blank) {
+    var o = blank ? [{ value: "", label: blank }] : [];
+    return o.concat(arr.map(function (v) { return { value: v, label: lab(kind, v) }; }));
+  }
+  function managerOpts(activeOnly, blank) {
+    var o = blank ? [{ value: "", label: blank }] : [];
+    data.managers.forEach(function (m) { if (activeOnly && !m.active) return; o.push({ value: m.id, label: m.name + (m.active ? "" : " (archived)") }); });
+    return o;
   }
   function refreshSelects() {
-    fillSelectOpts(fType, [{ value: "", label: "All" }].concat(
-      WORK_TYPES.map(function (v) { return { value: v, label: v }; })), true);
-    fillSelectOpts(fStatus, [{ value: "", label: "All" }].concat(
-      WORK_STATUS.map(function (v) { return { value: v, label: v }; })), true);
-    fillSelectOpts(fManager, mgrOptList(false, "All"), true);
-    fillSelectOpts(oooManager, mgrOptList(true, "— select a manager —"), true);
+    fillSelectOpts(fType, enumOpts(WORK_TYPES, "type", "All"), true);
+    fillSelectOpts(fStatus, enumOpts(WORK_STATUS, "wstatus", "All"), true);
+    fillSelectOpts(fManager, managerOpts(false, "All"), true);
   }
 
-  // ---- Workload weighting (brief §6) -----------------------------------
+  // ---- Weighting (brief §6) --------------------------------------------
   function round1(n) { return Math.round(n * 10) / 10; }
-  function managerScore(managerId) {
+  function managerScore(id) {
     var w = data.settings.weights || {}, eff = data.settings.effort || {};
     var score = 0, c = { led: 0, supporting: 0, escalation: 0, ditl: 0, oneoff: 0, other: 0 };
     data.assignments.forEach(function (a) {
-      if (a.archived || a.managerId !== managerId) return;
+      if (a.archived || a.managerId !== id) return;
       var p = findById(data.projects, a.projectId);
-      if (!p || p.status !== "active") return; // only active projects count
+      if (!p || p.status !== "active") return;
       var base = (a.role === "lead") ? (w.projectLead || 0) : (w.projectContributor || 0);
       var mult = (eff[a.effort] != null) ? eff[a.effort] : 1;
       score += base * mult;
       if (a.role === "lead") c.led++; else c.supporting++;
     });
     data.workItems.forEach(function (wi) {
-      if (wi.archived || wi.managerId !== managerId) return;
-      if (wi.status !== "open" && wi.status !== "in-progress") return; // only live items
+      if (wi.archived || wi.managerId !== id) return;
+      if (wi.status !== "open" && wi.status !== "in-progress") return;
       if (wi.type === "escalation") { score += (w.escalation || 0); c.escalation++; }
       else if (wi.type === "ditl") { score += (w.ditl || 0); c.ditl++; }
       else if (wi.type === "oneoff") { score += (w.oneoff || 0); c.oneoff++; }
@@ -760,147 +716,89 @@
   }
   function bandFor(score) {
     var bands = data.settings.bands || [];
-    for (var i = 0; i < bands.length; i++) {
-      var b = bands[i];
-      if (score >= b.min && (b.max == null || score <= b.max)) return b;
-    }
+    for (var i = 0; i < bands.length; i++) { var b = bands[i]; if (score >= b.min && (b.max == null || score <= b.max)) return b; }
     return bands.length ? bands[bands.length - 1] : { label: "—" };
   }
-  function heatClass(label) {
-    return "heat-" + String(label || "").toLowerCase().replace(/[^a-z]/g, "");
-  }
+  function heatClass(label) { return "heat-" + String(label || "na").toLowerCase().replace(/[^a-z]/g, ""); }
 
-  // ---- Workload board view ---------------------------------------------
-  function countLi(label, n, pop) {
-    var li = document.createElement("li");
-    if (pop) li.className = "pop";
-    var a = document.createElement("span"); a.textContent = label;
-    var b = document.createElement("span"); b.className = "n"; b.textContent = n;
-    li.appendChild(a); li.appendChild(b);
-    return li;
+  // ---- Board view ------------------------------------------------------
+  function chip(label, n, alert) {
+    var c = elem("span", "chip" + (alert ? " alert" : ""));
+    c.appendChild(elem("span", null, label));
+    c.appendChild(elem("b", null, String(n)));
+    return c;
   }
   function renderBoard() {
     var list = (data && data.managers) || [];
     mgrCount.textContent = list.length ? ("(" + list.length + ")") : "";
-    if (!list.length) { emptyP(boardCards, "No managers yet — use “Add manager”."); return; }
-    boardCards.innerHTML = "";
-    list.forEach(function (m) {
-      var card = document.createElement("div"); card.className = "card";
-      var top = document.createElement("div"); top.className = "card-top";
-      var left = document.createElement("div");
-      var nm = document.createElement("div"); nm.className = "m-name"; nm.textContent = m.name; left.appendChild(nm);
-      if (m.title) { var ti = document.createElement("div"); ti.className = "m-title"; ti.textContent = m.title; left.appendChild(ti); }
-      top.appendChild(left);
-      if (m.active) {
-        var sc = managerScore(m.id), b = bandFor(sc.score);
-        var heat = document.createElement("span"); heat.className = "heat " + heatClass(b.label); heat.textContent = b.label;
-        top.appendChild(heat);
-        card.appendChild(top);
-        var score = document.createElement("div"); score.className = "score"; score.textContent = "score " + round1(sc.score);
-        card.appendChild(score);
-        var ul = document.createElement("ul"); ul.className = "counts";
-        ul.appendChild(countLi("Projects led", sc.counts.led));
-        ul.appendChild(countLi("Supporting", sc.counts.supporting));
-        ul.appendChild(countLi("Escalations", sc.counts.escalation, sc.counts.escalation > 0));
-        ul.appendChild(countLi("DITL", sc.counts.ditl));
-        ul.appendChild(countLi("One-offs", sc.counts.oneoff));
-        if (sc.counts.other) ul.appendChild(countLi("Other", sc.counts.other));
-        card.appendChild(ul);
-      } else {
-        var arch = document.createElement("span"); arch.className = "heat"; arch.style.background = "#eef0f3"; arch.style.color = "#6b7280"; arch.textContent = "Archived";
-        top.appendChild(arch);
-        card.appendChild(top);
-      }
-      var act = document.createElement("div"); act.className = "card-actions";
-      act.appendChild(miniBtn("Edit", function () { editManager(m.id); }));
-      act.appendChild(miniBtn(m.active ? "Archive" : "Restore", function () { toggleManagerActive(m.id); }));
-      card.appendChild(act);
+    clear(boardCards);
+    var active = list.filter(function (m) { return m.active; });
+    if (!active.length) { boardCards.appendChild(elem("div", "empty", list.length ? "All managers are archived. Restore one in Settings, or add a manager." : "No managers yet — click “Add manager”.")); return; }
+    active.forEach(function (m) {
+      var sc = managerScore(m.id), b = bandFor(sc.score);
+      var card = elem("div", "mcard");
+      card.appendChild(elem("div", "m-name", m.name));
+      var sub = [m.title, m.location].filter(Boolean).join(" · ");
+      if (sub) card.appendChild(elem("div", "m-sub", sub));
+      var hr = elem("div", "m-heat-row");
+      hr.appendChild(elem("span", "heat " + heatClass(b.label), b.label));
+      hr.appendChild(elem("span", "m-score", "score " + round1(sc.score)));
+      card.appendChild(hr);
+      var chips = elem("div", "chips");
+      if (sc.counts.escalation) chips.appendChild(chip("Escalations", sc.counts.escalation, true));
+      chips.appendChild(chip("Led", sc.counts.led));
+      chips.appendChild(chip("Supporting", sc.counts.supporting));
+      if (sc.counts.ditl) chips.appendChild(chip("DITL", sc.counts.ditl));
+      if (sc.counts.oneoff) chips.appendChild(chip("One-offs", sc.counts.oneoff));
+      if (sc.counts.other) chips.appendChild(chip("Other", sc.counts.other));
+      card.appendChild(chips);
+      card.addEventListener("click", function () { openManager(m.id); });
       boardCards.appendChild(card);
     });
   }
 
-  // ---- Projects view (cards; lead highlighted) -------------------------
-  function teamLineFrag(live) {
-    var span = document.createElement("span");
-    if (!live.length) { span.className = "ooo-empty"; span.textContent = "No one assigned."; return span; }
-    var ordered = live.filter(function (a) { return a.role === "lead"; })
-                      .concat(live.filter(function (a) { return a.role !== "lead"; }));
-    ordered.forEach(function (a, i) {
-      if (i) span.appendChild(document.createTextNode(", "));
-      var s = document.createElement("span");
-      if (a.role === "lead") { s.className = "lead"; s.textContent = managerName(a.managerId) + " (lead, " + a.effort + ")"; }
-      else { s.textContent = managerName(a.managerId) + " (" + a.effort + ")"; }
-      span.appendChild(s);
+  // ---- Projects view ---------------------------------------------------
+  function teamFrag(live) {
+    var span = elem("span");
+    if (!live.length) { span.className = "d-empty"; span.textContent = "No one assigned."; return span; }
+    var ordered = live.filter(function (a) { return a.role === "lead"; }).concat(live.filter(function (a) { return a.role !== "lead"; }));
+    ordered.forEach(function (a) {
+      var txt = (a.role === "lead")
+        ? managerName(a.managerId) + " · Lead · " + lab("effort", a.effort)
+        : managerName(a.managerId) + " · " + lab("effort", a.effort);
+      span.appendChild(pill(a.role === "lead" ? "lead" : "contributor", txt));
     });
     return span;
-  }
-  function assignEditor(p) {
-    var box = document.createElement("div"); box.className = "assign-box";
-    var h = document.createElement("h3"); h.textContent = "Team on “" + (p.name || "project") + "”"; box.appendChild(h);
-    var live = activeAssignments(p.id);
-    var ul = document.createElement("ul"); ul.className = "assign-list";
-    if (!live.length) {
-      var li0 = document.createElement("li"); li0.className = "ooo-empty"; li0.textContent = "No one assigned yet."; ul.appendChild(li0);
-    } else {
-      live.forEach(function (a) {
-        var li = document.createElement("li");
-        var who = document.createElement("span"); who.className = "who"; who.textContent = managerName(a.managerId); li.appendChild(who);
-        li.appendChild(pill(a.role, a.role));
-        var eff = document.createElement("span"); eff.textContent = a.effort; li.appendChild(eff);
-        li.appendChild(miniBtn("Remove", function () { archiveAssignment(a.id); }));
-        ul.appendChild(li);
-      });
-    }
-    box.appendChild(ul);
-    box.appendChild(miniBtn("Assign a manager", function () { addAssignment(p.id); }));
-    return box;
   }
   function renderProjectsView() {
     var list = (data && data.projects) || [];
     projCount.textContent = list.length ? ("(" + list.length + ")") : "";
-    if (!list.length) { emptyP(projList, "No projects yet — use “Add project”."); return; }
-    projList.innerHTML = "";
+    clear(projList);
+    if (!list.length) { projList.appendChild(elem("div", "empty", "No projects yet — click “Add project”.")); return; }
     list.forEach(function (p) {
-      var card = document.createElement("div"); card.className = "pcard";
-      if (p.status === "complete") card.style.opacity = ".7";
-      var top = document.createElement("div"); top.className = "p-top";
-      var left = document.createElement("div");
-      var nm = document.createElement("div"); nm.className = "p-name"; nm.textContent = p.name; left.appendChild(nm);
-      var meta = document.createElement("div"); meta.className = "p-meta";
-      meta.textContent = [(p.status || "active"), (p.priority || "med") + " priority",
-        p.targetDate ? ("target " + p.targetDate) : null].filter(Boolean).join(" · ");
+      var card = elem("div", "pcard"); if (p.status === "complete") card.style.opacity = ".65";
+      var top = elem("div", "p-top");
+      var left = elem("div");
+      left.appendChild(elem("div", "p-name", p.name));
+      var meta = elem("div", "p-meta");
+      meta.appendChild(pill("status", lab("pstatus", p.status || "active")));
+      meta.appendChild(elem("span", null, lab("priority", p.priority || "med") + " priority"));
+      if (p.targetDate) meta.appendChild(elem("span", null, "target " + p.targetDate));
+      if (p.link) { var lw = elem("span", "p-link"); var a = elem("a", null, "Jira epic"); a.href = p.link; a.target = "_blank"; a.rel = "noopener"; lw.appendChild(a); meta.appendChild(lw); }
       left.appendChild(meta);
       top.appendChild(left);
-      var live = activeAssignments(p.id);
-      var act = document.createElement("div"); act.className = "p-actions";
-      act.appendChild(miniBtn("Edit", function () { editProject(p.id); }));
-      act.appendChild(miniBtn(expandedProject === p.id ? "Hide team" : ("Team (" + live.length + ")"),
-        function () { toggleAssignEditor(p.id); }));
-      top.appendChild(act);
+      top.appendChild(miniBtn("Edit", function () { openProjectModal(p.id); }));
       card.appendChild(top);
-      var team = document.createElement("div"); team.className = "p-team"; team.appendChild(teamLineFrag(live));
+      var team = elem("div", "p-team"); team.appendChild(teamFrag(activeAssignments(p.id)));
       card.appendChild(team);
-      if (expandedProject === p.id) card.appendChild(assignEditor(p));
       projList.appendChild(card);
     });
   }
 
-  // ---- Work Items Queue view (filters + aging) -------------------------
-  function daysSince(iso) {
-    if (!iso) return null;
-    var t = Date.parse(iso); if (isNaN(t)) return null;
-    return Math.floor((Date.now() - t) / 86400000);
-  }
-  function ageText(w) {
-    if (w.status === "done") return "—";
-    var d = daysSince(w.openedDate);
-    return (d == null) ? "—" : (d + "d");
-  }
-  function isStale(w) {
-    if (w.archived || w.status === "done") return false;
-    var d = daysSince(w.openedDate);
-    return d != null && d >= 14;
-  }
+  // ---- Work Items view -------------------------------------------------
+  function daysSince(iso) { if (!iso) return null; var t = Date.parse(iso); if (isNaN(t)) return null; return Math.floor((Date.now() - t) / 86400000); }
+  function ageText(w) { if (w.status === "done") return "—"; var d = daysSince(w.openedDate); return (d == null) ? "—" : (d + "d"); }
+  function isStale(w) { if (w.archived || w.status === "done") return false; var d = daysSince(w.openedDate); return d != null && d >= 14; }
   function applyWiFilters(all) {
     var t = fType.value, m = fManager.value, s = fStatus.value, from = fFrom.value, to = fTo.value;
     return all.filter(function (w) {
@@ -912,925 +810,704 @@
       return true;
     });
   }
+  function tdc(text) { return elem("td", null, text); }
   function renderWorkItemsView() {
-    wiRows.innerHTML = "";
+    clear(wiRows);
     var all = (data && data.workItems) || [];
     wiCount.textContent = all.length ? ("(" + all.length + ")") : "";
     var list = applyWiFilters(all);
     if (!list.length) {
-      emptyRow(wiRows, 10, all.length ? "No work items match the filters." : "No work items yet — use “Add work item”.");
-      return;
+      var tr = elem("tr"); var td = elem("td", "empty", all.length ? "No work items match the filters." : "No work items yet — click “Add work item”.");
+      td.colSpan = 10; tr.appendChild(td); wiRows.appendChild(tr); return;
     }
     list.forEach(function (w) {
-      var tr = document.createElement("tr");
-      if (w.archived || w.status === "done") tr.className = "archived";
-      var typeTd = document.createElement("td"); typeTd.appendChild(pill(w.type || "other", w.type || "other")); tr.appendChild(typeTd);
-      tr.appendChild(cell(w.title || ""));
-      tr.appendChild(cell(managerName(w.managerId)));
-      tr.appendChild(cell(w.status || "open"));
-      tr.appendChild(cell(w.priority || "med"));
-      tr.appendChild(cell(w.openedDate || "—"));
-      var ageTd = cell(ageText(w)); ageTd.className = isStale(w) ? "age old" : "age"; tr.appendChild(ageTd);
-      tr.appendChild(cell(w.dueDate || "—"));
-      tr.appendChild(cell(w.rollOffDate || "—"));
-      var act = document.createElement("td"); act.className = "actions";
-      act.appendChild(miniBtn("Edit", function () { editWorkItem(w.id); }));
-      if (w.status !== "done") act.appendChild(miniBtn("Done", function () { markWorkItemDone(w.id); }));
-      act.appendChild(miniBtn(w.archived ? "Restore" : "Archive", function () { toggleWorkItemArchived(w.id); }));
+      var tr = elem("tr"); if (w.archived || w.status === "done") tr.className = "archived";
+      var t1 = elem("td"); t1.appendChild(pill(w.type || "other", lab("type", w.type))); tr.appendChild(t1);
+      var titleTd = tdc(w.title || "");
+      if (w.link) { titleTd.textContent = ""; var a = elem("a", null, w.title || "(item)"); a.href = w.link; a.target = "_blank"; a.rel = "noopener"; titleTd.appendChild(a); }
+      tr.appendChild(titleTd);
+      tr.appendChild(tdc(managerName(w.managerId)));
+      tr.appendChild(tdc(lab("wstatus", w.status || "open")));
+      tr.appendChild(tdc(lab("priority", w.priority || "med")));
+      tr.appendChild(tdc(w.openedDate || "—"));
+      var ageTd = tdc(ageText(w)); ageTd.className = isStale(w) ? "age old" : "age"; tr.appendChild(ageTd);
+      tr.appendChild(tdc(w.dueDate || "—"));
+      tr.appendChild(tdc(w.rollOffDate || "—"));
+      var act = elem("td", "actions");
+      act.appendChild(miniBtn("Edit", function () { editWorkItem(w.id); }, "ghost"));
+      if (w.status !== "done") act.appendChild(miniBtn("Done", function () { markWorkItemDone(w.id); }, "ghost"));
+      act.appendChild(miniBtn(w.archived ? "Restore" : "Archive", function () { toggleWorkItemArchived(w.id); }, "ghost"));
       tr.appendChild(act);
       wiRows.appendChild(tr);
     });
   }
 
-  // ---- 1:1 Prep view ---------------------------------------------------
-  function cap(s) { s = s || ""; return s.charAt(0).toUpperCase() + s.slice(1); }
-  function soon(iso) { // past, or within the next 30 days
-    var t = Date.parse(iso); if (isNaN(t)) return false;
-    return (t - Date.now()) / 86400000 <= 30;
+  // ---- Reports view ----------------------------------------------------
+  function isoWeek(d) {
+    var x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    var day = (x.getUTCDay() + 6) % 7; x.setUTCDate(x.getUTCDate() - day + 3);
+    var firstThu = new Date(Date.UTC(x.getUTCFullYear(), 0, 4));
+    return 1 + Math.round((x - firstThu) / 604800000);
   }
-  function oooData(id) {
-    var current = [], wins = [], roll = [];
-    data.assignments.forEach(function (a) {
-      if (a.archived || a.managerId !== id) return;
-      var p = findById(data.projects, a.projectId); if (!p) return;
-      if (p.status === "active") current.push("Project: " + p.name + " — " + a.role + " (" + a.effort + ")");
-      if (a.endDate && soon(a.endDate)) roll.push("Assignment on " + p.name + " rolls off " + a.endDate);
+  function periodKey(iso, gran) {
+    if (gran === "all") return "All time";
+    if (!iso) return null;
+    var d = new Date(iso); if (isNaN(d)) return null;
+    var y = d.getFullYear();
+    if (gran === "year") return "" + y;
+    if (gran === "quarter") return y + " Q" + (Math.floor(d.getMonth() / 3) + 1);
+    if (gran === "month") return y + "-" + pad(d.getMonth() + 1);
+    if (gran === "week") return y + "-W" + pad(isoWeek(d));
+    return "" + y;
+  }
+  function renderReports() {
+    clear(reportBody);
+    var items = (data && data.workItems) || [];
+    var byType = { escalation: 0, ditl: 0, oneoff: 0, other: 0 };
+    var byStatus = { open: 0, "in-progress": 0, done: 0 };
+    items.forEach(function (w) { if (w.type in byType) byType[w.type]++; if (w.status in byStatus) byStatus[w.status]++; });
+
+    var summary = elem("div", "summary");
+    function stat(k, v) { var s = elem("div", "stat"); s.appendChild(elem("div", "v", String(v))); s.appendChild(elem("div", "k", k)); return s; }
+    summary.appendChild(stat("Total items", items.length));
+    summary.appendChild(stat("Open", byStatus.open));
+    summary.appendChild(stat("In progress", byStatus["in-progress"]));
+    summary.appendChild(stat("Done", byStatus.done));
+    reportBody.appendChild(summary);
+
+    if (!items.length) { reportBody.appendChild(elem("div", "empty", "No work items to report on yet.")); return; }
+
+    var legend = elem("div", "legend");
+    WORK_TYPES.forEach(function (t) {
+      var sp = elem("span"); var i = elem("i"); i.style.background = TYPE_COLOR[t]; sp.appendChild(i); sp.appendChild(elem("span", null, lab("type", t))); legend.appendChild(sp);
     });
-    data.workItems.forEach(function (w) {
-      if (w.managerId !== id) return;
-      if (!w.archived && (w.status === "open" || w.status === "in-progress")) current.push(cap(w.type) + ": " + w.title + " [" + w.status + "]");
-      if (w.status === "done" && w.completedDate) wins.push(cap(w.type) + ": " + w.title + " (done " + w.completedDate + ")");
-      if (!w.archived && w.status !== "done" && w.rollOffDate && soon(w.rollOffDate)) roll.push(cap(w.type) + ": " + w.title + " rolls off " + w.rollOffDate);
+    reportBody.appendChild(legend);
+
+    var gran = repGran.value;
+    var map = {};
+    items.forEach(function (w) {
+      var k = periodKey(w.openedDate, gran); if (k == null) k = "(no date)";
+      if (!map[k]) map[k] = { total: 0, types: { escalation: 0, ditl: 0, oneoff: 0, other: 0 } };
+      map[k].total++; if (w.type in map[k].types) map[k].types[w.type]++;
     });
-    wins.sort().reverse();
-    return { current: current, wins: wins, roll: roll };
-  }
-  function oooSection(title, items, emptyMsg) {
-    var sec = document.createElement("div"); sec.className = "ooo-section";
-    var h = document.createElement("h3"); h.textContent = title; sec.appendChild(h);
-    if (!items.length) { var e = document.createElement("p"); e.className = "ooo-empty"; e.textContent = emptyMsg; sec.appendChild(e); return sec; }
-    var ul = document.createElement("ul"); ul.className = "ooo-list";
-    items.forEach(function (it) { var li = document.createElement("li"); li.textContent = it; ul.appendChild(li); });
-    sec.appendChild(ul); return sec;
-  }
-  function render1on1() {
-    var id = oooManager.value;
-    if (!id) { emptyP(oooBody, "Pick a manager to see their current load, recent wins, and what is rolling off."); return; }
-    oooBody.innerHTML = "";
-    var sc = managerScore(id), b = bandFor(sc.score);
-    var head = document.createElement("p");
-    head.innerHTML = "";
-    head.textContent = "Workload: " + b.label + " (score " + round1(sc.score) + ")";
-    oooBody.appendChild(head);
-    var d = oooData(id);
-    oooBody.appendChild(oooSection("Currently carrying", d.current, "Nothing active right now."));
-    oooBody.appendChild(oooSection("Recently completed (wins)", d.wins, "No completed items recorded yet."));
-    oooBody.appendChild(oooSection("Rolling off soon / overdue", d.roll, "Nothing rolling off in the next 30 days."));
-  }
-  function oooSummaryText(id) {
-    var m = findById(data.managers, id); if (!m) return "";
-    var sc = managerScore(id), b = bandFor(sc.score), d = oooData(id);
-    function block(title, items) {
-      return title + "\n" + (items.length ? items.map(function (x) { return "  - " + x; }).join("\n") : "  (none)") + "\n";
-    }
-    return "1:1 Prep — " + m.name + (m.title ? " (" + m.title + ")" : "") + "\n" +
-           "Generated " + new Date().toLocaleString() + "\n" +
-           "Workload: " + b.label + " (score " + round1(sc.score) + ")\n\n" +
-           block("Currently carrying:", d.current) + "\n" +
-           block("Recently completed (wins):", d.wins) + "\n" +
-           block("Rolling off soon / overdue:", d.roll);
-  }
-  async function copySummary() {
-    var id = oooManager.value;
-    if (!id) { notice("Pick a manager first.", "err"); return; }
-    var text = oooSummaryText(id);
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); }
-      else { fallbackCopy(text); }
-      notice("Summary copied to the clipboard.", "ok");
-    } catch (e) { fallbackCopy(text); notice("Summary copied.", "ok"); }
-  }
-  function fallbackCopy(text) {
-    var ta = document.createElement("textarea");
-    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
-    document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); } catch (e) {}
-    ta.remove();
-  }
-  function exportSummary() {
-    var id = oooManager.value;
-    if (!id) { notice("Pick a manager first.", "err"); return; }
-    var m = findById(data.managers, id);
-    var text = oooSummaryText(id);
-    var blob = new Blob([text], { type: "text/plain" });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url; a.download = "1on1-" + (m.name || "manager").replace(/[^a-z0-9]+/gi, "-").toLowerCase() + ".txt";
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    notice("Summary exported.", "ok");
+    var keys = Object.keys(map).sort().reverse().slice(0, 20);
+    var max = 1; keys.forEach(function (k) { if (map[k].total > max) max = map[k].total; });
+    var wrap = elem("div");
+    keys.forEach(function (k) {
+      var row = elem("div", "bucket");
+      row.appendChild(elem("div", "lab", k));
+      var track = elem("div", "track"); track.style.width = (Math.max(8, map[k].total / max * 100)) + "%";
+      WORK_TYPES.forEach(function (t) {
+        var n = map[k].types[t]; if (!n) return;
+        var seg = elem("div", "seg"); seg.style.background = TYPE_COLOR[t]; seg.style.width = (n / map[k].total * 100) + "%";
+        seg.title = lab("type", t) + ": " + n; track.appendChild(seg);
+      });
+      row.appendChild(track);
+      row.appendChild(elem("div", "n", String(map[k].total)));
+      wrap.appendChild(row);
+    });
+    reportBody.appendChild(wrap);
   }
 
-  // ---- Settings view (editable weighting) ------------------------------
+  // ---- Settings view ---------------------------------------------------
   function numField(id, labelText, value) {
-    var wrap = document.createElement("label");
-    var span = document.createElement("span"); span.textContent = labelText; wrap.appendChild(span);
-    var inp = document.createElement("input"); inp.type = "number"; inp.step = "any"; inp.id = id;
-    inp.value = (value == null ? "" : value); wrap.appendChild(inp);
-    return wrap;
-  }
-  function settingsSubLabel(text) {
-    var p = document.createElement("p"); p.className = "settings-sub"; p.textContent = text; return p;
+    var w = elem("label"); w.appendChild(elem("span", null, labelText));
+    var inp = elem("input"); inp.type = "number"; inp.step = "any"; inp.id = id; inp.value = (value == null ? "" : value);
+    w.appendChild(inp); return w;
   }
   function renderSettings() {
     var w = data.settings.weights || {}, eff = data.settings.effort || {}, bands = data.settings.bands || [];
-    weightsBody.innerHTML = "";
-
-    weightsBody.appendChild(settingsSubLabel("Item weights"));
-    var grid = document.createElement("div"); grid.className = "weights-grid";
-    [["projectLead", "Project — lead"], ["projectContributor", "Project — contributor"],
-     ["escalation", "Escalation"], ["ditl", "DITL"], ["oneoff", "One-off"], ["other", "Other"]]
-      .forEach(function (p) { grid.appendChild(numField("w_" + p[0], p[1], w[p[0]])); });
+    clear(weightsBody);
+    weightsBody.appendChild(elem("p", "hint", "Item weights"));
+    var grid = elem("div", "filters");
+    [["projectLead", "Project — lead"], ["projectContributor", "Project — contributor"], ["escalation", "Escalation"],
+     ["ditl", "DITL"], ["oneoff", "One-off"], ["other", "Other"]].forEach(function (p) { grid.appendChild(numField("w_" + p[0], p[1], w[p[0]])); });
     weightsBody.appendChild(grid);
-
-    weightsBody.appendChild(settingsSubLabel("Effort multipliers"));
-    var eg = document.createElement("div"); eg.className = "weights-grid";
-    [["light", "Light ×"], ["medium", "Medium ×"], ["heavy", "Heavy ×"]]
-      .forEach(function (p) { eg.appendChild(numField("e_" + p[0], p[1], eff[p[0]])); });
+    weightsBody.appendChild(elem("p", "hint", "Effort multipliers"));
+    var eg = elem("div", "filters");
+    [["light", "Light ×"], ["medium", "Medium ×"], ["heavy", "Heavy ×"]].forEach(function (p) { eg.appendChild(numField("e_" + p[0], p[1], eff[p[0]])); });
     weightsBody.appendChild(eg);
-
-    weightsBody.appendChild(settingsSubLabel("Heat bands (min–max score; blank max = no upper limit)"));
-    var bb = document.createElement("div"); bb.className = "bands-edit";
+    weightsBody.appendChild(elem("p", "hint", "Heat bands (min–max score; blank max = no upper limit)"));
+    var bb = elem("div");
     bands.forEach(function (b, i) {
-      var row = document.createElement("div"); row.className = "band-row";
-      var lab = document.createElement("input"); lab.className = "lab"; lab.id = "b_lab_" + i; lab.value = b.label; row.appendChild(lab);
-      var mn = document.createElement("input"); mn.className = "num"; mn.type = "number"; mn.id = "b_min_" + i; mn.value = b.min; row.appendChild(mn);
-      var dash = document.createElement("span"); dash.textContent = "to"; row.appendChild(dash);
-      var mx = document.createElement("input"); mx.className = "num"; mx.type = "number"; mx.id = "b_max_" + i; mx.value = (b.max == null ? "" : b.max); row.appendChild(mx);
+      var row = elem("div", "filters"); row.style.marginBottom = "8px";
+      var l1 = elem("label"); l1.appendChild(elem("span", null, "Label")); var li = elem("input"); li.id = "b_lab_" + i; li.value = b.label; l1.appendChild(li); row.appendChild(l1);
+      var l2 = elem("label"); l2.appendChild(elem("span", null, "Min")); var mn = elem("input"); mn.type = "number"; mn.id = "b_min_" + i; mn.value = b.min; l2.appendChild(mn); row.appendChild(l2);
+      var l3 = elem("label"); l3.appendChild(elem("span", null, "Max")); var mx = elem("input"); mx.type = "number"; mx.id = "b_max_" + i; mx.value = (b.max == null ? "" : b.max); l3.appendChild(mx); row.appendChild(l3);
       bb.appendChild(row);
     });
     weightsBody.appendChild(bb);
+
+    renderSettingsManagers();
+    renderSyncControls();
+  }
+  function renderSettingsManagers() {
+    clear(settingsManagers);
+    var list = data.managers || [];
+    if (!list.length) { settingsManagers.appendChild(elem("div", "empty", "No managers yet.")); return; }
+    var tbl = elem("table");
+    var thead = elem("thead"); var hr = elem("tr");
+    ["Name", "Title", "Location", "Active", ""].forEach(function (h) { hr.appendChild(elem("th", null, h)); });
+    thead.appendChild(hr); tbl.appendChild(thead);
+    var tb = elem("tbody");
+    list.forEach(function (m) {
+      var tr = elem("tr"); if (!m.active) tr.className = "archived";
+      tr.appendChild(tdc(m.name || ""));
+      tr.appendChild(tdc(m.title || "—"));
+      tr.appendChild(tdc(m.location || "—"));
+      tr.appendChild(tdc(m.active ? "Yes" : "No"));
+      var act = elem("td", "actions");
+      act.appendChild(miniBtn("Edit", function () { editManager(m.id); }, "ghost"));
+      act.appendChild(miniBtn(m.active ? "Archive" : "Restore", function () { toggleManagerActive(m.id); }, m.active ? "danger" : ""));
+      tr.appendChild(act); tb.appendChild(tr);
+    });
+    tbl.appendChild(tb); settingsManagers.appendChild(tbl);
+  }
+  function renderSyncControls() {
+    clear(syncControls);
+    if (!DIR_API) { syncHint.textContent = "Live shared-file sync requires Microsoft Edge or Chrome. Your data is saved locally; use Export to share it."; return; }
+    if (linkState === "linked") {
+      syncHint.textContent = "Linked. Changes write to the shared file automatically, and teammates' changes are pulled when you return to the tab.";
+      syncControls.appendChild(miniBtn("Reload latest", function () { syncFromFile(true); }));
+      syncControls.appendChild(miniBtn("Unlink shared file", unlinkSharedFile, "danger"));
+    } else if (linkState === "needs-reconnect") {
+      syncHint.textContent = "A shared file is remembered but needs permission again.";
+      var b = elem("button", "primary", "Reconnect shared file"); b.addEventListener("click", reconnectSharedFile); syncControls.appendChild(b);
+    } else {
+      syncHint.textContent = "Link a folder in your synced cloud drive (OneDrive/SharePoint/Google Drive). Heimdall keeps a shared heimdall-data.json there plus timestamped backups.";
+      var bl = elem("button", "primary", "Link shared file"); bl.addEventListener("click", linkSharedFile); syncControls.appendChild(bl);
+    }
   }
   function saveSettings() {
     var w = data.settings.weights, eff = data.settings.effort, bands = data.settings.bands;
-    ["projectLead", "projectContributor", "escalation", "ditl", "oneoff", "other"].forEach(function (k) {
-      var v = parseFloat(el("w_" + k).value); if (!isNaN(v)) w[k] = v;
-    });
-    ["light", "medium", "heavy"].forEach(function (k) {
-      var v = parseFloat(el("e_" + k).value); if (!isNaN(v)) eff[k] = v;
-    });
+    ["projectLead", "projectContributor", "escalation", "ditl", "oneoff", "other"].forEach(function (k) { var v = parseFloat(el("w_" + k).value); if (!isNaN(v)) w[k] = v; });
+    ["light", "medium", "heavy"].forEach(function (k) { var v = parseFloat(el("e_" + k).value); if (!isNaN(v)) eff[k] = v; });
     bands.forEach(function (b, i) {
-      var lab = el("b_lab_" + i).value.trim(); if (lab) b.label = lab;
+      var lb = el("b_lab_" + i).value.trim(); if (lb) b.label = lb;
       var mn = parseFloat(el("b_min_" + i).value); if (!isNaN(mn)) b.min = mn;
-      var mxRaw = el("b_max_" + i).value.trim();
-      b.max = (mxRaw === "") ? null : parseFloat(mxRaw);
+      var mxRaw = el("b_max_" + i).value.trim(); b.max = (mxRaw === "") ? null : parseFloat(mxRaw);
     });
-    commit();
-    notice("Weighting saved.", "ok");
+    commit(); notice("Weighting saved.", "ok");
   }
   function resetSettings() {
     var d = defaultData();
-    data.settings.weights = d.settings.weights;
-    data.settings.effort = d.settings.effort;
-    data.settings.bands = d.settings.bands;
-    renderSettings();
-    commit();
-    notice("Weighting reset to defaults.", "ok");
+    data.settings.weights = d.settings.weights; data.settings.effort = d.settings.effort; data.settings.bands = d.settings.bands;
+    renderSettings(); commit(); notice("Weighting reset to defaults.", "ok");
   }
 
-  function cell(text) {
-    var td = document.createElement("td");
-    td.textContent = text;
-    return td;
-  }
-  function miniBtn(label, fn) {
-    var b = document.createElement("button");
-    b.className = "mini"; b.textContent = label;
-    b.addEventListener("click", fn);
-    return b;
-  }
-  function pill(cls, label) {
-    var s = document.createElement("span");
-    s.className = "pill " + cls; s.textContent = label;
-    return s;
-  }
-
-  // ---- Entity helpers --------------------------------------------------
-  function findById(arr, id) {
-    for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i];
-    return null;
-  }
-  function todayISO() { return new Date().toISOString().slice(0, 10); }
-  function managerName(id) {
-    var m = id && findById(data.managers, id);
-    return m ? m.name : (id ? "(unknown)" : "—");
-  }
-  function activeAssignments(projectId) {
-    return data.assignments.filter(function (a) {
-      return a.projectId === projectId && !a.archived;
+  // ---- Name prompt -----------------------------------------------------
+  function ensureName() {
+    return new Promise(function (resolve) {
+      if (userName) { resolve(userName); return; }
+      nameInput.value = (data && data.settings && data.settings.lastSavedBy) || "";
+      nameOverlay.className = "overlay show"; nameInput.focus();
+      function cleanup() { nameOverlay.className = "overlay"; nameOk.removeEventListener("click", onOk); nameCancel.removeEventListener("click", onCancel); nameInput.removeEventListener("keydown", onKey); }
+      function onOk() { var v = nameInput.value.trim(); if (!v) { nameInput.focus(); return; } userName = v; cleanup(); if (dbReady) idbSet("name", userName); resolve(userName); }
+      function onCancel() { cleanup(); resolve(null); }
+      function onKey(e) { if (e.key === "Enter") onOk(); else if (e.key === "Escape") onCancel(); }
+      nameOk.addEventListener("click", onOk); nameCancel.addEventListener("click", onCancel); nameInput.addEventListener("keydown", onKey);
     });
   }
-  function teamSummary(list) {
-    var leads = list.filter(function (a) { return a.role === "lead"; }).length;
-    var contribs = list.length - leads;
-    var parts = [];
-    if (leads) parts.push(leads + " lead" + (leads > 1 ? "s" : ""));
-    if (contribs) parts.push(contribs + " contributor" + (contribs > 1 ? "s" : ""));
-    return parts.join(", ") || "—";
-  }
-
-  // ---- Option lists (mirror the brief's data model) --------------------
-  var STATUS_PROJECT = ["active", "on-hold", "complete"];
-  var PRIORITY = ["low", "med", "high"];
-  var WORK_TYPES = ["escalation", "ditl", "oneoff", "other"];
-  var WORK_STATUS = ["open", "in-progress", "done"];
-  var ROLES = ["lead", "contributor"];
-  var EFFORTS = ["light", "medium", "heavy"];
 
   // ---- Generic form modal ----------------------------------------------
-  // fields: [{ key, label, type:"text"|"textarea"|"select"|"date"|"checkbox",
-  //            options?:[...], required?:bool, placeholder? }]
-  // Resolves to a values object, or null if cancelled.
   function openForm(title, fields, values) {
     values = values || {};
     return new Promise(function (resolve) {
-      formTitle.textContent = title;
-      formBody.innerHTML = "";
+      formTitle.textContent = title; clear(formBody);
       var inputs = {};
-
       fields.forEach(function (f) {
-        var wrap = document.createElement("div");
-        wrap.className = "ff" + (f.type === "checkbox" ? " check" : "");
+        var wrap = elem("div", "ff" + (f.type === "checkbox" ? " check" : ""));
         var input;
-        if (f.type === "textarea") {
-          input = document.createElement("textarea");
-        } else if (f.type === "select") {
-          input = document.createElement("select");
-          (f.options || []).forEach(function (opt) {
-            var o = document.createElement("option");
-            o.value = (opt.value !== undefined) ? opt.value : opt;
-            o.textContent = (opt.label !== undefined) ? opt.label : opt;
-            input.appendChild(o);
-          });
-        } else if (f.type === "checkbox") {
-          input = document.createElement("input");
-          input.type = "checkbox";
-        } else {
-          input = document.createElement("input");
-          input.type = (f.type === "date") ? "date" : "text";
-          if (f.placeholder) input.placeholder = f.placeholder;
-        }
+        if (f.type === "textarea") input = elem("textarea");
+        else if (f.type === "select") { input = elem("select"); (f.options || []).forEach(function (o) { var op = elem("option", null, o.label !== undefined ? o.label : o); op.value = (o.value !== undefined) ? o.value : o; input.appendChild(op); }); }
+        else if (f.type === "checkbox") { input = elem("input"); input.type = "checkbox"; }
+        else { input = elem("input"); input.type = (f.type === "date") ? "date" : "text"; if (f.placeholder) input.placeholder = f.placeholder; }
         input.id = "ff_" + f.key;
-
-        // Seed current value.
         var v = values[f.key];
-        if (f.type === "checkbox") { input.checked = !!v; }
-        else if (v != null) { input.value = v; }
-        else if (f.type === "select" && f.options && f.options.length) {
-          input.value = (f.options[0].value !== undefined) ? f.options[0].value : f.options[0];
-        }
-
-        var label = document.createElement("label");
-        label.setAttribute("for", input.id);
-        label.textContent = f.label + (f.required ? " *" : "");
-
-        if (f.type === "checkbox") { wrap.appendChild(input); wrap.appendChild(label); }
-        else { wrap.appendChild(label); wrap.appendChild(input); }
-        formBody.appendChild(wrap);
-        inputs[f.key] = { el: input, spec: f };
+        if (f.type === "checkbox") input.checked = !!v;
+        else if (v != null) input.value = v;
+        else if (f.type === "select" && f.options && f.options.length) input.value = (f.options[0].value !== undefined) ? f.options[0].value : f.options[0];
+        var label = elem("label", null, f.label + (f.required ? " *" : "")); label.setAttribute("for", input.id);
+        if (f.type === "checkbox") { wrap.appendChild(input); wrap.appendChild(label); } else { wrap.appendChild(label); wrap.appendChild(input); }
+        formBody.appendChild(wrap); inputs[f.key] = { el: input, spec: f };
       });
-
       formOverlay.className = "overlay show";
-      var first = formBody.querySelector("input, select, textarea");
-      if (first) first.focus();
-
-      function cleanup() {
-        formOverlay.className = "overlay";
-        formOk.removeEventListener("click", onOk);
-        formCancel.removeEventListener("click", onCancel);
-      }
+      var first = formBody.querySelector("input, select, textarea"); if (first) first.focus();
+      function cleanup() { formOverlay.className = "overlay"; formOk.removeEventListener("click", onOk); formCancel.removeEventListener("click", onCancel); }
       function onOk() {
         var out = {};
         for (var key in inputs) {
-          var rec = inputs[key], elx = rec.el, spec = rec.spec;
-          if (spec.type === "checkbox") { out[key] = elx.checked; continue; }
-          var val = elx.value;
-          if (typeof val === "string") val = val.trim();
-          if (spec.required && !val) { elx.focus(); return; } // block until filled
+          var rec = inputs[key], e = rec.el, spec = rec.spec;
+          if (spec.type === "checkbox") { out[key] = e.checked; continue; }
+          var val = e.value; if (typeof val === "string") val = val.trim();
+          if (spec.required && !val) { e.focus(); return; }
           out[key] = val || null;
         }
-        cleanup();
-        resolve(out);
+        cleanup(); resolve(out);
       }
       function onCancel() { cleanup(); resolve(null); }
-      formOk.addEventListener("click", onOk);
-      formCancel.addEventListener("click", onCancel);
+      formOk.addEventListener("click", onOk); formCancel.addEventListener("click", onCancel);
     });
   }
 
-  function selOpts(arr) {
-    return arr.map(function (v) { return { value: v, label: v }; });
-  }
-  function managerOpts(includeBlank) {
-    var opts = includeBlank ? [{ value: "", label: "— none —" }] : [];
-    data.managers.forEach(function (m) {
-      opts.push({ value: m.id, label: m.name + (m.active ? "" : " (archived)") });
-    });
-    return opts;
-  }
-
-  // After any mutation: re-render everything and auto-save.
+  // ---- Mutations -------------------------------------------------------
   function commit() { renderAll(); scheduleSave(); }
 
-  // ---- Managers CRUD (add is the inline quick-add; edit/archive here) ---
+  // Managers
+  async function addManager() {
+    await ensureName();
+    var v = await openForm("Add manager", [
+      { key: "name", label: "Name", type: "text", required: true },
+      { key: "title", label: "Title", type: "text" },
+      { key: "location", label: "Location", type: "text", placeholder: "e.g. Austin, TX / Remote" },
+      { key: "active", label: "Active", type: "checkbox" }
+    ], { active: true });
+    if (!v) return;
+    data.managers.push({ id: genId(), name: v.name, title: v.title, location: v.location, active: v.active });
+    commit();
+  }
   async function editManager(id) {
-    var m = findById(data.managers, id);
-    if (!m) return;
+    var m = findById(data.managers, id); if (!m) return;
     await ensureName();
     var v = await openForm("Edit manager", [
       { key: "name", label: "Name", type: "text", required: true },
       { key: "title", label: "Title", type: "text" },
+      { key: "location", label: "Location", type: "text", placeholder: "e.g. Austin, TX / Remote" },
       { key: "active", label: "Active", type: "checkbox" }
-    ], { name: m.name, title: m.title, active: m.active });
+    ], { name: m.name, title: m.title, location: m.location, active: m.active });
     if (!v) return;
-    m.name = v.name; m.title = v.title; m.active = v.active;
+    m.name = v.name; m.title = v.title; m.location = v.location; m.active = v.active;
     commit();
   }
   async function toggleManagerActive(id) {
-    var m = findById(data.managers, id);
-    if (!m) return;
-    await ensureName();
-    m.active = !m.active;
-    commit();
+    var m = findById(data.managers, id); if (!m) return;
+    await ensureName(); m.active = !m.active; commit();
   }
 
-  // ---- Projects CRUD ---------------------------------------------------
-  var projectFields = [
-    { key: "name", label: "Name", type: "text", required: true },
-    { key: "description", label: "Description", type: "textarea" },
-    { key: "status", label: "Status", type: "select", options: selOpts(STATUS_PROJECT) },
-    { key: "priority", label: "Priority", type: "select", options: selOpts(PRIORITY) },
-    { key: "startDate", label: "Start date", type: "date" },
-    { key: "targetDate", label: "Target date", type: "date" },
-    { key: "completedDate", label: "Completed date", type: "date" }
-  ];
-  async function addProject() {
-    await ensureName();
-    var v = await openForm("Add project", projectFields,
-      { status: "active", priority: "med", startDate: todayISO() });
-    if (!v) return;
-    if (v.status === "complete" && !v.completedDate) v.completedDate = todayISO();
-    data.projects.push({
-      id: genId(), name: v.name, description: v.description,
-      status: v.status, priority: v.priority,
-      startDate: v.startDate, targetDate: v.targetDate, completedDate: v.completedDate
-    });
-    commit();
-  }
-  async function editProject(id) {
-    var p = findById(data.projects, id);
-    if (!p) return;
-    await ensureName();
-    var v = await openForm("Edit project", projectFields, p);
-    if (!v) return;
-    if (v.status === "complete" && !v.completedDate) v.completedDate = todayISO();
-    p.name = v.name; p.description = v.description; p.status = v.status;
-    p.priority = v.priority; p.startDate = v.startDate;
-    p.targetDate = v.targetDate; p.completedDate = v.completedDate;
-    commit();
-  }
-
-  // ---- Assignments (managed per project) -------------------------------
-  function toggleAssignEditor(projectId) {
-    expandedProject = (expandedProject === projectId) ? null : projectId;
-    renderProjectsView();
-  }
-  async function addAssignment(projectId) {
-    if (!data.managers.length) { notice("Add a manager first.", "err"); return; }
-    await ensureName();
-    var v = await openForm("Assign a manager", [
-      { key: "managerId", label: "Manager", type: "select", options: managerOpts(false), required: true },
-      { key: "role", label: "Role", type: "select", options: selOpts(ROLES) },
-      { key: "effort", label: "Effort", type: "select", options: selOpts(EFFORTS) },
-      { key: "endDate", label: "End date (roll-off, optional)", type: "date" }
-    ], { role: "contributor", effort: "medium" });
-    if (!v) return;
-    data.assignments.push({
-      id: genId(), projectId: projectId, managerId: v.managerId,
-      role: v.role, effort: v.effort,
-      startDate: todayISO(), endDate: v.endDate, archived: false
-    });
-    commit();
-  }
-  async function archiveAssignment(id) {
-    var a = findById(data.assignments, id);
-    if (!a) return;
-    await ensureName();
-    a.archived = true;
-    commit();
-  }
-
-  // ---- Work items CRUD -------------------------------------------------
-  function workItemFields() {
+  // Work items
+  function workItemFields(presetManager) {
     return [
-      { key: "type", label: "Type", type: "select", options: selOpts(WORK_TYPES) },
+      { key: "type", label: "Type", type: "select", options: enumOpts(WORK_TYPES, "type") },
       { key: "title", label: "Title", type: "text", required: true },
-      { key: "managerId", label: "Owner (manager)", type: "select", options: managerOpts(true) },
+      { key: "managerId", label: "Owner (manager)", type: "select", options: managerOpts(true, "— none —") },
       { key: "relatedProjectId", label: "Related project", type: "select",
-        options: [{ value: "", label: "— none —" }].concat(
-          data.projects.map(function (p) { return { value: p.id, label: p.name }; })) },
-      { key: "status", label: "Status", type: "select", options: selOpts(WORK_STATUS) },
-      { key: "priority", label: "Priority", type: "select", options: selOpts(PRIORITY) },
+        options: [{ value: "", label: "— none —" }].concat(data.projects.map(function (p) { return { value: p.id, label: p.name }; })) },
+      { key: "status", label: "Status", type: "select", options: enumOpts(WORK_STATUS, "wstatus") },
+      { key: "priority", label: "Priority", type: "select", options: enumOpts(PRIORITY, "priority") },
       { key: "openedDate", label: "Opened date", type: "date" },
       { key: "dueDate", label: "Due date", type: "date" },
       { key: "rollOffDate", label: "Roll-off date", type: "date" },
-      { key: "link", label: "Link (ticket/doc URL — no sensitive content)", type: "text" },
+      { key: "link", label: "Link (Jira/ticket/doc URL — no sensitive content)", type: "text" },
       { key: "notes", label: "Notes (short)", type: "textarea" }
     ];
   }
-  async function addWorkItem() {
+  async function addWorkItem(presetManager) {
     await ensureName();
-    var v = await openForm("Add work item", workItemFields(),
-      { type: "escalation", status: "open", priority: "med", openedDate: todayISO() });
+    var defaults = { type: "escalation", status: "open", priority: "med", openedDate: todayISO() };
+    if (presetManager) defaults.managerId = presetManager;
+    var v = await openForm("Add work item", workItemFields(), defaults);
     if (!v) return;
     data.workItems.push({
-      id: genId(), type: v.type, title: v.title, managerId: v.managerId,
-      relatedProjectId: v.relatedProjectId, status: v.status, priority: v.priority,
-      openedDate: v.openedDate, dueDate: v.dueDate, rollOffDate: v.rollOffDate,
-      completedDate: (v.status === "done") ? todayISO() : null,
-      archived: false, link: v.link, notes: v.notes
+      id: genId(), type: v.type, title: v.title, managerId: v.managerId, relatedProjectId: v.relatedProjectId,
+      status: v.status, priority: v.priority, openedDate: v.openedDate, dueDate: v.dueDate, rollOffDate: v.rollOffDate,
+      completedDate: (v.status === "done") ? todayISO() : null, archived: false, link: v.link, notes: v.notes
     });
     commit();
   }
   async function editWorkItem(id) {
-    var w = findById(data.workItems, id);
-    if (!w) return;
+    var w = findById(data.workItems, id); if (!w) return;
     await ensureName();
     var v = await openForm("Edit work item", workItemFields(), w);
     if (!v) return;
     if (v.status === "done" && !w.completedDate) w.completedDate = todayISO();
     if (v.status !== "done") w.completedDate = null;
-    w.type = v.type; w.title = v.title; w.managerId = v.managerId;
-    w.relatedProjectId = v.relatedProjectId; w.status = v.status; w.priority = v.priority;
-    w.openedDate = v.openedDate; w.dueDate = v.dueDate; w.rollOffDate = v.rollOffDate;
-    w.link = v.link; w.notes = v.notes;
+    w.type = v.type; w.title = v.title; w.managerId = v.managerId; w.relatedProjectId = v.relatedProjectId;
+    w.status = v.status; w.priority = v.priority; w.openedDate = v.openedDate; w.dueDate = v.dueDate;
+    w.rollOffDate = v.rollOffDate; w.link = v.link; w.notes = v.notes;
     commit();
   }
-  async function markWorkItemDone(id) {
-    var w = findById(data.workItems, id);
-    if (!w) return;
+  async function markWorkItemDone(id) { var w = findById(data.workItems, id); if (!w) return; await ensureName(); w.status = "done"; w.completedDate = todayISO(); commit(); }
+  async function toggleWorkItemArchived(id) { var w = findById(data.workItems, id); if (!w) return; await ensureName(); w.archived = !w.archived; commit(); }
+
+  // Assign a manager to a project (from the drawer); excludes projects they're already on.
+  async function assignManagerToProject(managerId) {
+    var taken = {};
+    activeForManager(managerId).forEach(function (a) { taken[a.projectId] = true; });
+    var avail = data.projects.filter(function (p) { return p.status !== "complete" && !taken[p.id]; });
+    if (!avail.length) { notice("No available projects to assign (already on all active ones, or none exist).", "err"); return; }
     await ensureName();
-    w.status = "done"; w.completedDate = todayISO();
+    var v = await openForm("Assign to a project", [
+      { key: "projectId", label: "Project", type: "select", required: true, options: avail.map(function (p) { return { value: p.id, label: p.name }; }) },
+      { key: "role", label: "Role", type: "select", options: enumOpts(ROLES, "role") },
+      { key: "effort", label: "Effort", type: "select", options: enumOpts(EFFORTS, "effort") },
+      { key: "endDate", label: "End date (roll-off, optional)", type: "date" }
+    ], { role: "contributor", effort: "medium" });
+    if (!v) return;
+    data.assignments.push({ id: genId(), projectId: v.projectId, managerId: managerId, role: v.role, effort: v.effort, startDate: todayISO(), endDate: v.endDate, archived: false });
     commit();
   }
-  async function toggleWorkItemArchived(id) {
-    var w = findById(data.workItems, id);
-    if (!w) return;
-    await ensureName();
-    w.archived = !w.archived;
-    commit();
+  function activeForManager(id) { return data.assignments.filter(function (a) { return a.managerId === id && !a.archived; }); }
+
+  // ---- Project modal (fields + inline team builder) --------------------
+  var PROJECT_FIELD_SPEC = [
+    { key: "name", label: "Name", type: "text", required: true },
+    { key: "description", label: "Description", type: "textarea" },
+    { key: "status", label: "Status", type: "select", options: PSTATUS, kind: "pstatus" },
+    { key: "priority", label: "Priority", type: "select", options: PRIORITY, kind: "priority" },
+    { key: "startDate", label: "Start date", type: "date" },
+    { key: "targetDate", label: "Target date", type: "date" },
+    { key: "link", label: "Jira epic link (URL)", type: "text" }
+  ];
+  function openProjectModal(id) {
+    editingProjectId = id || null;
+    var p = id ? findById(data.projects, id) : null;
+    projTitle.textContent = p ? "Edit project" : "Add project";
+    clear(projFields);
+    var vals = p || { status: "active", priority: "med", startDate: todayISO() };
+    PROJECT_FIELD_SPEC.forEach(function (f) {
+      var wrap = elem("div", "ff");
+      var input;
+      if (f.type === "textarea") input = elem("textarea");
+      else if (f.type === "select") { input = elem("select"); f.options.forEach(function (o) { var op = elem("option", null, lab(f.kind, o)); op.value = o; input.appendChild(op); }); }
+      else { input = elem("input"); input.type = (f.type === "date") ? "date" : "text"; }
+      input.id = "pf_" + f.key;
+      var v = vals[f.key]; if (v != null) input.value = v; else if (f.type === "select") input.value = f.options[0];
+      var label = elem("label", null, f.label + (f.required ? " *" : "")); label.setAttribute("for", input.id);
+      wrap.appendChild(label); wrap.appendChild(input); projFields.appendChild(wrap);
+    });
+    // Build team draft from existing active assignments.
+    teamDraft = p ? activeAssignments(p.id).map(function (a) { return { assignmentId: a.id, managerId: a.managerId, role: a.role, effort: a.effort }; }) : [];
+    renderTeamDraft();
+    projectOverlay.className = "overlay show";
+    var first = projFields.querySelector("input,select,textarea"); if (first) first.focus();
   }
-
-  function showGuard(msg) {
-    fileBlocked = true;
-    guardMsg.textContent = msg;
-    guardEl.className = "guard show";
-  }
-  function hideGuard() { guardEl.className = "guard"; }
-
-  // ---- Name prompt (asked once, then remembered) -----------------------
-  function ensureName() {
-    return new Promise(function (resolve) {
-      if (userName) { resolve(userName); return; }
-      nameInput.value = (data && data.settings && data.settings.lastSavedBy) || "";
-      nameOverlay.className = "overlay show";
-      nameInput.focus();
-
-      function cleanup() {
-        nameOverlay.className = "overlay";
-        nameOk.removeEventListener("click", onOk);
-        nameCancel.removeEventListener("click", onCancel);
-        nameInput.removeEventListener("keydown", onKey);
-      }
-      function onOk() {
-        var v = nameInput.value.trim();
-        if (!v) { nameInput.focus(); return; }
-        userName = v;
-        cleanup();
-        if (dbReady) idbSet("name", userName);
-        resolve(userName);
-      }
-      function onCancel() { cleanup(); resolve(null); }
-      function onKey(e) {
-        if (e.key === "Enter") onOk();
-        else if (e.key === "Escape") onCancel();
-      }
-      nameOk.addEventListener("click", onOk);
-      nameCancel.addEventListener("click", onCancel);
-      nameInput.addEventListener("keydown", onKey);
+  function renderTeamDraft() {
+    clear(projTeam);
+    if (!data.managers.filter(function (m) { return m.active; }).length) {
+      projTeam.appendChild(elem("p", "d-empty", "Add a manager first to build a team."));
+      return;
+    }
+    if (!teamDraft.length) projTeam.appendChild(elem("p", "d-empty", "No one assigned yet."));
+    teamDraft.forEach(function (row, idx) {
+      var r = elem("div", "trow");
+      // manager select: exclude managers chosen in OTHER rows
+      var usedElsewhere = {};
+      teamDraft.forEach(function (o, j) { if (j !== idx && o.managerId) usedElsewhere[o.managerId] = true; });
+      var msel = elem("select"); msel.className = "who";
+      data.managers.forEach(function (m) {
+        if (!m.active && m.id !== row.managerId) return;
+        if (usedElsewhere[m.id]) return;
+        var op = elem("option", null, m.name + (m.active ? "" : " (archived)")); op.value = m.id; msel.appendChild(op);
+      });
+      msel.value = row.managerId || (msel.options[0] ? msel.options[0].value : "");
+      row.managerId = msel.value;
+      msel.addEventListener("change", function () { row.managerId = msel.value; renderTeamDraft(); });
+      r.appendChild(msel);
+      var rsel = elem("select"); ROLES.forEach(function (x) { var op = elem("option", null, lab("role", x)); op.value = x; rsel.appendChild(op); }); rsel.value = row.role; rsel.addEventListener("change", function () { row.role = rsel.value; }); r.appendChild(rsel);
+      var esel = elem("select"); EFFORTS.forEach(function (x) { var op = elem("option", null, lab("effort", x)); op.value = x; esel.appendChild(op); }); esel.value = row.effort; esel.addEventListener("change", function () { row.effort = esel.value; }); r.appendChild(esel);
+      r.appendChild(miniBtn("Remove", function () { teamDraft.splice(idx, 1); renderTeamDraft(); }, "ghost"));
+      projTeam.appendChild(r);
     });
   }
+  function addTeamMember() {
+    var actives = data.managers.filter(function (m) { return m.active; });
+    if (!actives.length) { notice("Add a manager first.", "err"); return; }
+    var used = {}; teamDraft.forEach(function (r) { if (r.managerId) used[r.managerId] = true; });
+    var avail = actives.filter(function (m) { return !used[m.id]; });
+    if (!avail.length) { notice("Every active manager is already on this project.", "info"); return; }
+    teamDraft.push({ assignmentId: null, managerId: avail[0].id, role: "contributor", effort: "medium" });
+    renderTeamDraft();
+  }
+  async function saveProject() {
+    var name = el("pf_name").value.trim();
+    if (!name) { el("pf_name").focus(); return; }
+    // duplicate-manager guard
+    var seen = {}, dup = false;
+    teamDraft.forEach(function (r) { if (r.managerId) { if (seen[r.managerId]) dup = true; seen[r.managerId] = true; } });
+    if (dup) { notice("A manager is listed twice on the team — each person can be on a project once.", "err"); return; }
+    await ensureName();
+    var fields = {};
+    PROJECT_FIELD_SPEC.forEach(function (f) { var v = el("pf_" + f.key).value; if (typeof v === "string") v = v.trim(); fields[f.key] = v || null; });
+    var p;
+    if (editingProjectId) { p = findById(data.projects, editingProjectId); }
+    else { p = { id: genId() }; data.projects.push(p); }
+    p.name = fields.name; p.description = fields.description; p.status = fields.status || "active";
+    p.priority = fields.priority || "med"; p.startDate = fields.startDate; p.targetDate = fields.targetDate;
+    p.link = fields.link;
+    if (p.status === "complete" && !p.completedDate) p.completedDate = todayISO();
+    if (p.status !== "complete") p.completedDate = p.completedDate || null;
+    // reconcile assignments
+    var existing = activeAssignments(p.id);
+    var draftIds = {}; teamDraft.forEach(function (r) { if (r.assignmentId) draftIds[r.assignmentId] = true; });
+    existing.forEach(function (a) { if (!draftIds[a.id]) a.archived = true; }); // removed -> archive
+    teamDraft.forEach(function (r) {
+      if (!r.managerId) return;
+      if (r.assignmentId) { var a = findById(data.assignments, r.assignmentId); if (a) { a.managerId = r.managerId; a.role = r.role; a.effort = r.effort; a.archived = false; } }
+      else { data.assignments.push({ id: genId(), projectId: p.id, managerId: r.managerId, role: r.role, effort: r.effort, startDate: todayISO(), endDate: null, archived: false }); }
+    });
+    projectOverlay.className = "overlay";
+    commit();
+    notice(editingProjectId ? "Project updated." : "Project added.", "ok");
+  }
 
-  // ---- File System Access plumbing -------------------------------------
-  async function verifyPermission(handle, readWrite, allowPrompt) {
-    var opts = readWrite ? { mode: "readwrite" } : {};
+  // ---- Manager detail drawer -------------------------------------------
+  function openManager(id) { openManagerId = id; renderDrawer(); drawerOverlay.className = "drawer-overlay show"; }
+  function closeDrawer() { openManagerId = null; drawerOverlay.className = "drawer-overlay"; }
+  function soon(iso) { var t = Date.parse(iso); if (isNaN(t)) return false; return (t - Date.now()) / 86400000 <= 30; }
+  function drawerSection(title, items) {
+    var sec = elem("div", "d-sec"); sec.appendChild(elem("h4", null, title));
+    if (!items.length) { sec.appendChild(elem("div", "d-empty", "—")); return sec; }
+    var ul = elem("ul", "d-list");
+    items.forEach(function (it) { var li = elem("li"); li.appendChild(it.cloneNode ? it : elem("span", "grow", String(it))); ul.appendChild(li); });
+    sec.appendChild(ul); return sec;
+  }
+  function renderDrawer() {
+    var m = findById(data.managers, openManagerId); if (!m) { closeDrawer(); return; }
+    clear(drawerBody);
+    var head = elem("div", "d-head");
+    var left = elem("div");
+    left.appendChild(elem("div", "d-name", m.name));
+    var sub = [m.title, m.location, m.active ? null : "Archived"].filter(Boolean).join(" · ");
+    if (sub) left.appendChild(elem("div", "d-sub", sub));
+    head.appendChild(left);
+    head.appendChild(miniBtn("✕", closeDrawer, "ghost"));
+    drawerBody.appendChild(head);
+
+    var sc = managerScore(m.id), b = bandFor(sc.score);
+    var heatRow = elem("div"); heatRow.style.margin = "12px 0 4px";
+    heatRow.appendChild(elem("span", "heat " + heatClass(b.label), b.label));
+    var scoreSpan = elem("span", "m-score", "  score " + round1(sc.score)); scoreSpan.style.marginLeft = "8px";
+    heatRow.appendChild(scoreSpan);
+    drawerBody.appendChild(heatRow);
+
+    var actions = elem("div", "d-actions");
+    actions.appendChild(miniBtn("+ Work item", function () { addWorkItem(m.id); }, "primary"));
+    actions.appendChild(miniBtn("+ Assign to project", function () { assignManagerToProject(m.id); }));
+    actions.appendChild(miniBtn("Edit", function () { editManager(m.id); }));
+    actions.appendChild(miniBtn("Copy summary", function () { copySummary(m.id); }));
+    actions.appendChild(miniBtn("Export", function () { exportSummary(m.id); }));
+    actions.appendChild(miniBtn("Print", function () { window.print(); }));
+    drawerBody.appendChild(actions);
+
+    var d = managerCarry(m.id);
+    drawerBody.appendChild(drawerSection("Currently carrying", d.current.map(function (t) { return elem("span", "grow", t); })));
+    drawerBody.appendChild(drawerSection("Recently completed (wins)", d.wins.map(function (t) { return elem("span", "grow", t); })));
+    drawerBody.appendChild(drawerSection("Rolling off soon / overdue", d.roll.map(function (t) { return elem("span", "grow", t); })));
+  }
+  function managerCarry(id) {
+    var current = [], wins = [], roll = [];
+    data.assignments.forEach(function (a) {
+      if (a.archived || a.managerId !== id) return;
+      var p = findById(data.projects, a.projectId); if (!p) return;
+      if (p.status === "active") current.push("Project: " + p.name + " — " + lab("role", a.role) + " (" + lab("effort", a.effort) + ")");
+      if (a.endDate && soon(a.endDate)) roll.push("Assignment on " + p.name + " rolls off " + a.endDate);
+    });
+    data.workItems.forEach(function (w) {
+      if (w.managerId !== id) return;
+      if (!w.archived && (w.status === "open" || w.status === "in-progress")) current.push(lab("type", w.type) + ": " + w.title + " [" + lab("wstatus", w.status) + "]");
+      if (w.status === "done" && w.completedDate) wins.push(lab("type", w.type) + ": " + w.title + " (done " + w.completedDate + ")");
+      if (!w.archived && w.status !== "done" && w.rollOffDate && soon(w.rollOffDate)) roll.push(lab("type", w.type) + ": " + w.title + " rolls off " + w.rollOffDate);
+    });
+    wins.sort().reverse();
+    return { current: current, wins: wins, roll: roll };
+  }
+  function summaryText(id) {
+    var m = findById(data.managers, id); if (!m) return "";
+    var sc = managerScore(id), b = bandFor(sc.score), d = managerCarry(id);
+    function block(t, items) { return t + "\n" + (items.length ? items.map(function (x) { return "  - " + x; }).join("\n") : "  (none)") + "\n"; }
+    return "1:1 Prep — " + m.name + (m.title ? " (" + m.title + ")" : "") + (m.location ? " — " + m.location : "") + "\n" +
+      "Generated " + new Date().toLocaleString() + "\n" + "Workload: " + b.label + " (score " + round1(sc.score) + ")\n\n" +
+      block("Currently carrying:", d.current) + "\n" + block("Recently completed (wins):", d.wins) + "\n" + block("Rolling off soon / overdue:", d.roll);
+  }
+  async function copySummary(id) {
+    var text = summaryText(id);
+    try { if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(text); else fallbackCopy(text); notice("Summary copied to the clipboard.", "ok"); }
+    catch (e) { fallbackCopy(text); notice("Summary copied.", "ok"); }
+  }
+  function fallbackCopy(text) { var ta = elem("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e) {} ta.remove(); }
+  function exportSummary(id) {
+    var m = findById(data.managers, id); var text = summaryText(id);
+    var blob = new Blob([text], { type: "text/plain" }); var url = URL.createObjectURL(blob);
+    var a = elem("a"); a.href = url; a.download = "1on1-" + (m.name || "manager").replace(/[^a-z0-9]+/gi, "-").toLowerCase() + ".txt";
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); notice("Summary exported.", "ok");
+  }
+
+  // ---- File System Access ----------------------------------------------
+  async function verifyPermission(handle, rw, allowPrompt) {
+    var opts = rw ? { mode: "readwrite" } : {};
     if ((await handle.queryPermission(opts)) === "granted") return true;
-    if (!allowPrompt) return false; // querying only (no user gesture available)
+    if (!allowPrompt) return false;
     if ((await handle.requestPermission(opts)) === "granted") return true;
     return false;
   }
-
-  async function writeTextTo(handle, text) {
-    var w = await handle.createWritable();
-    await w.write(text);
-    await w.close();
-  }
-
-  async function readHandleText(handle) {
-    var file = await handle.getFile();
-    return await file.text();
-  }
-
+  async function writeTextTo(handle, text) { var w = await handle.createWritable(); await w.write(text); await w.close(); }
+  async function readHandleText(handle) { var f = await handle.getFile(); return await f.text(); }
   async function writeBackup(text) {
     if (!dirHandle) return;
     var name = "heimdall-data.backup-" + stamp(new Date()) + ".json";
     var fh = await dirHandle.getFileHandle(name, { create: true });
-    await writeTextTo(fh, text);
-    await pruneBackups(dirHandle);
+    await writeTextTo(fh, text); await pruneBackups(dirHandle);
   }
-
   async function pruneBackups(dir) {
     var names = [];
-    for await (var entry of dir.values()) {
-      if (entry.kind === "file" && BACKUP_RE.test(entry.name)) names.push(entry.name);
-    }
-    names.sort(); // fixed-width timestamp => lexicographic == chronological
-    while (names.length > MAX_BACKUPS) {
-      var oldest = names.shift();
-      try { await dir.removeEntry(oldest); } catch (e) { /* ignore */ }
-    }
+    for await (var entry of dir.values()) { if (entry.kind === "file" && BACKUP_RE.test(entry.name)) names.push(entry.name); }
+    names.sort();
+    while (names.length > MAX_BACKUPS) { var oldest = names.shift(); try { await dir.removeEntry(oldest); } catch (e) {} }
   }
-
-  // Write the current data to the shared file (+ backup). Does NOT re-stamp;
-  // callers stamp when appropriate. Returns true on success.
   async function writeToFile() {
     if (linkState !== "linked" || !fileHandle || fileBlocked) return false;
-    if (!(await verifyPermission(fileHandle, true, false))) {
-      linkState = "needs-reconnect";
-      updateLinkUI();
-      throw new Error("permission to the shared file was lost");
-    }
+    if (!(await verifyPermission(fileHandle, true, false))) { linkState = "needs-reconnect"; updateLinkUI(); throw new Error("permission to the shared file was lost"); }
     var text = JSON.stringify(data, null, 2);
-    await writeTextTo(fileHandle, text);
-    await writeBackup(text);
-    return true;
+    await writeTextTo(fileHandle, text); await writeBackup(text); return true;
   }
 
   // ---- Save / auto-save ------------------------------------------------
-  function scheduleSave() {
-    setSaveStatus("dirty");
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(function () { saveTimer = null; persist(); }, SAVE_DEBOUNCE_MS);
-  }
-
-  // Called on every edit: stamp, save locally (always), then sync to the
-  // shared file if linked. Local data is never lost even if the file fails.
+  function scheduleSave() { setSaveStatus("dirty"); if (saveTimer) clearTimeout(saveTimer); saveTimer = setTimeout(function () { saveTimer = null; persist(); }, SAVE_DEBOUNCE_MS); }
   async function persist() {
     if (!data) return;
     setSaveStatus("saving");
     var who = userName || (data.settings && data.settings.lastSavedBy) || "Unknown";
-    data.settings.lastSavedBy = who;
-    data.settings.lastSavedAt = new Date().toISOString();
-    await saveLocal();
-    updateBanner();
+    data.settings.lastSavedBy = who; data.settings.lastSavedAt = new Date().toISOString();
+    await saveLocal(); updateBanner();
     if (linkState === "linked" && !fileBlocked) {
-      try {
-        await writeToFile();
-        lastSaveOk = true;
-        setSaveStatus("saved");
-      } catch (e) {
-        lastSaveOk = false;
-        setSaveStatus("error");
-        notice("Saved locally, but syncing to the shared file failed: " +
-               (e && e.message ? e.message : e) + " — click Retry sync.", "err");
-      }
-    } else {
-      setSaveStatus("saved");
-    }
+      try { await writeToFile(); lastSaveOk = true; setSaveStatus("saved"); }
+      catch (e) { lastSaveOk = false; setSaveStatus("error"); notice("Saved locally, but syncing to the shared file failed: " + (e && e.message ? e.message : e) + " — click Retry sync.", "err"); }
+    } else { setSaveStatus("saved"); }
   }
-
-  // Retry button: re-attempt the shared-file write only (local is already saved).
   async function retrySync() {
-    if (linkState === "needs-reconnect") { return reconnectSharedFile(); }
+    if (linkState === "needs-reconnect") return reconnectSharedFile();
     setSaveStatus("saving");
-    try {
-      await writeToFile();
-      lastSaveOk = true;
-      setSaveStatus("saved");
-      notice("Synced to the shared file.", "ok");
-    } catch (e) {
-      lastSaveOk = false;
-      setSaveStatus("error");
-      notice("Still couldn't sync: " + (e && e.message ? e.message : e), "err");
-    }
+    try { await writeToFile(); lastSaveOk = true; setSaveStatus("saved"); notice("Synced to the shared file.", "ok"); }
+    catch (e) { lastSaveOk = false; setSaveStatus("error"); notice("Still couldn't sync: " + (e && e.message ? e.message : e), "err"); }
   }
 
-  // ---- Shared-file linking & sync --------------------------------------
-  // Pick a folder, find/create the shared data file, remember it, reconcile.
+  // ---- Shared file linking & sync --------------------------------------
   async function linkSharedFile() {
     try {
       var dh = await window.showDirectoryPicker({ mode: "readwrite" });
-      if (!(await verifyPermission(dh, true, true))) {
-        notice("Write permission to the folder was not granted.", "err");
-        return;
-      }
-      dirHandle = dh;
-      fileHandle = await dirHandle.getFileHandle(DATA_FILE, { create: true });
+      if (!(await verifyPermission(dh, true, true))) { notice("Write permission to the folder was not granted.", "err"); return; }
+      dirHandle = dh; fileHandle = await dirHandle.getFileHandle(DATA_FILE, { create: true });
       if (dbReady) { try { await idbSet("dirHandle", dirHandle); } catch (e) {} }
-      linkState = "linked";
-      fileBlocked = false;
-      hideGuard();
-      await ensureName();
-      await syncFromFile(true); // reconcile: adopt newer peer data or push local
-      updateLinkUI();
-    } catch (e) {
-      if (e && e.name === "AbortError") return;
-      notice("Could not link shared file: " + (e && e.message ? e.message : e), "err");
-    }
+      linkState = "linked"; fileBlocked = false; hideGuard(); await ensureName();
+      await syncFromFile(true); updateBanner();
+    } catch (e) { if (e && e.name === "AbortError") return; notice("Could not link shared file: " + (e && e.message ? e.message : e), "err"); }
   }
-
-  // Re-grant permission to a remembered folder (requires a user gesture).
   async function reconnectSharedFile() {
-    if (!dirHandle) { return linkSharedFile(); }
+    if (!dirHandle) return linkSharedFile();
     try {
-      if (!(await verifyPermission(dirHandle, true, true))) {
-        notice("Permission to the shared folder was not granted.", "err");
-        return;
-      }
+      if (!(await verifyPermission(dirHandle, true, true))) { notice("Permission to the shared folder was not granted.", "err"); return; }
       fileHandle = await dirHandle.getFileHandle(DATA_FILE, { create: true });
-      linkState = "linked";
-      fileBlocked = false;
-      hideGuard();
-      await ensureName();
-      await syncFromFile(true);
-      updateLinkUI();
-    } catch (e) {
-      if (e && e.name === "AbortError") return;
-      notice("Could not reconnect: " + (e && e.message ? e.message : e), "err");
-    }
+      linkState = "linked"; fileBlocked = false; hideGuard(); await ensureName();
+      await syncFromFile(true); updateBanner();
+    } catch (e) { if (e && e.name === "AbortError") return; notice("Could not reconnect: " + (e && e.message ? e.message : e), "err"); }
   }
-
   async function unlinkSharedFile() {
-    fileHandle = null;
-    dirHandle = null;
-    linkState = "none";
-    fileBlocked = false;
-    hideGuard();
+    fileHandle = null; dirHandle = null; linkState = "none"; fileBlocked = false; hideGuard();
     if (dbReady) { try { await idbDel("dirHandle"); } catch (e) {} }
-    updateBanner();
-    setSaveStatus(lastSaveOk ? "saved" : "");
+    updateBanner(); setSaveStatus(lastSaveOk ? "saved" : "");
     notice("Unlinked the shared file. Data stays saved locally; Export to share.", "info");
   }
-
-  // Read the shared file and reconcile with local data (last-write-wins).
-  // interactive=true surfaces problems (called from a user action); when
-  // false it is a quiet background refresh (focus/visibility).
+  function showGuard(msg) { fileBlocked = true; guardMsg.textContent = msg; guardEl.className = "guard show"; }
+  function hideGuard() { guardEl.className = "guard"; }
   async function syncFromFile(interactive) {
     if (linkState !== "linked" || !fileHandle || fileBlocked || syncing) return;
     syncing = true;
     try {
-      // Flush any pending local edit first so timestamps compare correctly,
-      // but only if there were actual unsaved changes.
       if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; await persist(); }
-
-      if (!(await verifyPermission(fileHandle, true, false))) {
-        linkState = "needs-reconnect";
-        updateLinkUI();
-        if (interactive) notice("Permission to the shared file lapsed — click Reconnect.", "err");
-        return;
-      }
-
+      if (!(await verifyPermission(fileHandle, true, false))) { linkState = "needs-reconnect"; updateLinkUI(); if (interactive) notice("Permission to the shared file lapsed — reconnect in Settings.", "err"); return; }
       var text = await readHandleText(fileHandle);
-      if (text.trim() === "") {
-        // Empty shared file: seed it from local data if we have any.
-        if (hasContent(data)) { await writeToFile(); }
-        if (interactive) notice("Shared file is empty — initialized from your local data.", "info");
-        return;
-      }
-
-      var parsed;
-      try { parsed = JSON.parse(text); }
-      catch (e) { showGuard("The shared file is not valid JSON (" + e.message + ")."); return; }
-
-      var v = validate(parsed);
-      if (!v.ok) { showGuard("The shared file is not a valid Heimdall data file: " + v.error); return; }
-
-      var fileTs = tsValue(v.data.settings.lastSavedAt);
-      var localTs = tsValue(data && data.settings && data.settings.lastSavedAt);
-
-      if (fileTs > localTs) {
-        // Peer's copy is newer — adopt it.
-        data = v.data;
-        await saveLocal();
-        updateBanner();
-        renderAll();
-        setSaveStatus("saved");
-        if (interactive) notice("Loaded the latest from the shared file.", "ok");
-        else notice("Updated with a teammate's latest changes.", "info");
-      } else if (localTs > fileTs) {
-        // Our copy is newer — push it to the shared file.
-        await writeToFile();
-        setSaveStatus("saved");
-        if (interactive) notice("Your local changes were newer — synced them to the shared file.", "ok");
-      } else if (interactive) {
-        notice("Already up to date.", "ok");
-      }
-    } catch (e) {
-      if (interactive) notice("Sync failed: " + (e && e.message ? e.message : e), "err");
-    } finally {
-      syncing = false;
-    }
+      if (text.trim() === "") { if (hasContent(data)) await writeToFile(); return; }
+      var parsed; try { parsed = JSON.parse(text); } catch (e) { showGuard("The shared file is not valid JSON (" + e.message + ")."); return; }
+      var v = validate(parsed); if (!v.ok) { showGuard("The shared file is not a valid Heimdall data file: " + v.error); return; }
+      var fileTs = tsValue(v.data.settings.lastSavedAt), localTs = tsValue(data && data.settings && data.settings.lastSavedAt);
+      if (fileTs > localTs) { data = v.data; await saveLocal(); updateBanner(); renderCurrent(); if (openManagerId) renderDrawer(); setSaveStatus("saved"); notice(interactive ? "Loaded the latest from the shared file." : "Updated with a teammate's latest changes.", interactive ? "ok" : "info"); }
+      else if (localTs > fileTs) { await writeToFile(); setSaveStatus("saved"); if (interactive) notice("Your local changes were newer — synced them to the shared file.", "ok"); }
+      else if (interactive) notice("Already up to date.", "ok");
+    } catch (e) { if (interactive) notice("Sync failed: " + (e && e.message ? e.message : e), "err"); }
+    finally { syncing = false; }
   }
 
   // ---- Export / Import -------------------------------------------------
   async function exportJson() {
     var src = data || defaultData();
     var who = await ensureName();
-    if (who) {
-      src.settings.lastSavedBy = who;
-      src.settings.lastSavedAt = new Date().toISOString();
-      await saveLocal();
-      updateBanner();
-    }
+    if (who) { src.settings.lastSavedBy = who; src.settings.lastSavedAt = new Date().toISOString(); await saveLocal(); updateBanner(); }
     var text = JSON.stringify(src, null, 2);
-    var blob = new Blob([text], { type: "application/json" });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url;
-    a.download = DATA_FILE;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    var blob = new Blob([text], { type: "application/json" }); var url = URL.createObjectURL(blob);
+    var a = elem("a"); a.href = url; a.download = DATA_FILE; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     notice("Exported " + DATA_FILE + " to your downloads.", "ok");
   }
-
   function importJson() { importInput.click(); }
-
   async function onImportFile(ev) {
-    var file = ev.target.files && ev.target.files[0];
-    importInput.value = "";
-    if (!file) return;
-    var text = await file.text();
-    var parsed;
-    try { parsed = JSON.parse(text); }
-    catch (e) { notice("Import failed — not valid JSON (" + e.message + ").", "err"); return; }
-    var v = validate(parsed);
-    if (!v.ok) { notice("Import failed — not a valid Heimdall data file: " + v.error, "err"); return; }
-    data = v.data;
-    await ensureName();
-    data.settings.lastSavedBy = userName || data.settings.lastSavedBy || "Unknown";
-    data.settings.lastSavedAt = new Date().toISOString();
-    await saveLocal();
-    updateBanner();
-    renderAll();
-    scheduleSave(); // pushes to the shared file too, if linked
-    notice("Imported and saved.", "ok");
+    var file = ev.target.files && ev.target.files[0]; importInput.value = ""; if (!file) return;
+    var text = await file.text(); var parsed;
+    try { parsed = JSON.parse(text); } catch (e) { notice("Import failed — not valid JSON (" + e.message + ").", "err"); return; }
+    var v = validate(parsed); if (!v.ok) { notice("Import failed — not a valid Heimdall data file: " + v.error, "err"); return; }
+    data = v.data; await ensureName();
+    data.settings.lastSavedBy = userName || data.settings.lastSavedBy || "Unknown"; data.settings.lastSavedAt = new Date().toISOString();
+    await saveLocal(); updateBanner(); renderAll(); scheduleSave(); notice("Imported and saved.", "ok");
   }
-
-  // ---- Malformed shared file: load a backup to restore -----------------
   async function loadBackupFile() {
     if (!FSA) { notice("Use Settings → Import JSON to load a backup in this browser.", "info"); return; }
     try {
-      var picked = await window.showOpenFilePicker({
-        multiple: false,
-        types: [{ description: "Heimdall backup (JSON)", accept: { "application/json": [".json"] } }]
-      });
-      var text = await readHandleText(picked[0]);
-      var parsed;
-      try { parsed = JSON.parse(text); }
-      catch (e) { notice("That backup is also invalid JSON (" + e.message + ").", "err"); return; }
-      var v = validate(parsed);
-      if (!v.ok) { notice("That backup is not a valid Heimdall data file: " + v.error, "err"); return; }
-      data = v.data;
-      fileBlocked = false;
-      hideGuard();
-      await saveLocal();
-      updateBanner();
-      renderAll();
-      scheduleSave(); // restore the shared file from the backup
+      var picked = await window.showOpenFilePicker({ multiple: false, types: [{ description: "Heimdall backup (JSON)", accept: { "application/json": [".json"] } }] });
+      var text = await readHandleText(picked[0]); var parsed;
+      try { parsed = JSON.parse(text); } catch (e) { notice("That backup is also invalid JSON (" + e.message + ").", "err"); return; }
+      var v = validate(parsed); if (!v.ok) { notice("That backup is not a valid Heimdall data file: " + v.error, "err"); return; }
+      data = v.data; fileBlocked = false; hideGuard(); await saveLocal(); updateBanner(); renderAll(); scheduleSave();
       notice("Loaded from backup — restoring the shared file.", "ok");
-    } catch (e) {
-      if (e && e.name === "AbortError") return;
-      notice("Could not load backup: " + (e && e.message ? e.message : e), "err");
-    }
-  }
-
-  // ---- Managers: add ---------------------------------------------------
-  async function addManager() {
-    await ensureName(); // first edit: ask once (then remembered)
-    var v = await openForm("Add manager", [
-      { key: "name", label: "Name", type: "text", required: true },
-      { key: "title", label: "Title", type: "text" },
-      { key: "active", label: "Active", type: "checkbox" }
-    ], { active: true });
-    if (!v) return;
-    data.managers.push({ id: genId(), name: v.name, title: v.title, active: v.active });
-    commit();
+    } catch (e) { if (e && e.name === "AbortError") return; notice("Could not load backup: " + (e && e.message ? e.message : e), "err"); }
   }
 
   // ---- Wire up ---------------------------------------------------------
   btnReload.addEventListener("click", function () { syncFromFile(true); });
   btnRetry.addEventListener("click", retrySync);
-  btnExport.addEventListener("click", exportJson);
-  btnImport.addEventListener("click", importJson);
   btnLoadBackup.addEventListener("click", loadBackupFile);
   btnGuardUnlink.addEventListener("click", unlinkSharedFile);
   btnAddManager.addEventListener("click", addManager);
-  btnAddProject.addEventListener("click", addProject);
-  btnAddWorkItem.addEventListener("click", addWorkItem);
-  btnLink.addEventListener("click", linkSharedFile);
-  btnReconnect.addEventListener("click", reconnectSharedFile);
-  btnUnlink.addEventListener("click", unlinkSharedFile);
+  btnAddProject.addEventListener("click", function () { openProjectModal(null); });
+  btnAddWorkItem.addEventListener("click", function () { addWorkItem(null); });
+  btnExport.addEventListener("click", exportJson);
+  btnImport.addEventListener("click", importJson);
   importInput.addEventListener("change", onImportFile);
-
-  // Top navigation.
-  navEl.addEventListener("click", function (e) {
-    var v = e.target && e.target.getAttribute && e.target.getAttribute("data-view");
-    if (v) showView(v);
-  });
-  // Work-item filters.
-  [fType, fManager, fStatus, fFrom, fTo].forEach(function (s) {
-    s.addEventListener("change", renderWorkItemsView);
-  });
-  fClear.addEventListener("click", function () {
-    fType.value = ""; fManager.value = ""; fStatus.value = ""; fFrom.value = ""; fTo.value = "";
-    renderWorkItemsView();
-  });
-  // 1:1 Prep.
-  oooManager.addEventListener("change", render1on1);
-  btnCopySummary.addEventListener("click", copySummary);
-  btnExportSummary.addEventListener("click", exportSummary);
-  btnPrintSummary.addEventListener("click", function () { window.print(); });
-  // Settings.
+  navEl.addEventListener("click", function (e) { var v = e.target && e.target.getAttribute && e.target.getAttribute("data-view"); if (v) showView(v); });
+  [fType, fManager, fStatus, fFrom, fTo].forEach(function (s) { s.addEventListener("change", renderWorkItemsView); });
+  fClear.addEventListener("click", function () { fType.value = ""; fManager.value = ""; fStatus.value = ""; fFrom.value = ""; fTo.value = ""; renderWorkItemsView(); });
+  repGran.addEventListener("change", renderReports);
   btnSaveSettings.addEventListener("click", saveSettings);
   btnResetSettings.addEventListener("click", resetSettings);
-
-  // Pull teammates' changes automatically when returning to the tab.
-  document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible") syncFromFile(false);
-  });
+  projAddMember.addEventListener("click", addTeamMember);
+  projOk.addEventListener("click", saveProject);
+  projCancel.addEventListener("click", function () { projectOverlay.className = "overlay"; });
+  drawerOverlay.addEventListener("click", function (e) { if (e.target === drawerOverlay) closeDrawer(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { closeDrawer(); projectOverlay.className = "overlay"; } });
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") syncFromFile(false); });
   window.addEventListener("focus", function () { syncFromFile(false); });
 
   // ---- Init ------------------------------------------------------------
   async function init() {
-    // 1) Open the local store and load saved data + name (instant, no prompts).
     if (HAS_IDB) {
       try {
-        await idbOpen();
-        dbReady = true;
-        var savedName = await idbGet("name");
-        if (typeof savedName === "string" && savedName) userName = savedName;
-        var savedData = await idbGet("data");
-        if (savedData != null) {
-          var v = validate(savedData);
-          data = v.ok ? v.data : defaultData();
-        }
+        await idbOpen(); dbReady = true;
+        var savedName = await idbGet("name"); if (typeof savedName === "string" && savedName) userName = savedName;
+        var savedData = await idbGet("data"); if (savedData != null) { var v = validate(savedData); data = v.ok ? v.data : defaultData(); }
       } catch (e) { dbReady = false; }
     }
     if (!data) data = defaultData();
-
-    // 2) Render immediately — the app is usable now, with zero clicks.
-    updateBanner();
-    renderAll();
-    setSaveStatus(hasContent(data) ? "saved" : "");
-
-    // 3) If a shared file was linked before, try to reconnect silently.
+    updateBanner(); renderAll(); setSaveStatus(hasContent(data) ? "saved" : "");
     if (DIR_API && dbReady) {
-      var savedDir = null;
-      try { savedDir = await idbGet("dirHandle"); } catch (e) {}
+      var savedDir = null; try { savedDir = await idbGet("dirHandle"); } catch (e) {}
       if (savedDir) {
         dirHandle = savedDir;
         if (await verifyPermission(dirHandle, true, false)) {
-          try {
-            fileHandle = await dirHandle.getFileHandle(DATA_FILE, { create: true });
-            linkState = "linked";
-            updateLinkUI();
-            await syncFromFile(false); // auto-pull latest from teammates
-          } catch (e) { linkState = "needs-reconnect"; }
-        } else {
-          linkState = "needs-reconnect"; // remembered, but needs a click to resume
-        }
+          try { fileHandle = await dirHandle.getFileHandle(DATA_FILE, { create: true }); linkState = "linked"; updateLinkUI(); await syncFromFile(false); }
+          catch (e) { linkState = "needs-reconnect"; }
+        } else { linkState = "needs-reconnect"; }
       }
     }
     updateBanner();
-    setSaveStatus(hasContent(data) ? "saved" : "");
-
-    if (!HAS_IDB) {
-      notice("This browser has no local storage available, so data won't persist " +
-             "across reloads. Use Settings → Export to save your work.", "info");
-    }
+    if (!HAS_IDB) notice("This browser has no local storage available, so data won't persist across reloads. Use Settings → Export to save your work.", "info");
   }
-
   init();
 })();
 </script>
