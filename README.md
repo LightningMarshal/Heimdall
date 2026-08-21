@@ -34,6 +34,9 @@ once so the "Last saved by" banner can attribute changes.
   print **1:1 summary** for weekly one-on-ones.
 - **Projects** — status, priority, dates, Jira epic link, and the team with the
   lead highlighted. A person can appear only once per project.
+- **Custom "Other" types** — choosing type **Other** prompts for a short free-text label
+  ("Vendor audit", "Hiring loop"), which then replaces "Other" wherever the item is shown
+  and is included in search. Reports still group these under Other.
 - **Work Items queue** — filterable by scope (Active / All / History), type, owner,
   status, and date range, with an aging flag for items open 14+ days.
 - **Backlog** — unassigned items surface next to the board so distribution
