@@ -150,6 +150,13 @@
   .pill.lead       { background: var(--accent-weak); color: var(--accent); }
   .pill.contributor{ background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
   .pill.status     { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+  /* Clickable variant of .pill (a <button>, not a <span>) — a name that navigates elsewhere. */
+  .pill.btn { border-width: 1px; border-style: solid; border-color: transparent; font: inherit; cursor: pointer; }
+  .pill.btn:hover, .pill.btn:focus-visible { border-color: currentColor; text-decoration: underline; }
+  /* Inline text-link button: turns a table/list label into a click-through. */
+  .lnk { background: none; border: none; padding: 0; margin: 0; font: inherit; color: var(--accent);
+         cursor: pointer; text-align: left; }
+  .lnk:hover, .lnk:focus-visible { text-decoration: underline; }
 
   /* Project cards */
   .pcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
@@ -510,6 +517,9 @@
           appears — queue, board drawer, 1:1 summary, search — and it is searchable. Reports still group
           all of them under Other, and the Other weight in Settings still applies.</li>
         <li><strong>Backlog:</strong> items with no owner appear in the amber Backlog panel on the Board, so you assign work where everyone's load is visible.</li>
+        <li><strong>Click-through:</strong> a manager's name, a project's team member, or a work item's owner
+          is a link — click it to jump straight to that manager, project, or work item, from the drawer,
+          the Projects list, the Work Items table, search, or Needs attention.</li>
         <li><strong>Done:</strong> marking an item Done stamps its completion date and moves it to History; it then feeds the owner's “Recently completed” list in the drawer.</li>
         <li><strong>Roll-off:</strong> when an item's roll-off date (or an assignment's end date) passes, nothing disappears silently — a “Needs attention” chip appears in the nav. Open it to review and archive items deliberately, one by one or all at once.</li>
         <li><strong>History:</strong> Work Items → “Show: History” lists everything archived. Nothing is ever hard-deleted.</li>
@@ -771,6 +781,14 @@
   function elem(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function miniBtn(label, fn, cls) { var b = elem("button", "mini" + (cls ? " " + cls : ""), label); b.addEventListener("click", fn); return b; }
   function pill(cls, label) { return elem("span", "pill " + cls, label); }
+  // Clickable pill (button, not span) — same look as pill(), used for a name that
+  // navigates somewhere (e.g. a project's team member -> that manager's drawer).
+  function pillBtn(cls, label, fn) { var b = elem("button", "pill btn " + cls, label); b.type = "button"; b.addEventListener("click", fn); return b; }
+  // Plain-text button styled as an inline link, for turning a drawer/table row's
+  // label into a click-through to the project, work item, or manager it names.
+  // "grow" so it fills the row the way the plain <span class="grow"> it replaces did
+  // (pushes a trailing action button, e.g. "Done", to the right of the row).
+  function linkBtn(text, fn) { var b = elem("button", "lnk grow", text); b.type = "button"; b.addEventListener("click", fn); return b; }
 
   var noticeTimer = null;
   function notice(msg, kind) {
@@ -852,6 +870,18 @@
     else if (currentView === "settings") renderSettings();
   }
   function renderAll() { refreshSelects(); renderCurrent(); updateAttn(); if (openManagerId) renderDrawer(); }
+
+  // ---- Cross-navigation (Board <-> Projects <-> Work Items) ------------
+  // Click-through targets shared by search, the manager drawer, the projects
+  // list, the work items table, and needs-attention: switch to the owning
+  // view (when there is one) and open the same edit surface search already
+  // uses, so "click a work item/project/manager wherever it's named" behaves
+  // the same everywhere.
+  // Close the drawer first: it's a full-screen backdrop, so leaving it open behind
+  // a view switch would silently block clicks on the view we just switched to.
+  function goToProject(id) { closeDrawer(); showView("projects"); openProjectModal(id); }
+  function goToWorkItem(id) { closeDrawer(); showView("workitems"); editWorkItem(id); }
+  function goToManager(id) { openManager(id); } // drawer is an overlay; no view switch needed
 
   // ---- Selects ---------------------------------------------------------
   function fillSelectOpts(sel, opts, keep) {
@@ -952,7 +982,8 @@
       var txt = (a.role === "lead")
         ? managerName(a.managerId) + " · Lead · " + lab("effort", a.effort)
         : managerName(a.managerId) + " · " + lab("effort", a.effort);
-      span.appendChild(pill(a.role === "lead" ? "lead" : "contributor", txt));
+      // Team pills click through to that manager's drawer.
+      span.appendChild(pillBtn(a.role === "lead" ? "lead" : "contributor", txt, function () { goToManager(a.managerId); }));
     });
     return span;
   }
@@ -1014,7 +1045,11 @@
       var titleTd = tdc(w.title || "");
       if (w.link) { titleTd.textContent = ""; var a = elem("a", null, w.title || "(item)"); a.href = w.link; a.target = "_blank"; a.rel = "noopener"; titleTd.appendChild(a); }
       tr.appendChild(titleTd);
-      tr.appendChild(tdc(managerName(w.managerId)));
+      // Owner click-through to that manager's drawer; unassigned items just show "—".
+      var ownerTd = elem("td");
+      if (w.managerId) ownerTd.appendChild(linkBtn(managerName(w.managerId), function () { goToManager(w.managerId); }));
+      else ownerTd.textContent = "—";
+      tr.appendChild(ownerTd);
       tr.appendChild(tdc(lab("wstatus", w.status || "open")));
       var prTd = tdc(lab("priority", w.priority || "med"));
       if (w.priority === "high" && !w.archived && w.status !== "done") prTd.className = "pri-high";
@@ -1523,29 +1558,37 @@
     drawerBody.appendChild(actions);
 
     var d = managerCarry(m.id);
+    // Each entry's own text is the click-through: a project or work item name in
+    // the drawer opens that project/work item's edit form (same target the
+    // search results already jump to). Plain text where an item has neither.
+    function carryLine(it) {
+      return it.projectId ? linkBtn(it.text, function () { goToProject(it.projectId); })
+           : it.wiId ? linkBtn(it.text, function () { goToWorkItem(it.wiId); })
+           : elem("span", "grow", it.text);
+    }
     drawerBody.appendChild(drawerSection("Currently carrying", d.current.map(function (it) {
-      var nodes = [elem("span", "grow", it.text)];
+      var nodes = [carryLine(it)];
       if (it.wiId) nodes.push(miniBtn("Done", function () { markWorkItemDone(it.wiId); }, "ghost"));
       return nodes;
     })));
-    drawerBody.appendChild(drawerSection("Recently completed (wins)", d.wins.map(function (t) { return elem("span", "grow", t); })));
-    drawerBody.appendChild(drawerSection("Rolling off soon / overdue", d.roll.map(function (t) { return elem("span", "grow", t); })));
+    drawerBody.appendChild(drawerSection("Recently completed (wins)", d.wins.map(carryLine)));
+    drawerBody.appendChild(drawerSection("Rolling off soon / overdue", d.roll.map(carryLine)));
   }
   function managerCarry(id) {
     var current = [], wins = [], roll = [];
     data.assignments.forEach(function (a) {
       if (a.archived || a.managerId !== id) return;
       var p = findById(data.projects, a.projectId); if (!p) return;
-      if (p.status === "active") current.push({ text: "Project: " + p.name + " — " + lab("role", a.role) + " (" + lab("effort", a.effort) + ")" });
-      if (a.endDate && soon(a.endDate)) roll.push("Assignment on " + p.name + " rolls off " + a.endDate);
+      if (p.status === "active") current.push({ text: "Project: " + p.name + " — " + lab("role", a.role) + " (" + lab("effort", a.effort) + ")", projectId: p.id });
+      if (a.endDate && soon(a.endDate)) roll.push({ text: "Assignment on " + p.name + " rolls off " + a.endDate, projectId: p.id });
     });
     data.workItems.forEach(function (w) {
       if (w.managerId !== id) return;
       if (!w.archived && (w.status === "open" || w.status === "in-progress")) current.push({ text: typeLabel(w) + ": " + w.title + " [" + lab("wstatus", w.status) + "]", wiId: w.id });
-      if (w.status === "done" && w.completedDate) wins.push(typeLabel(w) + ": " + w.title + " (done " + w.completedDate + ")");
-      if (!w.archived && w.status !== "done" && w.rollOffDate && soon(w.rollOffDate)) roll.push(typeLabel(w) + ": " + w.title + " rolls off " + w.rollOffDate);
+      if (w.status === "done" && w.completedDate) wins.push({ text: typeLabel(w) + ": " + w.title + " (done " + w.completedDate + ")", wiId: w.id });
+      if (!w.archived && w.status !== "done" && w.rollOffDate && soon(w.rollOffDate)) roll.push({ text: typeLabel(w) + ": " + w.title + " rolls off " + w.rollOffDate, wiId: w.id });
     });
-    wins.sort().reverse();
+    wins.sort(function (a, b) { return a.text < b.text ? 1 : a.text > b.text ? -1 : 0; }); // was string-sort().reverse() on plain strings
     return { current: current, wins: wins, roll: roll };
   }
   function summaryText(id) {
@@ -1610,7 +1653,7 @@
     data.assignments.forEach(function (a) {
       if (a.archived || !a.endDate || a.endDate >= today) return;
       var p = findById(data.projects, a.projectId);
-      out.push({ kind: "as-roll", id: a.id, why: "Ended " + a.endDate,
+      out.push({ kind: "as-roll", id: a.id, why: "Ended " + a.endDate, projectId: p ? p.id : null,
                  text: "Assignment: " + managerName(a.managerId) + " on " + (p ? p.name : "(project)") });
     });
     return out;
@@ -1629,7 +1672,13 @@
     }
     items.forEach(function (it) {
       var li = elem("li");
-      li.appendChild(elem("span", "grow", it.text));
+      // Click-through to whatever the row is about: the work item, or (for an
+      // ended assignment) the project it was on.
+      if (it.kind === "as-roll" && it.projectId) {
+        li.appendChild(linkBtn(it.text, function () { attnOverlay.className = "overlay"; goToProject(it.projectId); }));
+      } else {
+        li.appendChild(elem("span", "grow", it.text));
+      }
       li.appendChild(elem("span", "why", it.why));
       if (it.kind === "wi-due") {
         li.appendChild(miniBtn("Done", function () { markWorkItemDone(it.id).then(renderAttnList); }, "ghost"));
@@ -1677,15 +1726,15 @@
     }
     if (ms.length) {
       searchPop.appendChild(elem("div", "sr-group", "Managers"));
-      ms.slice(0, 5).forEach(function (m) { item(m.name + (m.title ? " — " + m.title : ""), function () { openManager(m.id); }); });
+      ms.slice(0, 5).forEach(function (m) { item(m.name + (m.title ? " — " + m.title : ""), function () { goToManager(m.id); }); });
     }
     if (ps.length) {
       searchPop.appendChild(elem("div", "sr-group", "Projects"));
-      ps.slice(0, 5).forEach(function (p) { item(p.name, function () { showView("projects"); openProjectModal(p.id); }); });
+      ps.slice(0, 5).forEach(function (p) { item(p.name, function () { goToProject(p.id); }); });
     }
     if (ws.length) {
       searchPop.appendChild(elem("div", "sr-group", "Work items"));
-      ws.slice(0, 5).forEach(function (w) { item(typeLabel(w) + ": " + (w.title || ""), function () { showView("workitems"); editWorkItem(w.id); }); });
+      ws.slice(0, 5).forEach(function (w) { item(typeLabel(w) + ": " + (w.title || ""), function () { goToWorkItem(w.id); }); });
     }
     searchPop.className = "search-pop show";
   }
