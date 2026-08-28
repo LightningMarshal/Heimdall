@@ -199,8 +199,8 @@
              justify-content: center; padding: 20px; z-index: 50; }
   .overlay.show { display: flex; }
   .modal { background: var(--surface); border-radius: var(--radius); padding: 24px; width: 100%;
-           max-width: 420px; box-shadow: var(--shadow-lg); }
-  .modal.wide { max-width: 540px; max-height: 90vh; overflow-y: auto; }
+           max-width: 420px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
+  .modal.wide { max-width: 540px; }
   .modal h3 { margin: 0 0 14px; font-size: 18px; }
   .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
   .ff { display: flex; flex-direction: column; gap: 5px; margin-bottom: 13px; }
@@ -729,6 +729,7 @@
   function cap(s) { s = s || ""; return s.charAt(0).toUpperCase() + s.slice(1); }
   function lab(kind, v) { return (LABELS[kind] && LABELS[kind][v]) || cap(v || ""); }
   function findById(arr, id) { for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i]; return null; }
+  function safeHref(url) { return /^(https?:|mailto:)/i.test(url || "") ? url : null; }
   function managerName(id) { var m = id && findById(data.managers, id); return m ? m.name : (id ? "(unknown)" : "—"); }
   function activeAssignments(projectId) {
     return data.assignments.filter(function (a) { return a.projectId === projectId && !a.archived; });
@@ -940,7 +941,7 @@
       meta.appendChild(pill("status", lab("pstatus", p.status || "active")));
       meta.appendChild(elem("span", null, lab("priority", p.priority || "med") + " priority"));
       if (p.targetDate) meta.appendChild(elem("span", null, "target " + p.targetDate));
-      if (p.link) { var lw = elem("span", "p-link"); var a = elem("a", null, "Jira epic"); a.href = p.link; a.target = "_blank"; a.rel = "noopener"; lw.appendChild(a); meta.appendChild(lw); }
+      if (p.link) { var lw = elem("span", "p-link"); var href = safeHref(p.link); if (href) { var a = elem("a", null, "Jira epic"); a.href = href; a.target = "_blank"; a.rel = "noopener"; lw.appendChild(a); } else { lw.appendChild(elem("span", null, "Jira epic (invalid link)")); } meta.appendChild(lw); }
       left.appendChild(meta);
       top.appendChild(left);
       top.appendChild(miniBtn("Edit", function () { openProjectModal(p.id); }));
@@ -982,7 +983,8 @@
       var tr = elem("tr"); if (w.archived || w.status === "done") tr.className = "archived";
       var t1 = elem("td"); t1.appendChild(pill(w.type || "other", lab("type", w.type))); tr.appendChild(t1);
       var titleTd = tdc(w.title || "");
-      if (w.link) { titleTd.textContent = ""; var a = elem("a", null, w.title || "(item)"); a.href = w.link; a.target = "_blank"; a.rel = "noopener"; titleTd.appendChild(a); }
+      var wHref = w.link ? safeHref(w.link) : null;
+      if (wHref) { titleTd.textContent = ""; var a = elem("a", null, w.title || "(item)"); a.href = wHref; a.target = "_blank"; a.rel = "noopener"; titleTd.appendChild(a); }
       tr.appendChild(titleTd);
       tr.appendChild(tdc(managerName(w.managerId)));
       tr.appendChild(tdc(lab("wstatus", w.status || "open")));
@@ -1004,10 +1006,12 @@
 
   // ---- Reports view ----------------------------------------------------
   function isoWeek(d) {
+    // Per ISO-8601, the week belongs to the year of its Thursday, which can
+    // differ from d's calendar year for dates in late Dec / early Jan.
     var x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
     var day = (x.getUTCDay() + 6) % 7; x.setUTCDate(x.getUTCDate() - day + 3);
     var firstThu = new Date(Date.UTC(x.getUTCFullYear(), 0, 4));
-    return 1 + Math.round((x - firstThu) / 604800000);
+    return { year: x.getUTCFullYear(), week: 1 + Math.round((x - firstThu) / 604800000) };
   }
   function periodKey(iso, gran) {
     if (gran === "all") return "All time";
@@ -1017,7 +1021,7 @@
     if (gran === "year") return "" + y;
     if (gran === "quarter") return y + " Q" + (Math.floor(d.getMonth() / 3) + 1);
     if (gran === "month") return y + "-" + pad(d.getMonth() + 1);
-    if (gran === "week") return y + "-W" + pad(isoWeek(d));
+    if (gran === "week") { var iw = isoWeek(d); return iw.year + "-W" + pad(iw.week); }
     return "" + y;
   }
   function renderReports() {
@@ -1441,7 +1445,7 @@
     var sub = [m.title, m.location, m.active ? null : "Archived"].filter(Boolean).join(" · ");
     if (sub) left.appendChild(elem("div", "d-sub", sub));
     head.appendChild(left);
-    head.appendChild(miniBtn("✕", closeDrawer, "ghost"));
+    head.appendChild(miniBtn("✕", closeDrawer, "ghost d-close"));
     drawerBody.appendChild(head);
 
     var sc = managerScore(m.id), b = bandFor(sc.score);
@@ -1745,6 +1749,7 @@
     var text = await file.text(); var parsed;
     try { parsed = JSON.parse(text); } catch (e) { notice("Import failed — not valid JSON (" + e.message + ").", "err"); return; }
     var v = validate(parsed); if (!v.ok) { notice("Import failed — not a valid Heimdall data file: " + v.error, "err"); return; }
+    if (hasContent(data) && !window.confirm("Importing will replace all current data in this browser with the contents of the selected file. Continue?")) return;
     data = v.data; await ensureName();
     data.settings.lastSavedBy = userName || data.settings.lastSavedBy || "Unknown"; data.settings.lastSavedAt = new Date().toISOString();
     await saveLocal(); updateBanner(); renderAll(); scheduleSave(); notice("Imported and saved.", "ok");
@@ -1756,6 +1761,7 @@
       var text = await readHandleText(picked[0]); var parsed;
       try { parsed = JSON.parse(text); } catch (e) { notice("That backup is also invalid JSON (" + e.message + ").", "err"); return; }
       var v = validate(parsed); if (!v.ok) { notice("That backup is not a valid Heimdall data file: " + v.error, "err"); return; }
+      if (hasContent(data) && !window.confirm("Loading this backup will replace all current data in this browser. Continue?")) return;
       data = v.data; fileBlocked = false; hideGuard(); await saveLocal(); updateBanner(); renderAll(); scheduleSave();
       notice("Loaded from backup — restoring the shared file.", "ok");
     } catch (e) { if (e && e.name === "AbortError") return; notice("Could not load backup: " + (e && e.message ? e.message : e), "err"); }
