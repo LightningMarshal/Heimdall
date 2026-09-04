@@ -150,6 +150,13 @@
   .pill.lead       { background: var(--accent-weak); color: var(--accent); }
   .pill.contributor{ background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
   .pill.status     { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+  /* Clickable variant of .pill (a <button>, not a <span>) — a name that navigates elsewhere. */
+  .pill.btn { border-width: 1px; border-style: solid; border-color: transparent; font: inherit; cursor: pointer; }
+  .pill.btn:hover, .pill.btn:focus-visible { border-color: currentColor; text-decoration: underline; }
+  /* Inline text-link button: turns a table/list label into a click-through. */
+  .lnk { background: none; border: none; padding: 0; margin: 0; font: inherit; color: var(--accent);
+         cursor: pointer; text-align: left; }
+  .lnk:hover, .lnk:focus-visible { text-decoration: underline; }
 
   /* Project cards */
   .pcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
@@ -195,15 +202,26 @@
   .bucket .n { width: 34px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
 
   /* Forms (modal + generic) */
+  /* Sits above the manager drawer (z-index 60) so a form opened from the drawer is usable. */
   .overlay { position: fixed; inset: 0; background: rgba(16,24,40,.45); display: none; align-items: center;
-             justify-content: center; padding: 20px; z-index: 50; }
+             justify-content: center; padding: 20px; z-index: 80; }
   .overlay.show { display: flex; }
-  .modal { background: var(--surface); border-radius: var(--radius); padding: 24px; width: 100%;
-           max-width: 420px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
-  .modal.wide { max-width: 540px; }
-  .modal h3 { margin: 0 0 14px; font-size: 18px; }
-  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  /* Header and actions stay put; only .modal-body scrolls, so a tall form is never cut off. */
+  .modal { background: var(--surface); border-radius: var(--radius); padding: 22px 24px; width: 100%;
+           max-width: 420px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column;
+           max-height: calc(100vh - 40px); }
+  .modal.wide { max-width: 640px; }
+  .modal h3 { margin: 0 0 14px; font-size: 18px; flex: 0 0 auto; }
+  .modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+                margin: 0 -24px; padding: 2px 24px; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; flex: 0 0 auto;
+                    margin: 14px -24px 0; padding: 13px 24px 0; border-top: 1px solid var(--border); }
   .ff { display: flex; flex-direction: column; gap: 5px; margin-bottom: 13px; }
+  /* Two-column field grid for the taller forms. */
+  .ff-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; align-items: start; }
+  .ff-cols .ff.full { grid-column: 1 / -1; }
+  @media (max-width: 620px) { .ff-cols { grid-template-columns: 1fr; } }
+  @media (max-height: 620px) { .overlay { padding: 10px; } .modal { max-height: calc(100vh - 20px); } }
   .ff > label { font-size: 12px; color: var(--muted); font-weight: 600; }
   .ff input, .ff select, .ff textarea { font: inherit; padding: 9px 11px; border: 1px solid var(--border-strong);
                                          border-radius: 8px; width: 100%; }
@@ -494,7 +512,14 @@
       <h3>Work items, backlog, roll-off &amp; history</h3>
       <ul>
         <li><strong>Types:</strong> Escalation (red), DITL (blue), One-off (amber), Other (gray).</li>
+        <li><strong>Other:</strong> pick <em>Other</em> and the form asks what kind of work it is. That
+          free-text label (up to 60 characters) is then shown in place of “Other” everywhere the item
+          appears — queue, board drawer, 1:1 summary, search — and it is searchable. Reports still group
+          all of them under Other, and the Other weight in Settings still applies.</li>
         <li><strong>Backlog:</strong> items with no owner appear in the amber Backlog panel on the Board, so you assign work where everyone's load is visible.</li>
+        <li><strong>Click-through:</strong> a manager's name, a project's team member, or a work item's owner
+          is a link — click it to jump straight to that manager, project, or work item, from the drawer,
+          the Projects list, the Work Items table, search, or Needs attention.</li>
         <li><strong>Done:</strong> marking an item Done stamps its completion date and moves it to History; it then feeds the owner's “Recently completed” list in the drawer.</li>
         <li><strong>Roll-off:</strong> when an item's roll-off date (or an assignment's end date) passes, nothing disappears silently — a “Needs attention” chip appears in the nav. Open it to review and archive items deliberately, one by one or all at once.</li>
         <li><strong>History:</strong> Work Items → “Show: History” lists everything archived. Nothing is ever hard-deleted.</li>
@@ -543,9 +568,9 @@
 
 <!-- Generic form modal -->
 <div class="overlay" id="formOverlay">
-  <div class="modal">
+  <div class="modal" id="formModal">
     <h3 id="formTitle"></h3>
-    <div id="formBody"></div>
+    <div class="modal-body"><div id="formBody"></div></div>
     <div class="actions">
       <button id="formCancel">Cancel</button>
       <button id="formOk" class="primary">Save</button>
@@ -557,11 +582,13 @@
 <div class="overlay" id="projectOverlay">
   <div class="modal wide">
     <h3 id="projTitle">Add project</h3>
-    <div id="projFields"></div>
-    <div class="team-build">
-      <h4>Team</h4>
-      <div id="projTeam"></div>
-      <button id="projAddMember" class="mini">+ Add team member</button>
+    <div class="modal-body">
+      <div id="projFields" class="ff-cols"></div>
+      <div class="team-build">
+        <h4>Team</h4>
+        <div id="projTeam"></div>
+        <button id="projAddMember" class="mini">+ Add team member</button>
+      </div>
     </div>
     <div class="actions">
       <button id="projCancel">Cancel</button>
@@ -579,9 +606,11 @@
 <div class="overlay" id="attnOverlay">
   <div class="modal wide">
     <h3>Needs attention</h3>
-    <p class="hint">Items past their roll-off / end date, or overdue. Review them here so nothing
-      disappears silently — archived items stay in History.</p>
-    <ul class="attn-list" id="attnList"></ul>
+    <div class="modal-body">
+      <p class="hint">Items past their roll-off / end date, or overdue. Review them here so nothing
+        disappears silently — archived items stay in History.</p>
+      <ul class="attn-list" id="attnList"></ul>
+    </div>
     <div class="actions">
       <button id="attnArchiveAll">Archive all past roll-off</button>
       <button id="attnClose" class="primary">Close</button>
@@ -593,9 +622,11 @@
 <div class="overlay" id="nameOverlay">
   <div class="modal">
     <h3>What's your name?</h3>
-    <p class="hint">Used to attribute saves in the "Last saved by" banner. Asked once, then remembered.</p>
-    <input type="text" id="nameInput" placeholder="Your name" autocomplete="off"
-           style="width:100%;font:inherit;padding:9px 11px;border:1px solid var(--border-strong);border-radius:8px;">
+    <div class="modal-body">
+      <p class="hint">Used to attribute saves in the "Last saved by" banner. Asked once, then remembered.</p>
+      <input type="text" id="nameInput" placeholder="Your name" autocomplete="off"
+             style="width:100%;font:inherit;padding:9px 11px;border:1px solid var(--border-strong);border-radius:8px;">
+    </div>
     <div class="actions">
       <button id="nameCancel">Cancel</button>
       <button id="nameOk" class="primary">Continue</button>
@@ -634,6 +665,7 @@
     effort: { light: "Light", medium: "Medium", heavy: "Heavy" }
   };
   var TYPE_COLOR = { escalation: "#dc2626", ditl: "#2563eb", oneoff: "#d97706", other: "#6b7280" };
+  var TYPE_OTHER_MAX = 60;   // free-text label captured when Type is "Other"
 
   // ---- Session state ---------------------------------------------------
   var data = null, userName = null;
@@ -663,8 +695,8 @@
   var btnExport = el("btnExport"), btnImport = el("btnImport"), importInput = el("importInput"),
       appVersionEl = el("appVersion");
   var nameOverlay = el("nameOverlay"), nameInput = el("nameInput"), nameOk = el("nameOk"), nameCancel = el("nameCancel");
-  var formOverlay = el("formOverlay"), formTitle = el("formTitle"), formBody = el("formBody"),
-      formOk = el("formOk"), formCancel = el("formCancel");
+  var formOverlay = el("formOverlay"), formModal = el("formModal"), formTitle = el("formTitle"),
+      formBody = el("formBody"), formOk = el("formOk"), formCancel = el("formCancel");
   var projectOverlay = el("projectOverlay"), projTitle = el("projTitle"), projFields = el("projFields"),
       projTeam = el("projTeam"), projAddMember = el("projAddMember"), projOk = el("projOk"), projCancel = el("projCancel");
   var drawerOverlay = el("drawerOverlay"), drawerBody = el("drawerBody");
@@ -728,6 +760,14 @@
   function todayISO() { return new Date().toISOString().slice(0, 10); }
   function cap(s) { s = s || ""; return s.charAt(0).toUpperCase() + s.slice(1); }
   function lab(kind, v) { return (LABELS[kind] && LABELS[kind][v]) || cap(v || ""); }
+  // Free-text label for an "Other" work item, trimmed and capped; null for every other type.
+  function typeOtherOf(w) {
+    if (!w || w.type !== "other") return null;
+    var t = (typeof w.typeOther === "string") ? w.typeOther.trim() : "";
+    return t ? t.slice(0, TYPE_OTHER_MAX) : null;
+  }
+  // What a work item's type is called on screen: the user's own words when they picked "Other".
+  function typeLabel(w) { return typeOtherOf(w) || lab("type", w && w.type); }
   function findById(arr, id) { for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i]; return null; }
   function safeHref(url) { return /^(https?:|mailto:)/i.test(url || "") ? url : null; }
   function managerName(id) { var m = id && findById(data.managers, id); return m ? m.name : (id ? "(unknown)" : "—"); }
@@ -742,6 +782,14 @@
   function elem(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function miniBtn(label, fn, cls) { var b = elem("button", "mini" + (cls ? " " + cls : ""), label); b.addEventListener("click", fn); return b; }
   function pill(cls, label) { return elem("span", "pill " + cls, label); }
+  // Clickable pill (button, not span) — same look as pill(), used for a name that
+  // navigates somewhere (e.g. a project's team member -> that manager's drawer).
+  function pillBtn(cls, label, fn) { var b = elem("button", "pill btn " + cls, label); b.type = "button"; b.addEventListener("click", fn); return b; }
+  // Plain-text button styled as an inline link, for turning a drawer/table row's
+  // label into a click-through to the project, work item, or manager it names.
+  // "grow" so it fills the row the way the plain <span class="grow"> it replaces did
+  // (pushes a trailing action button, e.g. "Done", to the right of the row).
+  function linkBtn(text, fn) { var b = elem("button", "lnk grow", text); b.type = "button"; b.addEventListener("click", fn); return b; }
 
   var noticeTimer = null;
   function notice(msg, kind) {
@@ -823,6 +871,18 @@
     else if (currentView === "settings") renderSettings();
   }
   function renderAll() { refreshSelects(); renderCurrent(); updateAttn(); if (openManagerId) renderDrawer(); }
+
+  // ---- Cross-navigation (Board <-> Projects <-> Work Items) ------------
+  // Click-through targets shared by search, the manager drawer, the projects
+  // list, the work items table, and needs-attention: switch to the owning
+  // view (when there is one) and open the same edit surface search already
+  // uses, so "click a work item/project/manager wherever it's named" behaves
+  // the same everywhere.
+  // Close the drawer first: it's a full-screen backdrop, so leaving it open behind
+  // a view switch would silently block clicks on the view we just switched to.
+  function goToProject(id) { closeDrawer(); showView("projects"); openProjectModal(id); }
+  function goToWorkItem(id) { closeDrawer(); showView("workitems"); editWorkItem(id); }
+  function goToManager(id) { openManager(id); } // drawer is an overlay; no view switch needed
 
   // ---- Selects ---------------------------------------------------------
   function fillSelectOpts(sel, opts, keep) {
@@ -923,7 +983,8 @@
       var txt = (a.role === "lead")
         ? managerName(a.managerId) + " · Lead · " + lab("effort", a.effort)
         : managerName(a.managerId) + " · " + lab("effort", a.effort);
-      span.appendChild(pill(a.role === "lead" ? "lead" : "contributor", txt));
+      // Team pills click through to that manager's drawer.
+      span.appendChild(pillBtn(a.role === "lead" ? "lead" : "contributor", txt, function () { goToManager(a.managerId); }));
     });
     return span;
   }
@@ -981,12 +1042,16 @@
     }
     list.forEach(function (w) {
       var tr = elem("tr"); if (w.archived || w.status === "done") tr.className = "archived";
-      var t1 = elem("td"); t1.appendChild(pill(w.type || "other", lab("type", w.type))); tr.appendChild(t1);
+      var t1 = elem("td"); t1.appendChild(pill(w.type || "other", typeLabel(w))); tr.appendChild(t1);
       var titleTd = tdc(w.title || "");
       var wHref = w.link ? safeHref(w.link) : null;
       if (wHref) { titleTd.textContent = ""; var a = elem("a", null, w.title || "(item)"); a.href = wHref; a.target = "_blank"; a.rel = "noopener"; titleTd.appendChild(a); }
       tr.appendChild(titleTd);
-      tr.appendChild(tdc(managerName(w.managerId)));
+      // Owner click-through to that manager's drawer; unassigned items just show "—".
+      var ownerTd = elem("td");
+      if (w.managerId) ownerTd.appendChild(linkBtn(managerName(w.managerId), function () { goToManager(w.managerId); }));
+      else ownerTd.textContent = "—";
+      tr.appendChild(ownerTd);
       tr.appendChild(tdc(lab("wstatus", w.status || "open")));
       var prTd = tdc(lab("priority", w.priority || "med"));
       if (w.priority === "high" && !w.archived && w.status !== "done") prTd.className = "pri-high";
@@ -1174,18 +1239,24 @@
   }
 
   // ---- Generic form modal ----------------------------------------------
-  function openForm(title, fields, values) {
-    values = values || {};
+  // Field spec extras: full (span both grid columns), showWhen {key, equals} for a
+  // conditional field, requiredWhen (required only while it is showing).
+  // opts: { wide: true } widens the modal and lays fields out in two columns.
+  function openForm(title, fields, values, opts) {
+    values = values || {}; opts = opts || {};
     return new Promise(function (resolve) {
       formTitle.textContent = title; clear(formBody);
+      formModal.className = "modal" + (opts.wide ? " wide" : "");
+      formBody.className = opts.wide ? "ff-cols" : "";
       var inputs = {};
       fields.forEach(function (f) {
-        var wrap = elem("div", "ff" + (f.type === "checkbox" ? " check" : ""));
+        var wrap = elem("div", "ff" + (f.type === "checkbox" ? " check" : "") + (f.full ? " full" : ""));
         var input;
         if (f.type === "textarea") input = elem("textarea");
         else if (f.type === "select") { input = elem("select"); (f.options || []).forEach(function (o) { var op = elem("option", null, o.label !== undefined ? o.label : o); op.value = (o.value !== undefined) ? o.value : o; input.appendChild(op); }); }
         else if (f.type === "checkbox") { input = elem("input"); input.type = "checkbox"; }
         else { input = elem("input"); input.type = (f.type === "date") ? "date" : "text"; if (f.placeholder) input.placeholder = f.placeholder; }
+        if (f.maxLength && input.tagName !== "SELECT") input.maxLength = f.maxLength;
         input.id = "ff_" + f.key;
         var v = values[f.key];
         if (f.type === "checkbox") input.checked = !!v;
@@ -1193,8 +1264,29 @@
         else if (f.type === "select" && f.options && f.options.length) input.value = (f.options[0].value !== undefined) ? f.options[0].value : f.options[0];
         var label = elem("label", null, f.label + (f.required ? " *" : "")); label.setAttribute("for", input.id);
         if (f.type === "checkbox") { wrap.appendChild(input); wrap.appendChild(label); } else { wrap.appendChild(label); wrap.appendChild(input); }
-        formBody.appendChild(wrap); inputs[f.key] = { el: input, spec: f };
+        if (f.hint) wrap.appendChild(elem("span", "hint", f.hint));
+        formBody.appendChild(wrap); inputs[f.key] = { el: input, wrap: wrap, spec: f };
       });
+      // Conditional fields: shown only while their controlling field holds the trigger value.
+      function shown(rec) {
+        var c = rec.spec.showWhen; if (!c) return true;
+        var ctrl = inputs[c.key]; if (!ctrl) return true;
+        return ctrl.el.value === c.equals;
+      }
+      function applyConditions(focusRevealed) {
+        for (var key in inputs) {
+          var rec = inputs[key]; if (!rec.spec.showWhen) continue;
+          var vis = shown(rec), was = rec.wrap.style.display !== "none";
+          rec.wrap.style.display = vis ? "" : "none";
+          if (vis && !was && focusRevealed) rec.el.focus();
+        }
+      }
+      fields.forEach(function (f) {
+        if (!f.showWhen) return;
+        var ctrl = inputs[f.showWhen.key];
+        if (ctrl) ctrl.el.addEventListener("change", function () { applyConditions(true); });
+      });
+      applyConditions(false);
       formOverlay.className = "overlay show";
       var first = formBody.querySelector("input, select, textarea"); if (first) first.focus();
       function cleanup() { formOverlay.className = "overlay"; formOk.removeEventListener("click", onOk); formCancel.removeEventListener("click", onCancel); }
@@ -1202,9 +1294,10 @@
         var out = {};
         for (var key in inputs) {
           var rec = inputs[key], e = rec.el, spec = rec.spec;
+          if (!shown(rec)) { out[key] = (spec.type === "checkbox") ? false : null; continue; }
           if (spec.type === "checkbox") { out[key] = e.checked; continue; }
           var val = e.value; if (typeof val === "string") val = val.trim();
-          if (spec.required && !val) { e.focus(); return; }
+          if ((spec.required || spec.requiredWhen) && !val) { e.focus(); return; }
           out[key] = val || null;
         }
         cleanup(); resolve(out);
@@ -1252,7 +1345,11 @@
   function workItemFields(presetManager) {
     return [
       { key: "type", label: "Type", type: "select", options: enumOpts(WORK_TYPES, "type") },
-      { key: "title", label: "Title", type: "text", required: true },
+      // Shown only when Type is "Other": the free-text label used everywhere in place of "Other".
+      { key: "typeOther", label: "What kind of work?", type: "text", maxLength: TYPE_OTHER_MAX,
+        showWhen: { key: "type", equals: "other" }, requiredWhen: true,
+        placeholder: "e.g. Vendor audit, Hiring loop, Conference" },
+      { key: "title", label: "Title", type: "text", required: true, full: true },
       { key: "managerId", label: "Owner (manager)", type: "select", options: managerOpts(true, "— none —") },
       { key: "relatedProjectId", label: "Related project", type: "select",
         options: [{ value: "", label: "— none —" }].concat(data.projects.map(function (p) { return { value: p.id, label: p.name }; })) },
@@ -1261,18 +1358,18 @@
       { key: "openedDate", label: "Opened date", type: "date" },
       { key: "dueDate", label: "Due date", type: "date" },
       { key: "rollOffDate", label: "Roll-off date", type: "date" },
-      { key: "link", label: "Link (Jira/ticket/doc URL — no sensitive content)", type: "text" },
-      { key: "notes", label: "Notes (short)", type: "textarea" }
+      { key: "link", label: "Link (Jira/ticket/doc URL — no sensitive content)", type: "text", full: true },
+      { key: "notes", label: "Notes (short)", type: "textarea", full: true }
     ];
   }
   async function addWorkItem(presetManager) {
     await ensureName();
     var defaults = { type: "escalation", status: "open", priority: "med", openedDate: todayISO() };
     if (presetManager) defaults.managerId = presetManager;
-    var v = await openForm("Add work item", workItemFields(), defaults);
+    var v = await openForm("Add work item", workItemFields(), defaults, { wide: true });
     if (!v) return;
     data.workItems.push({
-      id: genId(), type: v.type, title: v.title, managerId: v.managerId, relatedProjectId: v.relatedProjectId,
+      id: genId(), type: v.type, typeOther: typeOtherOf(v), title: v.title, managerId: v.managerId, relatedProjectId: v.relatedProjectId,
       status: v.status, priority: v.priority, openedDate: v.openedDate, dueDate: v.dueDate, rollOffDate: v.rollOffDate,
       completedDate: (v.status === "done") ? todayISO() : null, archived: false, link: v.link, notes: v.notes
     });
@@ -1281,12 +1378,12 @@
   async function editWorkItem(id) {
     var w = findById(data.workItems, id); if (!w) return;
     await ensureName();
-    var v = await openForm("Edit work item", workItemFields(), w);
+    var v = await openForm("Edit work item", workItemFields(), w, { wide: true });
     if (!v) return;
     var wasDone = (w.status === "done");
     if (v.status === "done") { if (!w.completedDate) w.completedDate = todayISO(); w.archived = true; }
     else { w.completedDate = null; if (wasDone) w.archived = false; } // reopening restores from history
-    w.type = v.type; w.title = v.title; w.managerId = v.managerId; w.relatedProjectId = v.relatedProjectId;
+    w.type = v.type; w.typeOther = typeOtherOf(v); w.title = v.title; w.managerId = v.managerId; w.relatedProjectId = v.relatedProjectId;
     w.status = v.status; w.priority = v.priority; w.openedDate = v.openedDate; w.dueDate = v.dueDate;
     w.rollOffDate = v.rollOffDate; w.link = v.link; w.notes = v.notes;
     commit();
@@ -1321,13 +1418,13 @@
 
   // ---- Project modal (fields + inline team builder) --------------------
   var PROJECT_FIELD_SPEC = [
-    { key: "name", label: "Name", type: "text", required: true },
-    { key: "description", label: "Description", type: "textarea" },
+    { key: "name", label: "Name", type: "text", required: true, full: true },
+    { key: "description", label: "Description", type: "textarea", full: true },
     { key: "status", label: "Status", type: "select", options: PSTATUS, kind: "pstatus" },
     { key: "priority", label: "Priority", type: "select", options: PRIORITY, kind: "priority" },
     { key: "startDate", label: "Start date", type: "date" },
     { key: "targetDate", label: "Target date", type: "date" },
-    { key: "link", label: "Jira epic link (URL)", type: "text" }
+    { key: "link", label: "Jira epic link (URL)", type: "text", full: true }
   ];
   function openProjectModal(id) {
     editingProjectId = id || null;
@@ -1336,7 +1433,7 @@
     clear(projFields);
     var vals = p || { status: "active", priority: "med", startDate: todayISO() };
     PROJECT_FIELD_SPEC.forEach(function (f) {
-      var wrap = elem("div", "ff");
+      var wrap = elem("div", "ff" + (f.full ? " full" : ""));
       var input;
       if (f.type === "textarea") input = elem("textarea");
       else if (f.type === "select") { input = elem("select"); f.options.forEach(function (o) { var op = elem("option", null, lab(f.kind, o)); op.value = o; input.appendChild(op); }); }
@@ -1465,29 +1562,37 @@
     drawerBody.appendChild(actions);
 
     var d = managerCarry(m.id);
+    // Each entry's own text is the click-through: a project or work item name in
+    // the drawer opens that project/work item's edit form (same target the
+    // search results already jump to). Plain text where an item has neither.
+    function carryLine(it) {
+      return it.projectId ? linkBtn(it.text, function () { goToProject(it.projectId); })
+           : it.wiId ? linkBtn(it.text, function () { goToWorkItem(it.wiId); })
+           : elem("span", "grow", it.text);
+    }
     drawerBody.appendChild(drawerSection("Currently carrying", d.current.map(function (it) {
-      var nodes = [elem("span", "grow", it.text)];
+      var nodes = [carryLine(it)];
       if (it.wiId) nodes.push(miniBtn("Done", function () { markWorkItemDone(it.wiId); }, "ghost"));
       return nodes;
     })));
-    drawerBody.appendChild(drawerSection("Recently completed (wins)", d.wins.map(function (t) { return elem("span", "grow", t); })));
-    drawerBody.appendChild(drawerSection("Rolling off soon / overdue", d.roll.map(function (t) { return elem("span", "grow", t); })));
+    drawerBody.appendChild(drawerSection("Recently completed (wins)", d.wins.map(carryLine)));
+    drawerBody.appendChild(drawerSection("Rolling off soon / overdue", d.roll.map(carryLine)));
   }
   function managerCarry(id) {
     var current = [], wins = [], roll = [];
     data.assignments.forEach(function (a) {
       if (a.archived || a.managerId !== id) return;
       var p = findById(data.projects, a.projectId); if (!p) return;
-      if (p.status === "active") current.push({ text: "Project: " + p.name + " — " + lab("role", a.role) + " (" + lab("effort", a.effort) + ")" });
-      if (a.endDate && soon(a.endDate)) roll.push("Assignment on " + p.name + " rolls off " + a.endDate);
+      if (p.status === "active") current.push({ text: "Project: " + p.name + " — " + lab("role", a.role) + " (" + lab("effort", a.effort) + ")", projectId: p.id });
+      if (a.endDate && soon(a.endDate)) roll.push({ text: "Assignment on " + p.name + " rolls off " + a.endDate, projectId: p.id });
     });
     data.workItems.forEach(function (w) {
       if (w.managerId !== id) return;
-      if (!w.archived && (w.status === "open" || w.status === "in-progress")) current.push({ text: lab("type", w.type) + ": " + w.title + " [" + lab("wstatus", w.status) + "]", wiId: w.id });
-      if (w.status === "done" && w.completedDate) wins.push(lab("type", w.type) + ": " + w.title + " (done " + w.completedDate + ")");
-      if (!w.archived && w.status !== "done" && w.rollOffDate && soon(w.rollOffDate)) roll.push(lab("type", w.type) + ": " + w.title + " rolls off " + w.rollOffDate);
+      if (!w.archived && (w.status === "open" || w.status === "in-progress")) current.push({ text: typeLabel(w) + ": " + w.title + " [" + lab("wstatus", w.status) + "]", wiId: w.id });
+      if (w.status === "done" && w.completedDate) wins.push({ text: typeLabel(w) + ": " + w.title + " (done " + w.completedDate + ")", wiId: w.id });
+      if (!w.archived && w.status !== "done" && w.rollOffDate && soon(w.rollOffDate)) roll.push({ text: typeLabel(w) + ": " + w.title + " rolls off " + w.rollOffDate, wiId: w.id });
     });
-    wins.sort().reverse();
+    wins.sort(function (a, b) { return a.text < b.text ? 1 : a.text > b.text ? -1 : 0; }); // was string-sort().reverse() on plain strings
     return { current: current, wins: wins, roll: roll };
   }
   function summaryText(id) {
@@ -1527,7 +1632,7 @@
     panel.appendChild(elem("p", "hint", "Incoming items with no owner yet — assign them here, where everyone's load is visible."));
     items.forEach(function (w) {
       var row = elem("div", "b-row");
-      row.appendChild(pill(w.type || "other", lab("type", w.type)));
+      row.appendChild(pill(w.type || "other", typeLabel(w)));
       row.appendChild(elem("span", "grow", w.title || "(untitled)"));
       if (w.dueDate) row.appendChild(elem("span", "m-score", "due " + w.dueDate));
       row.appendChild(miniBtn("Assign…", function () { editWorkItem(w.id); }, "ghost"));
@@ -1543,16 +1648,16 @@
       if (w.archived || w.status === "done") return;
       if (w.rollOffDate && w.rollOffDate < today) {
         out.push({ kind: "wi-roll", id: w.id, why: "Past roll-off " + w.rollOffDate,
-                   text: lab("type", w.type) + ": " + (w.title || "") + " — " + managerName(w.managerId) });
+                   text: typeLabel(w) + ": " + (w.title || "") + " — " + managerName(w.managerId) });
       } else if (w.dueDate && w.dueDate < today) {
         out.push({ kind: "wi-due", id: w.id, why: "Overdue (due " + w.dueDate + ")",
-                   text: lab("type", w.type) + ": " + (w.title || "") + " — " + managerName(w.managerId) });
+                   text: typeLabel(w) + ": " + (w.title || "") + " — " + managerName(w.managerId) });
       }
     });
     data.assignments.forEach(function (a) {
       if (a.archived || !a.endDate || a.endDate >= today) return;
       var p = findById(data.projects, a.projectId);
-      out.push({ kind: "as-roll", id: a.id, why: "Ended " + a.endDate,
+      out.push({ kind: "as-roll", id: a.id, why: "Ended " + a.endDate, projectId: p ? p.id : null,
                  text: "Assignment: " + managerName(a.managerId) + " on " + (p ? p.name : "(project)") });
     });
     return out;
@@ -1571,7 +1676,13 @@
     }
     items.forEach(function (it) {
       var li = elem("li");
-      li.appendChild(elem("span", "grow", it.text));
+      // Click-through to whatever the row is about: the work item, or (for an
+      // ended assignment) the project it was on.
+      if (it.kind === "as-roll" && it.projectId) {
+        li.appendChild(linkBtn(it.text, function () { attnOverlay.className = "overlay"; goToProject(it.projectId); }));
+      } else {
+        li.appendChild(elem("span", "grow", it.text));
+      }
       li.appendChild(elem("span", "why", it.why));
       if (it.kind === "wi-due") {
         li.appendChild(miniBtn("Done", function () { markWorkItemDone(it.id).then(renderAttnList); }, "ghost"));
@@ -1610,7 +1721,7 @@
     function match(s) { return (s || "").toLowerCase().indexOf(q) >= 0; }
     var ms = data.managers.filter(function (m) { return match(m.name) || match(m.title) || match(m.location); });
     var ps = data.projects.filter(function (p) { return match(p.name) || match(p.description); });
-    var ws = data.workItems.filter(function (w) { return match(w.title) || match(w.notes); });
+    var ws = data.workItems.filter(function (w) { return match(w.title) || match(w.notes) || match(typeOtherOf(w)); });
     if (!ms.length && !ps.length && !ws.length) searchPop.appendChild(elem("div", "sr-none", "No matches."));
     function item(label, fn) {
       var b = elem("button", "sr-item", label);
@@ -1619,15 +1730,15 @@
     }
     if (ms.length) {
       searchPop.appendChild(elem("div", "sr-group", "Managers"));
-      ms.slice(0, 5).forEach(function (m) { item(m.name + (m.title ? " — " + m.title : ""), function () { openManager(m.id); }); });
+      ms.slice(0, 5).forEach(function (m) { item(m.name + (m.title ? " — " + m.title : ""), function () { goToManager(m.id); }); });
     }
     if (ps.length) {
       searchPop.appendChild(elem("div", "sr-group", "Projects"));
-      ps.slice(0, 5).forEach(function (p) { item(p.name, function () { showView("projects"); openProjectModal(p.id); }); });
+      ps.slice(0, 5).forEach(function (p) { item(p.name, function () { goToProject(p.id); }); });
     }
     if (ws.length) {
       searchPop.appendChild(elem("div", "sr-group", "Work items"));
-      ws.slice(0, 5).forEach(function (w) { item(lab("type", w.type) + ": " + (w.title || ""), function () { showView("workitems"); editWorkItem(w.id); }); });
+      ws.slice(0, 5).forEach(function (w) { item(typeLabel(w) + ": " + (w.title || ""), function () { goToWorkItem(w.id); }); });
     }
     searchPop.className = "search-pop show";
   }
@@ -1807,11 +1918,13 @@
   });
   document.addEventListener("keydown", function (e) {
     if (e.key !== "Escape") return;
-    closeDrawer();
-    projectOverlay.className = "overlay";
-    attnOverlay.className = "overlay";
+    // Close the topmost layer only, so Escape in a form opened from the drawer
+    // does not also close the drawer behind it.
     closeSearch(); toggleQuickMenu(false);
-    if (formOverlay.className.indexOf("show") >= 0) formCancel.click();
+    if (formOverlay.className.indexOf("show") >= 0) { formCancel.click(); return; }
+    if (projectOverlay.className.indexOf("show") >= 0) { projectOverlay.className = "overlay"; return; }
+    if (attnOverlay.className.indexOf("show") >= 0) { attnOverlay.className = "overlay"; return; }
+    closeDrawer();
   });
   document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") syncFromFile(false); });
   window.addEventListener("focus", function () { syncFromFile(false); });
