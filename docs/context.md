@@ -1,14 +1,14 @@
 # Project Context: Heimdall
-_Last updated: 2026-08-27_
+_Last updated: 2026-09-18_
 _This file changes rarely. If the stack or architecture shifts significantly, re-run /first-principles._
 
 ## Stack
 Vanilla JS, HTML, and CSS — no framework, no build step, no package manager,
 no dependencies of any kind. The entire application is one file,
-`heimdall.html` (~1,840 lines: inlined `<style>` + a single IIFE `<script>`
+`heimdall.html` (~2,120 lines: inlined `<style>` + a single IIFE `<script>`
 using ES5-style `function` expressions, not classes/modules). Currently at
-`APP_VERSION = "0.5.0"` (heimdall.html:613). Double-clicking the file runs
-it — there is no `npm install`, no dev server, no compiler.
+`APP_VERSION = "0.6.0"`. Double-clicking the file runs it — there is no
+`npm install`, no dev server, no compiler.
 
 ## Deployment
 There is no deployment target in the usual sense: the "deployment artifact"
@@ -32,12 +32,20 @@ No server, no port, no Electron wrapper.
   from the board so distribution decisions are visible.
 - **Roll-off** — a project/work-item end date; items past it aren't
   auto-deleted, they surface under **Needs attention** for deliberate
-  archiving.
+  archiving. Active projects past their target date surface there too, with
+  a **Close out** action rather than an archive one.
+- **Close out** — how a project ends: status goes to Complete with a
+  completion date (today by default, backdatable). It requires no start,
+  target, or end date — open-ended projects close the same way — keeps the
+  team and history, and stops counting toward workload. **Reopen** reverses
+  it and clears the completion date.
 - **Heat label** — the board's headline signal per manager, derived from a
   **weighted workload score**: Light (0–4) / Balanced (5–9) / Heavy (10–14)
   / Overloaded (15+). Weights (Lead 3, Contributor 1, escalation 4, DITL 2,
   one-off 1, other 1) and bands are editable in Settings and stored in the
-  data file, not hardcoded assumptions.
+  data file, not hardcoded assumptions. Scores are fractional (effort
+  multiplies), so one landing between two whole-number bands resolves
+  *downward*, to the highest band it has reached — see `bandFor`.
 - **Archiving** — the app's only form of deletion. Nothing is hard-deleted;
   archived managers/projects/items are preserved for history.
 
@@ -46,14 +54,18 @@ No server, no port, no Electron wrapper.
   `class`/`let`/arrow functions in the core — see heimdall.html for the
   established style before adding new code).
 - Small DOM helper functions instead of a templating library: `el()`,
-  `elem()`, `clear()`, `pill()`, `miniBtn()`, `notice()` (heimdall.html:648,
-  740–753).
+  `elem()`, `clear()`, `pill()`, `miniBtn()`, `notice()` (heimdall.html:688,
+  792–806).
 - Data validated/normalized through a single `validate(parsed)` function
-  (heimdall.html:695) whenever loading from IndexedDB, an imported file, or
+  (heimdall.html:735) whenever loading from IndexedDB, an imported file, or
   a synced shared file — new fields on any entity should be threaded
   through there.
 - No test framework, no linter config present — this is a hand-verified,
-  manually-tested single file.
+  manually-tested single file. Changes are best verified by driving the real
+  file over `file://` in Chromium (Playwright), seeding IndexedDB
+  (db `heimdall`, store `kv`, key `data`) and asserting on rendered DOM —
+  done ad hoc so far; `docs/roadmap.md` item 1 weighs checking such a
+  harness in.
 - No git submodules/monorepo; this is the whole repo.
 
 ## Known gotchas
@@ -62,7 +74,7 @@ No server, no port, no Electron wrapper.
   `file://` — don't tighten this without testing `file://` loads, not just
   `http://`.
 - Live shared-file sync (via `showDirectoryPicker`/File System Access API)
-  is Chromium-only (`DIR_API` check at heimdall.html:618). Firefox/Safari
+  is Chromium-only (`DIR_API` check at heimdall.html:657). Firefox/Safari
   get full local (IndexedDB) functionality but must use manual JSON
   Export/Import to share — there is no feature-equivalent fallback to
   build, this is a real platform gap the README documents deliberately.
@@ -75,3 +87,10 @@ No server, no port, no Electron wrapper.
 - `connect-src 'none'` in the CSP is intentional and load-bearing for the
   "no network calls ever" security posture — any future feature needing
   `fetch`/XHR is a scope change, not a bug fix.
+- All dates in the data file are plain `YYYY-MM-DD` calendar dates with no
+  time zone. Read and write them **locally** — `todayISO()` builds from
+  `getFullYear/getMonth/getDate`, and `parseISODate()` parses to local
+  midnight. `new Date("2026-01-01")` and `toISOString().slice(0,10)` are
+  UTC-based and put the app a day off for anyone not on UTC; both have
+  caused real bugs (wrong report buckets, "-1d" ages, roll-off flagged a day
+  early).
