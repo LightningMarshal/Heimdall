@@ -122,6 +122,7 @@
     transition: transform .12s, box-shadow .12s, border-color .12s;
   }
   .mcard:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: var(--border-strong); }
+  .mcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .mcard .m-name { font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
   .mcard .m-sub { color: var(--muted); font-size: 13px; margin-top: 1px; }
   .mcard .m-heat-row { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 10px; }
@@ -236,7 +237,9 @@
   .team-build h4 { margin: 0 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
   .trow { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
   .trow select { font: inherit; padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: 8px; }
-  .trow .who { flex: 1 1 130px; }
+  .trow .who { flex: 1 1 100px; min-width: 0; }
+  .trow .t-end { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+  .trow .t-end input { font: inherit; font-size: 13px; padding: 6px 6px; border: 1px solid var(--border-strong); border-radius: 8px; }
 
   /* Manager detail drawer */
   .drawer-overlay { position: fixed; inset: 0; background: rgba(16,24,40,.4); display: none; z-index: 60; }
@@ -309,7 +312,9 @@
   @media print {
     .appbar, .banner, .nav, .notice, .footer-note, .drawer .d-actions, .drawer .d-close { display: none !important; }
     .drawer-overlay { position: static; background: none; }
-    .drawer { position: static; width: auto; box-shadow: none; transform: none; }
+    .drawer { position: static; width: auto; max-width: none; height: auto; box-shadow: none; transform: none; }
+    /* Print from the drawer prints the 1:1 summary, not the board underneath it. */
+    body.drawer-open .wrap { display: none !important; }
     body { background: #fff; }
   }
 
@@ -494,18 +499,19 @@
         <li><strong>3.</strong> Log work items (escalations, DITL requests, one-offs) as they arrive. Leave the owner as “— none —” to park an item in the Backlog until you decide who takes it.</li>
         <li><strong>4.</strong> Read the Board: each card shows a weighted heat label — who is overloaded, who has room.</li>
       </ul>
-      <p>Everything saves automatically; there is no Save button. The first time you change something you'll be asked your name once, so the “Last saved by” banner can attribute changes.</p>
+      <p>Everything saves automatically; there is no Save button. The first time you change something you'll be asked your name once, so the “Last saved by” banner can attribute changes. Cancelling that prompt cancels the change too.</p>
     </div>
 
     <div class="panel">
       <h3>The Board and the manager drawer</h3>
       <p>The Board shows one card per active manager: weighted workload heat (Light → Overloaded), the numeric score, and counts for projects leading / supporting, escalations (red), DITL, and one-offs. Hover the heat label to see which score range that band covers.</p>
-      <p>Click any card to open that manager's drawer: everything they're carrying, recent wins, and what's rolling off soon. From the drawer you can add a work item (owner pre-filled), assign them to a project, mark items done, edit their details, and copy / export / print a 1:1 summary — built for weekly 1:1s.</p>
+      <p>Click any card (or Tab to it and press Enter) to open that manager's drawer: everything they're carrying, their ten most recent wins, and what's rolling off soon. From the drawer you can add a work item (owner pre-filled), assign them to a project, mark items done, edit their details, and copy / export / print a 1:1 summary — built for weekly 1:1s. Print from the drawer prints the drawer alone.</p>
+      <p>Archiving a manager (Settings) takes them off the board. If they still own open work, you're asked first, and those items then appear under <em>Needs attention</em> as “Owner archived” until you reassign them.</p>
     </div>
 
     <div class="panel">
       <h3>Projects, leads &amp; effort</h3>
-      <p>A project has a status (Active / On hold / Complete), a priority, dates, and an optional Jira epic link. Its team is managed on the project itself: one entry per person with a role (Lead or Contributor) and an effort (Light / Medium / Heavy). A person can appear only once per project; removing someone archives their assignment rather than deleting it.</p>
+      <p>A project has a status (Active / On hold / Complete), a priority, dates, and an optional Jira epic link. Its team is managed on the project itself: one entry per person with a role (Lead or Contributor) and an effort (Light / Medium / Heavy). A person can appear only once per project; removing someone archives their assignment rather than deleting it, and so does switching a row to a different person (the new person gets a fresh assignment). Each team member can have an optional <em>until</em> date — the assignment's roll-off date.</p>
       <p>Only <em>Active</em> projects count toward workload.</p>
       <p><strong>Closing a project out:</strong> every project card has a <em>Close out</em> button, and a project
         whose target date has passed also shows up under <em>Needs attention</em> with the same action. Closing out
@@ -548,7 +554,8 @@
         <li><strong>Local first:</strong> data is stored in this browser (IndexedDB) and saves automatically. The app opens instantly, with zero prompts, in any modern browser.</li>
         <li><strong>Team sync (Edge / Chrome):</strong> Settings → “Link shared file” points Heimdall at a folder in a synced drive (OneDrive / SharePoint / Google Drive). It keeps a shared <code>heimdall-data.json</code> there, pulls teammates' changes when you return to the tab, and remembers the link across sessions.</li>
         <li><strong>Conflicts:</strong> last write wins, decided by save timestamp. The banner always shows who saved last; “Reload latest” re-reads the shared file on demand.</li>
-        <li><strong>Backups:</strong> every synced save also writes a timestamped <code>heimdall-data.backup-…json</code> beside the shared file (the 10 most recent are kept). If the shared file is ever corrupted, Heimdall refuses to overwrite it and offers to restore from a backup.</li>
+        <li><strong>Other tabs:</strong> two Heimdall tabs or windows in the same browser share one local copy; switching to a tab loads anything newer the other one saved.</li>
+        <li><strong>Backups:</strong> synced saves also write a timestamped <code>heimdall-data.backup-…json</code> beside the shared file — at most one every 30 minutes, so the 10 that are kept span hours of work rather than the last ten edits. If the shared file is ever corrupted, Heimdall refuses to overwrite it and offers to restore from a backup.</li>
         <li><strong>Export / Import:</strong> Settings → Export downloads the full dataset as JSON — a manual backup and the sharing route for non-Chromium browsers. Import loads one back in.</li>
       </ul>
       <p><strong>Important:</strong> clearing this browser's site data erases the local copy. Link a shared file, or Export periodically, so a copy always exists on disk.</p>
@@ -615,8 +622,8 @@
   <div class="modal wide">
     <h3>Needs attention</h3>
     <div class="modal-body">
-      <p class="hint">Items past their roll-off / end date, or overdue. Review them here so nothing
-        disappears silently — archived items stay in History.</p>
+      <p class="hint">Items past their roll-off / end date, overdue, or owned by an archived manager.
+        Review them here so nothing disappears silently — archived items stay in History.</p>
       <ul class="attn-list" id="attnList"></ul>
     </div>
     <div class="actions">
@@ -649,8 +656,11 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.6.0";
+  var APP_VERSION = "0.6.1";
   var MAX_BACKUPS = 10;
+  // Minimum spacing between backups. One per save meant ten quick edits rotated out
+  // every older backup, so the ten on disk only ever covered the last few minutes.
+  var BACKUP_GAP_MS = 30 * 60 * 1000;
   var BACKUP_RE = /^heimdall-data\.backup-\d{8}-\d{4}\.json$/;
   var DATA_FILE = "heimdall-data.json";
   var SAVE_DEBOUNCE_MS = 600;
@@ -674,6 +684,7 @@
   };
   var TYPE_COLOR = { escalation: "#dc2626", ditl: "#2563eb", oneoff: "#d97706", other: "#6b7280" };
   var TYPE_OTHER_MAX = 60;   // free-text label captured when Type is "Other"
+  var MAX_WINS = 10;         // "Recently completed" entries shown in the drawer and 1:1 summary
 
   // ---- Session state ---------------------------------------------------
   var data = null, userName = null;
@@ -742,17 +753,45 @@
     if ("settings" in parsed && !isPlainObject(parsed.settings))
       return { ok: false, error: '"settings" must be an object.' };
     var out = defaultData();
-    arrays.forEach(function (k) { if (Array.isArray(parsed[k])) out[k] = parsed[k]; });
+    // Rows that are not objects would throw mid-render; a row with no id can be neither
+    // found nor edited. Drop the former and give the latter one.
+    arrays.forEach(function (k) {
+      if (!Array.isArray(parsed[k])) return;
+      out[k] = parsed[k].filter(isPlainObject);
+      out[k].forEach(function (r) { if (typeof r.id !== "string" || !r.id) r.id = genId(); });
+    });
     if (isPlainObject(parsed.settings)) {
       var s = parsed.settings;
       out.settings.appVersion = (s.appVersion != null) ? s.appVersion : out.settings.appVersion;
       out.settings.lastSavedBy = (s.lastSavedBy != null) ? s.lastSavedBy : null;
       out.settings.lastSavedAt = (s.lastSavedAt != null) ? s.lastSavedAt : null;
-      if (isPlainObject(s.weights)) out.settings.weights = s.weights;
-      if (isPlainObject(s.effort)) out.settings.effort = s.effort;
-      if (Array.isArray(s.bands)) out.settings.bands = s.bands;
+      // Weights and multipliers must be numbers: a hand-edited "4" is added to the score
+      // as a string ("0" + "4" → "04"), and a missing key used to count as 0. Coerce
+      // what parses, and take the default for anything absent or unusable.
+      out.settings.weights = numbersOver(out.settings.weights, s.weights);
+      out.settings.effort = numbersOver(out.settings.effort, s.effort);
+      if (Array.isArray(s.bands)) {
+        var bands = [];
+        s.bands.forEach(function (b) {
+          if (!isPlainObject(b)) return;
+          var min = toNum(b.min), max = (b.max == null || b.max === "") ? null : toNum(b.max);
+          if (min == null) return;
+          bands.push({ label: (b.label != null && String(b.label).trim()) ? String(b.label) : "Band " + (bands.length + 1),
+                       min: min, max: (max == null || max < min) ? null : max });
+        });
+        if (bands.length) out.settings.bands = bands;
+      }
     }
     return { ok: true, data: out };
+  }
+  function toNum(v) { var n = (typeof v === "number") ? v : parseFloat(v); return isFinite(n) ? n : null; }
+  function numbersOver(defaults, given) {
+    var out = {};
+    Object.keys(defaults).forEach(function (k) {
+      var n = isPlainObject(given) ? toNum(given[k]) : null;
+      out[k] = (n == null) ? defaults[k] : n;
+    });
+    return out;
   }
 
   // ---- Small helpers ---------------------------------------------------
@@ -782,6 +821,7 @@
   function findById(arr, id) { for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i]; return null; }
   function safeHref(url) { return /^(https?:|mailto:)/i.test(url || "") ? url : null; }
   function managerName(id) { var m = id && findById(data.managers, id); return m ? m.name : (id ? "(unknown)" : "—"); }
+  function isActiveManager(id) { var m = findById(data.managers, id); return !!(m && m.active); }
   function activeAssignments(projectId) {
     return data.assignments.filter(function (a) { return a.projectId === projectId && !a.archived; });
   }
@@ -843,7 +883,9 @@
       var when; try { when = new Date(s.lastSavedAt).toLocaleString(); } catch (e) { when = s.lastSavedAt; }
       bannerText.textContent = "Last saved by " + s.lastSavedBy + " at " + when;
     } else { bannerText.textContent = "No changes saved yet."; }
-    appVersionEl.textContent = (s && s.appVersion) || APP_VERSION;
+    // The running app's version. settings.appVersion records which version last wrote
+    // the data file; it was never updated on save, so showing it lagged real upgrades.
+    appVersionEl.textContent = APP_VERSION;
     updateLinkUI();
   }
   function updateLinkUI() {
@@ -858,7 +900,8 @@
     var text = "";
     if (state === "dirty") text = "Unsaved changes…";
     else if (state === "saving") text = "Saving…";
-    else if (state === "saved") text = (linkState === "linked") ? "Saved & synced" : "Saved locally";
+    // While the guard is up the shared file is deliberately not written — don't claim it was.
+    else if (state === "saved") text = (linkState !== "linked") ? "Saved locally" : fileBlocked ? "Saved locally · sync paused" : "Saved & synced";
     else if (state === "error") text = "Saved locally · sync failed";
     saveStatus.textContent = text;
     saveStatus.className = "save-status" + (state ? " " + state : "");
@@ -881,7 +924,8 @@
     else if (currentView === "reports") renderReports();
     else if (currentView === "settings") renderSettings();
   }
-  function renderAll() { refreshSelects(); renderCurrent(); updateAttn(); if (openManagerId) renderDrawer(); }
+  var renderedDay = null;   // the local date the screen was last rendered for
+  function renderAll() { renderedDay = todayISO(); refreshSelects(); renderCurrent(); updateAttn(); if (openManagerId) renderDrawer(); }
 
   // ---- Cross-navigation (Board <-> Projects <-> Work Items) ------------
   // Click-through targets shared by search, the manager drawer, the projects
@@ -967,11 +1011,17 @@
       });
     });
     out.sort(function (a, b) { return a.min - b.min; });
+    // Color follows a band's position, not its name, so renaming "Heavy" in Settings
+    // keeps its color. Four built-in colors; more or fewer bands spread across them.
+    out.forEach(function (b, i) {
+      b.heat = HEAT_CLASSES[out.length < 2 ? 0 : Math.round(i * (HEAT_CLASSES.length - 1) / (out.length - 1))];
+    });
     return out;
   }
+  var HEAT_CLASSES = ["heat-light", "heat-balanced", "heat-heavy", "heat-overloaded"];
   function bandFor(score) {
     var bands = normalizedBands();
-    if (!bands.length) return { label: "—", min: 0, max: null };
+    if (!bands.length) return { label: "—", min: 0, max: null, heat: "heat-na" };
     var i, b;
     for (i = 0; i < bands.length; i++) { b = bands[i]; if (score >= b.min && (b.max == null || score <= b.max)) return b; }
     // Nothing contained it: a fractional score between two ranges, or one past the
@@ -986,12 +1036,11 @@
     return (b.max == null) ? (b.min + "+") : (b.min + "–" + b.max);
   }
   function heatLabelEl(b, score) {
-    var e = elem("span", "heat " + heatClass(b.label), b.label);
+    var e = elem("span", "heat " + (b.heat || "heat-na"), b.label);
     var r = bandRange(b);
     e.title = b.label + (r ? " · score " + r : "") + " · this score: " + round1(score);
     return e;
   }
-  function heatClass(label) { return "heat-" + String(label || "na").toLowerCase().replace(/[^a-z]/g, ""); }
 
   // ---- Board view ------------------------------------------------------
   function chip(label, n, alert) {
@@ -1031,6 +1080,9 @@
       if (sc.counts.other) chips.appendChild(chip("Other", sc.counts.other));
       card.appendChild(chips);
       card.addEventListener("click", function () { openManager(m.id); });
+      // Reachable and openable from the keyboard, like every other click-through.
+      card.tabIndex = 0; card.setAttribute("role", "button"); card.setAttribute("aria-label", m.name + " — " + b.label + ", score " + round1(sc.score));
+      card.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openManager(m.id); } });
       boardCards.appendChild(card);
     });
   }
@@ -1113,8 +1165,9 @@
   function renderWorkItemsView() {
     clear(wiRows);
     var all = (data && data.workItems) || [];
-    wiCount.textContent = all.length ? ("(" + all.length + ")") : "";
     var list = applyWiFilters(all);
+    // Count what the filters leave on screen, out of the total.
+    wiCount.textContent = !all.length ? "" : (list.length === all.length) ? ("(" + all.length + ")") : ("(" + list.length + " of " + all.length + ")");
     if (!list.length) {
       var tr = elem("tr"); var td = elem("td", "empty", all.length ? "No work items match the filters." : "No work items yet — click “Add work item”.");
       td.colSpan = 10; tr.appendChild(td); wiRows.appendChild(tr); return;
@@ -1324,6 +1377,8 @@
   }
 
   // ---- Name prompt -----------------------------------------------------
+  // Resolves to the name, or null if the prompt was cancelled — which cancels the edit
+  // that asked for it (button or Escape alike), so callers return on null.
   function ensureName() {
     return new Promise(function (resolve) {
       if (userName) { resolve(userName); return; }
@@ -1332,7 +1387,9 @@
       function cleanup() { nameOverlay.className = "overlay"; nameOk.removeEventListener("click", onOk); nameCancel.removeEventListener("click", onCancel); nameInput.removeEventListener("keydown", onKey); }
       function onOk() { var v = nameInput.value.trim(); if (!v) { nameInput.focus(); return; } userName = v; cleanup(); if (dbReady) idbSet("name", userName); resolve(userName); }
       function onCancel() { cleanup(); resolve(null); }
-      function onKey(e) { if (e.key === "Enter") onOk(); else if (e.key === "Escape") onCancel(); }
+      // stopPropagation: the document-level Escape handler would otherwise go on to
+      // close the drawer underneath, since the prompt is already hidden by then.
+      function onKey(e) { if (e.key === "Enter") onOk(); else if (e.key === "Escape") { e.stopPropagation(); onCancel(); } }
       nameOk.addEventListener("click", onOk); nameCancel.addEventListener("click", onCancel); nameInput.addEventListener("keydown", onKey);
     });
   }
@@ -1340,7 +1397,8 @@
   // ---- Generic form modal ----------------------------------------------
   // Field spec extras: full (span both grid columns), showWhen {key, equals} for a
   // conditional field, requiredWhen (required only while it is showing).
-  // opts: { wide: true } widens the modal and lays fields out in two columns.
+  // opts: { wide: true } widens the modal and lays fields out in two columns;
+  // { check: fn(values) } returns an error message to keep the form open, or "".
   function openForm(title, fields, values, opts) {
     values = values || {}; opts = opts || {};
     return new Promise(function (resolve) {
@@ -1399,6 +1457,8 @@
           if ((spec.required || spec.requiredWhen) && !val) { notice("“" + spec.label + "” is required.", "err"); e.focus(); return; }
           out[key] = val || null;
         }
+        var problem = opts.check ? opts.check(out) : "";
+        if (problem) { notice(problem, "err"); return; }
         cleanup(); resolve(out);
       }
       function onCancel() { cleanup(); resolve(null); }
@@ -1407,11 +1467,12 @@
   }
 
   // ---- Mutations -------------------------------------------------------
+  var GONE_MSG = "That record is no longer in the data — a newer copy was loaded while the form was open. Nothing was changed.";
   function commit() { renderAll(); scheduleSave(); }
 
   // Managers
   async function addManager() {
-    await ensureName();
+    if (!(await ensureName())) return;
     var v = await openForm("Add manager", [
       { key: "name", label: "Name", type: "text", required: true },
       { key: "title", label: "Title", type: "text" },
@@ -1424,7 +1485,7 @@
   }
   async function editManager(id) {
     var m = findById(data.managers, id); if (!m) return;
-    await ensureName();
+    if (!(await ensureName())) return;
     var v = await openForm("Edit manager", [
       { key: "name", label: "Name", type: "text", required: true },
       { key: "title", label: "Title", type: "text" },
@@ -1432,12 +1493,27 @@
       { key: "active", label: "Active", type: "checkbox" }
     ], { name: m.name, title: m.title, location: m.location, active: m.active });
     if (!v) return;
+    m = findById(data.managers, id); if (!m) { notice(GONE_MSG, "err"); return; }
+    if (m.active && !v.active && !confirmArchiveManager(m)) return;
     m.name = v.name; m.title = v.title; m.location = v.location; m.active = v.active;
     commit();
   }
   async function toggleManagerActive(id) {
     var m = findById(data.managers, id); if (!m) return;
-    await ensureName(); m.active = !m.active; commit();
+    if (m.active && !confirmArchiveManager(m)) return;
+    if (!(await ensureName())) return; m.active = !m.active; commit();
+  }
+  // Archiving takes a manager off the board and out of scoring, but not their work —
+  // say what they still carry before it drops out of sight.
+  function confirmArchiveManager(m) {
+    var sc = managerScore(m.id), c = sc.counts;
+    var items = c.escalation + c.ditl + c.oneoff + c.other, roles = c.led + c.supporting;
+    if (!items && !roles) return true;
+    var parts = [];
+    if (items) parts.push(items + " open work item" + (items === 1 ? "" : "s"));
+    if (roles) parts.push(roles + " active project role" + (roles === 1 ? "" : "s"));
+    return window.confirm(m.name + " still carries " + parts.join(" and ") + ". Archiving takes them off the board; " +
+      "their open work items will show under Needs attention for reassignment. Archive anyway?");
   }
 
   // Work items
@@ -1461,24 +1537,34 @@
       { key: "notes", label: "Notes (short)", type: "textarea", full: true }
     ];
   }
+  // Plain YYYY-MM-DD strings compare correctly as text, with no time zone involved.
+  function workItemDateCheck(o) {
+    if (o.openedDate && o.dueDate && o.dueDate < o.openedDate) return "The due date is before the opened date.";
+    if (o.openedDate && o.rollOffDate && o.rollOffDate < o.openedDate) return "The roll-off date is before the opened date.";
+    return "";
+  }
   async function addWorkItem(presetManager) {
-    await ensureName();
+    if (!(await ensureName())) return;
     var defaults = { type: "escalation", status: "open", priority: "med", openedDate: todayISO() };
     if (presetManager) defaults.managerId = presetManager;
-    var v = await openForm("Add work item", workItemFields(presetManager), defaults, { wide: true });
+    var v = await openForm("Add work item", workItemFields(presetManager), defaults, { wide: true, check: workItemDateCheck });
     if (!v) return;
     data.workItems.push({
       id: genId(), type: v.type, typeOther: typeOtherOf(v), title: v.title, managerId: v.managerId, relatedProjectId: v.relatedProjectId,
       status: v.status, priority: v.priority, openedDate: v.openedDate, dueDate: v.dueDate, rollOffDate: v.rollOffDate,
-      completedDate: (v.status === "done") ? todayISO() : null, archived: false, link: v.link, notes: v.notes
+      // Logged as already Done: straight to History, the same as marking it done later.
+      completedDate: (v.status === "done") ? todayISO() : null, archived: (v.status === "done"), link: v.link, notes: v.notes
     });
     commit();
   }
   async function editWorkItem(id) {
     var w = findById(data.workItems, id); if (!w) return;
-    await ensureName();
-    var v = await openForm("Edit work item", workItemFields(w.managerId), w, { wide: true });
+    if (!(await ensureName())) return;
+    var v = await openForm("Edit work item", workItemFields(w.managerId), w, { wide: true, check: workItemDateCheck });
     if (!v) return;
+    // A sync can replace `data` while the form is open (returning to the tab pulls the
+    // shared file); writing to the object captured before it would silently drop the edit.
+    w = findById(data.workItems, id); if (!w) { notice(GONE_MSG, "err"); return; }
     var wasDone = (w.status === "done");
     if (v.status === "done") { if (!w.completedDate) w.completedDate = todayISO(); w.archived = true; }
     else { w.completedDate = null; if (wasDone) w.archived = false; } // reopening restores from history
@@ -1489,12 +1575,12 @@
   }
   async function markWorkItemDone(id) {
     var w = findById(data.workItems, id); if (!w) return;
-    await ensureName();
+    if (!(await ensureName())) return;
     w.status = "done"; w.completedDate = todayISO(); w.archived = true; // done -> history
     commit();
     notice("Marked done — moved to History (Work Items → Show: History).", "ok");
   }
-  async function toggleWorkItemArchived(id) { var w = findById(data.workItems, id); if (!w) return; await ensureName(); w.archived = !w.archived; commit(); }
+  async function toggleWorkItemArchived(id) { var w = findById(data.workItems, id); if (!w) return; if (!(await ensureName())) return; w.archived = !w.archived; commit(); }
 
   // Assign a manager to a project (from the drawer); excludes projects they're already on.
   async function assignManagerToProject(managerId) {
@@ -1502,7 +1588,7 @@
     activeForManager(managerId).forEach(function (a) { taken[a.projectId] = true; });
     var avail = data.projects.filter(function (p) { return p.status !== "complete" && !taken[p.id]; });
     if (!avail.length) { notice("No available projects to assign (already on all active ones, or none exist).", "err"); return; }
-    await ensureName();
+    if (!(await ensureName())) return;
     var v = await openForm("Assign to a project", [
       { key: "projectId", label: "Project", type: "select", required: true, options: avail.map(function (p) { return { value: p.id, label: p.name }; }) },
       { key: "role", label: "Role", type: "select", options: enumOpts(ROLES, "role") },
@@ -1568,14 +1654,16 @@
     });
     applyProjectConditions();
     // Build team draft from existing active assignments.
-    teamDraft = p ? activeAssignments(p.id).map(function (a) { return { assignmentId: a.id, managerId: a.managerId, role: a.role, effort: a.effort }; }) : [];
+    teamDraft = p ? activeAssignments(p.id).map(function (a) { return { assignmentId: a.id, managerId: a.managerId, role: a.role, effort: a.effort, endDate: a.endDate || "" }; }) : [];
     renderTeamDraft();
     projectOverlay.className = "overlay show";
     var first = projFields.querySelector("input,select,textarea"); if (first) first.focus();
   }
   function renderTeamDraft() {
     clear(projTeam);
-    if (!data.managers.filter(function (m) { return m.active; }).length) {
+    // Only when there is nothing to show: a team made up of since-archived managers
+    // must stay visible (and removable) even if no one active is left to add.
+    if (!teamDraft.length && !data.managers.filter(function (m) { return m.active; }).length) {
       projTeam.appendChild(elem("p", "d-empty", "Add a manager first to build a team."));
       return;
     }
@@ -1597,6 +1685,13 @@
       r.appendChild(msel);
       var rsel = elem("select"); ROLES.forEach(function (x) { var op = elem("option", null, lab("role", x)); op.value = x; rsel.appendChild(op); }); rsel.value = row.role; rsel.addEventListener("change", function () { row.role = rsel.value; }); r.appendChild(rsel);
       var esel = elem("select"); EFFORTS.forEach(function (x) { var op = elem("option", null, lab("effort", x)); op.value = x; esel.appendChild(op); }); esel.value = row.effort; esel.addEventListener("change", function () { row.effort = esel.value; }); r.appendChild(esel);
+      // The assignment's end date is its roll-off; before this it could only be set when
+      // assigning from the drawer, and never changed afterwards.
+      var endWrap = elem("label", "t-end", "until");
+      var end = elem("input"); end.type = "date"; end.value = row.endDate || ""; end.title = "Roll-off (end) date — optional";
+      end.setAttribute("aria-label", "Roll-off date for this team member");
+      end.addEventListener("change", function () { row.endDate = end.value; });
+      endWrap.appendChild(end); r.appendChild(endWrap);
       r.appendChild(miniBtn("Remove", function () { teamDraft.splice(idx, 1); renderTeamDraft(); }, "ghost"));
       projTeam.appendChild(r);
     });
@@ -1607,7 +1702,7 @@
     var used = {}; teamDraft.forEach(function (r) { if (r.managerId) used[r.managerId] = true; });
     var avail = actives.filter(function (m) { return !used[m.id]; });
     if (!avail.length) { notice("Every active manager is already on this project.", "info"); return; }
-    teamDraft.push({ assignmentId: null, managerId: avail[0].id, role: "contributor", effort: "medium" });
+    teamDraft.push({ assignmentId: null, managerId: avail[0].id, role: "contributor", effort: "medium", endDate: "" });
     renderTeamDraft();
   }
   async function saveProject() {
@@ -1617,11 +1712,14 @@
     var seen = {}, dup = false;
     teamDraft.forEach(function (r) { if (r.managerId) { if (seen[r.managerId]) dup = true; seen[r.managerId] = true; } });
     if (dup) { notice("A manager is listed twice on the team — each person can be on a project once.", "err"); return; }
-    await ensureName();
+    var sd = el("pf_startDate").value, td = el("pf_targetDate").value, cd = el("pf_completedDate").value;
+    if (sd && td && td < sd) { notice("The target date is before the start date.", "err"); el("pf_targetDate").focus(); return; }
+    if (el("pf_status").value === "complete" && cd && cd > todayISO()) { notice("The completed date can't be in the future.", "err"); el("pf_completedDate").focus(); return; }
+    if (!(await ensureName())) return;
     var fields = {};
     PROJECT_FIELD_SPEC.forEach(function (f) { var v = el("pf_" + f.key).value; if (typeof v === "string") v = v.trim(); fields[f.key] = v || null; });
     var p;
-    if (editingProjectId) { p = findById(data.projects, editingProjectId); }
+    if (editingProjectId) { p = findById(data.projects, editingProjectId); if (!p) { projectOverlay.className = "overlay"; notice(GONE_MSG, "err"); return; } }
     else { p = { id: genId() }; data.projects.push(p); }
     p.name = fields.name; p.description = fields.description; p.status = fields.status || "active";
     p.priority = fields.priority || "med"; p.startDate = fields.startDate; p.targetDate = fields.targetDate;
@@ -1636,8 +1734,13 @@
     existing.forEach(function (a) { if (!draftIds[a.id]) a.archived = true; }); // removed -> archive
     teamDraft.forEach(function (r) {
       if (!r.managerId) return;
-      if (r.assignmentId) { var a = findById(data.assignments, r.assignmentId); if (a) { a.managerId = r.managerId; a.role = r.role; a.effort = r.effort; a.archived = false; } }
-      else { data.assignments.push({ id: genId(), projectId: p.id, managerId: r.managerId, role: r.role, effort: r.effort, startDate: todayISO(), endDate: null, archived: false }); }
+      var a = r.assignmentId ? findById(data.assignments, r.assignmentId) : null;
+      // Same person: update in place. A different person picked on an existing row is
+      // a new assignment — rewriting the old record's managerId would erase the record
+      // that the first person was ever on the project.
+      if (a && a.managerId === r.managerId) { a.role = r.role; a.effort = r.effort; a.endDate = r.endDate || null; a.archived = false; return; }
+      if (a) a.archived = true;
+      data.assignments.push({ id: genId(), projectId: p.id, managerId: r.managerId, role: r.role, effort: r.effort, startDate: todayISO(), endDate: r.endDate || null, archived: false });
     });
     projectOverlay.className = "overlay";
     commit();
@@ -1650,27 +1753,31 @@
   // keeps its team and history, and stops counting toward anyone's workload.
   async function closeOutProject(id) {
     var p = findById(data.projects, id); if (!p) return;
-    await ensureName();
+    if (!(await ensureName())) return;
     var v = await openForm("Close out project", [
       { key: "completedDate", label: "Completed date", type: "date", required: true,
         hint: "Defaults to today — backdate it if the work actually wrapped earlier." }
-    ], { completedDate: p.completedDate || todayISO() });
+    ], { completedDate: p.completedDate || todayISO() }, { check: function (o) {
+      return (o.completedDate > todayISO()) ? "The completed date can't be in the future." : "";
+    } });
     if (!v) return;
+    p = findById(data.projects, id); if (!p) { notice(GONE_MSG, "err"); return; }
     p.status = "complete"; p.completedDate = v.completedDate;
     commit();
     notice("“" + p.name + "” closed out. It no longer counts toward workload; its team and history are kept.", "ok");
   }
   async function reopenProject(id) {
     var p = findById(data.projects, id); if (!p) return;
-    await ensureName();
+    if (!(await ensureName())) return;
     p.status = "active"; p.completedDate = null;
     commit();
     notice("“" + p.name + "” reopened — it counts toward workload again.", "ok");
   }
 
   // ---- Manager detail drawer -------------------------------------------
-  function openManager(id) { openManagerId = id; renderDrawer(); drawerOverlay.className = "drawer-overlay show"; }
-  function closeDrawer() { openManagerId = null; drawerOverlay.className = "drawer-overlay"; }
+  // body.drawer-open lets the print stylesheet print the 1:1 drawer on its own.
+  function openManager(id) { openManagerId = id; renderDrawer(); drawerOverlay.className = "drawer-overlay show"; document.body.classList.add("drawer-open"); }
+  function closeDrawer() { openManagerId = null; drawerOverlay.className = "drawer-overlay"; document.body.classList.remove("drawer-open"); }
   // "Rolling off soon / overdue": within the next 30 days, or already past.
   function soon(iso) { var d = parseISODate(iso); if (!d) return false; return dayDiff(startOfToday(), d) <= 30; }
   function drawerSection(title, items) {
@@ -1735,24 +1842,29 @@
       if (a.archived || a.managerId !== id) return;
       var p = findById(data.projects, a.projectId); if (!p) return;
       if (p.status === "active") current.push({ text: "Project: " + p.name + " — " + lab("role", a.role) + " (" + lab("effort", a.effort) + ")", projectId: p.id });
-      if (a.endDate && soon(a.endDate)) roll.push({ text: "Assignment on " + p.name + " rolls off " + a.endDate, projectId: p.id });
+      // Closing out a project settles its assignments (as in Needs attention), so their
+      // end dates are no longer something to roll off.
+      if (p.status !== "complete" && a.endDate && soon(a.endDate)) roll.push({ text: "Assignment on " + p.name + " rolls off " + a.endDate, projectId: p.id });
     });
     data.workItems.forEach(function (w) {
       if (w.managerId !== id) return;
       if (!w.archived && (w.status === "open" || w.status === "in-progress")) current.push({ text: typeLabel(w) + ": " + w.title + " [" + lab("wstatus", w.status) + "]", wiId: w.id });
-      if (w.status === "done" && w.completedDate) wins.push({ text: typeLabel(w) + ": " + w.title + " (done " + w.completedDate + ")", wiId: w.id });
+      if (w.status === "done" && w.completedDate) wins.push({ text: typeLabel(w) + ": " + w.title + " (done " + w.completedDate + ")", wiId: w.id, date: w.completedDate });
       if (!w.archived && w.status !== "done" && w.rollOffDate && soon(w.rollOffDate)) roll.push({ text: typeLabel(w) + ": " + w.title + " rolls off " + w.rollOffDate, wiId: w.id });
     });
-    wins.sort(function (a, b) { return a.text < b.text ? 1 : a.text > b.text ? -1 : 0; }); // was string-sort().reverse() on plain strings
-    return { current: current, wins: wins, roll: roll };
+    // Newest first by completion date — sorting on the text sorted by type label — and
+    // only the most recent few, so "Recently completed" stays recent as history grows.
+    wins.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+    return { current: current, wins: wins.slice(0, MAX_WINS), roll: roll };
   }
   function summaryText(id) {
     var m = findById(data.managers, id); if (!m) return "";
     var sc = managerScore(id), b = bandFor(sc.score), d = managerCarry(id);
-    function block(t, items) { return t + "\n" + (items.length ? items.map(function (x) { return "  - " + x; }).join("\n") : "  (none)") + "\n"; }
+    // Every list managerCarry returns holds {text, …} entries, not strings.
+    function block(t, items) { return t + "\n" + (items.length ? items.map(function (x) { return "  - " + x.text; }).join("\n") : "  (none)") + "\n"; }
     return "1:1 Prep — " + m.name + (m.title ? " (" + m.title + ")" : "") + (m.location ? " — " + m.location : "") + "\n" +
       "Generated " + new Date().toLocaleString() + "\n" + "Workload: " + b.label + " (score " + round1(sc.score) + ")\n\n" +
-      block("Currently carrying:", d.current.map(function (x) { return x.text; })) + "\n" +
+      block("Currently carrying:", d.current) + "\n" +
       block("Recently completed (wins):", d.wins) + "\n" + block("Rolling off soon / overdue:", d.roll);
   }
   async function copySummary(id) {
@@ -1803,6 +1915,11 @@
       } else if (w.dueDate && w.dueDate < today) {
         out.push({ kind: "wi-due", id: w.id, why: "Overdue (due " + w.dueDate + ")",
                    text: typeLabel(w) + ": " + (w.title || "") + " — " + managerName(w.managerId) });
+      } else if (w.managerId && !isActiveManager(w.managerId)) {
+        // An archived owner is off the board, and an owned item is not in the Backlog:
+        // without this, open work quietly stops being visible anywhere but the queue.
+        out.push({ kind: "wi-orphan", id: w.id, why: "Owner archived",
+                   text: typeLabel(w) + ": " + (w.title || "") + " — " + managerName(w.managerId) });
       }
     });
     data.assignments.forEach(function (a) {
@@ -1847,6 +1964,8 @@
         // An overdue project is closed out, never archived: archiving is for items,
         // and a project that has simply run long may just need a new target date.
         li.appendChild(miniBtn("Close out", function () { attnOverlay.className = "overlay"; closeOutProject(it.id); }, "ghost"));
+      } else if (it.kind === "wi-orphan") {
+        li.appendChild(miniBtn("Reassign…", function () { attnOverlay.className = "overlay"; editWorkItem(it.id); }, "ghost"));
       } else if (it.kind === "wi-due") {
         li.appendChild(miniBtn("Done", function () { markWorkItemDone(it.id).then(renderAttnList); }, "ghost"));
         li.appendChild(miniBtn("Edit", function () { attnOverlay.className = "overlay"; editWorkItem(it.id); }, "ghost"));
@@ -1861,13 +1980,13 @@
   }
   function openAttn() { renderAttnList(); attnOverlay.className = "overlay show"; }
   async function archiveFromAttn(it) {
-    await ensureName();
+    if (!(await ensureName())) return;
     if (it.kind === "as-roll") { var a = findById(data.assignments, it.id); if (a) a.archived = true; }
     else { var w = findById(data.workItems, it.id); if (w) w.archived = true; }
     commit(); renderAttnList();
   }
   async function archiveAllPastRollOff() {
-    await ensureName();
+    if (!(await ensureName())) return;
     attentionItems().forEach(function (it) {
       if (it.kind === "wi-roll") { var w = findById(data.workItems, it.id); if (w) w.archived = true; }
       else if (it.kind === "as-roll") { var a = findById(data.assignments, it.id); if (a) a.archived = true; }
@@ -1923,16 +2042,24 @@
   }
   async function writeTextTo(handle, text) { var w = await handle.createWritable(); await w.write(text); await w.close(); }
   async function readHandleText(handle) { var f = await handle.getFile(); return await f.text(); }
-  async function writeBackup(text) {
-    if (!dirHandle) return;
-    var name = "heimdall-data.backup-" + stamp(new Date()) + ".json";
-    var fh = await dirHandle.getFileHandle(name, { create: true });
-    await writeTextTo(fh, text); await pruneBackups(dirHandle);
-  }
-  async function pruneBackups(dir) {
+  function backupName(d) { return "heimdall-data.backup-" + stamp(d) + ".json"; }
+  // Backup names embed a local YYYYMMDD-HHMM stamp, so they sort chronologically as text.
+  async function backupNames(dir) {
     var names = [];
     for await (var entry of dir.values()) { if (entry.kind === "file" && BACKUP_RE.test(entry.name)) names.push(entry.name); }
-    names.sort();
+    return names.sort();
+  }
+  async function writeBackup(text) {
+    if (!dirHandle) return;
+    var names = await backupNames(dirHandle);
+    var newest = names[names.length - 1];
+    if (newest && newest >= backupName(new Date(Date.now() - BACKUP_GAP_MS))) return;
+    var name = backupName(new Date());
+    var fh = await dirHandle.getFileHandle(name, { create: true });
+    await writeTextTo(fh, text); await pruneBackups(dirHandle, names.concat([name]));
+  }
+  async function pruneBackups(dir, names) {
+    names = names.slice().sort();
     while (names.length > MAX_BACKUPS) { var oldest = names.shift(); try { await dir.removeEntry(oldest); } catch (e) {} }
   }
   async function writeToFile() {
@@ -1949,6 +2076,7 @@
     setSaveStatus("saving");
     var who = userName || (data.settings && data.settings.lastSavedBy) || "Unknown";
     data.settings.lastSavedBy = who; data.settings.lastSavedAt = new Date().toISOString();
+    data.settings.appVersion = APP_VERSION;
     await saveLocal(); updateBanner();
     if (linkState === "linked" && !fileBlocked) {
       try { await writeToFile(); lastSaveOk = true; setSaveStatus("saved"); }
@@ -2001,11 +2129,30 @@
       var parsed; try { parsed = JSON.parse(text); } catch (e) { showGuard("The shared file is not valid JSON (" + e.message + ")."); return; }
       var v = validate(parsed); if (!v.ok) { showGuard("The shared file is not a valid Heimdall data file: " + v.error); return; }
       var fileTs = tsValue(v.data.settings.lastSavedAt), localTs = tsValue(data && data.settings && data.settings.lastSavedAt);
-      if (fileTs > localTs) { data = v.data; await saveLocal(); updateBanner(); renderCurrent(); if (openManagerId) renderDrawer(); setSaveStatus("saved"); notice(interactive ? "Loaded the latest from the shared file." : "Updated with a teammate's latest changes.", interactive ? "ok" : "info"); }
+      // renderAll, not just the current view: the filter selects and the Needs attention
+      // chip are derived from the data too, and were left showing the old copy.
+      if (fileTs > localTs) { data = v.data; await saveLocal(); updateBanner(); renderAll(); setSaveStatus("saved"); notice(interactive ? "Loaded the latest from the shared file." : "Updated with a teammate's latest changes.", interactive ? "ok" : "info"); }
       else if (localTs > fileTs) { await writeToFile(); setSaveStatus("saved"); if (interactive) notice("Your local changes were newer — synced them to the shared file.", "ok"); }
       else if (interactive) notice("Already up to date.", "ok");
     } catch (e) { if (interactive) notice("Sync failed: " + (e && e.message ? e.message : e), "err"); }
     finally { syncing = false; }
+  }
+
+  // Another tab or window of Heimdall shares this IndexedDB. Without this, a tab left
+  // open in the background kept its old copy in memory and its next save overwrote
+  // everything done in the other tab. Same rule as the shared file: newer save wins.
+  var localSyncing = false;
+  async function syncFromLocal() {
+    if (!dbReady || !data || saveTimer || localSyncing) return;  // own edits pending: they win
+    localSyncing = true;
+    try {
+      var stored = await idbGet("data"); if (stored == null) return;
+      var v = validate(stored); if (!v.ok) return;
+      if (tsValue(v.data.settings.lastSavedAt) > tsValue(data.settings.lastSavedAt)) {
+        data = v.data; updateBanner(); renderAll();
+        notice("Loaded newer changes saved from another Heimdall tab or window.", "info");
+      }
+    } catch (e) {} finally { localSyncing = false; }
   }
 
   // ---- Export / Import -------------------------------------------------
@@ -2085,13 +2232,20 @@
     // Close the topmost layer only, so Escape in a form opened from the drawer
     // does not also close the drawer behind it.
     closeSearch(); toggleQuickMenu(false);
+    // The name prompt can sit above the drawer: Escape dismisses it and nothing else.
+    if (nameOverlay.className.indexOf("show") >= 0) { nameCancel.click(); return; }
     if (formOverlay.className.indexOf("show") >= 0) { formCancel.click(); return; }
     if (projectOverlay.className.indexOf("show") >= 0) { projectOverlay.className = "overlay"; return; }
     if (attnOverlay.className.indexOf("show") >= 0) { attnOverlay.className = "overlay"; return; }
     closeDrawer();
   });
-  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") syncFromFile(false); });
-  window.addEventListener("focus", function () { syncFromFile(false); });
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") onReturn(); });
+  window.addEventListener("focus", onReturn);
+  async function onReturn() {
+    await syncFromLocal(); await syncFromFile(false);
+    // Left open overnight: ages, roll-off, and Needs attention are all relative to today.
+    if (renderedDay !== todayISO()) renderAll();
+  }
 
   // ---- Init ------------------------------------------------------------
   async function init() {

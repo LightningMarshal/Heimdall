@@ -32,7 +32,8 @@ once so the "Last saved by" banner can attribute changes.
   Hover a heat label to see the band's score range and the exact score behind it.
 - **Manager drawer** — click a card for everything that manager carries, recent
   wins, and upcoming roll-offs, plus in-context quick-add and a copy / export /
-  print **1:1 summary** for weekly one-on-ones.
+  print **1:1 summary** for weekly one-on-ones (printing from the drawer prints the
+  drawer alone).
 - **Projects** — status, priority, dates, Jira epic link, and the team with the
   lead highlighted. A person can appear only once per project.
 - **Close out / Reopen** — one click on the project card. Closing out asks for a
@@ -49,7 +50,8 @@ once so the "Last saved by" banner can attribute changes.
   decisions happen where the load is visible.
 - **Needs attention** — items past their roll-off / end date or overdue are never
   silently removed; a review panel lets you archive them deliberately. Active projects
-  past their target date show up there too, with a *Close out* action.
+  past their target date show up there too, with a *Close out* action, and so does open
+  work whose owner has been archived, with a *Reassign* action.
 - **Reports** — work-item volume over all time or by year / quarter / month / week,
   segmented by type.
 - **Settings** — every weight, effort multiplier, and heat band is editable and
@@ -85,10 +87,12 @@ band it has actually reached. One medium-effort lead role is 3 × 1.5 = 4.5, whi
   folder in a synced drive (OneDrive / SharePoint / Google Drive). It maintains a
   shared `heimdall-data.json` there, pulls teammates' changes when you return to
   the tab, and remembers the link across sessions.
+- **Other tabs:** two Heimdall tabs in one browser share the same local copy; returning
+  to a tab loads anything newer the other saved, instead of overwriting it.
 - **Conflict model:** last write wins by save timestamp (documented and accepted —
   the banner always shows who saved last, and *Reload latest* re-reads on demand).
-- **Backups:** every synced save also writes `heimdall-data.backup-YYYYMMDD-HHMM.json`
-  beside the shared file; the 10 most recent are kept. A corrupted shared file is
+- **Backups:** synced saves also write `heimdall-data.backup-YYYYMMDD-HHMM.json`
+  beside the shared file, at most one every 30 minutes; the 10 most recent are kept. A corrupted shared file is
   never overwritten — the app offers to restore from a backup instead.
 - **Export / Import (all browsers):** manual JSON download / load, which is also
   the sharing route for non-Chromium browsers.
