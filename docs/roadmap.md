@@ -1,6 +1,6 @@
 # Heimdall — Roadmap
 
-_Last updated: 2026-09-18 · app version 0.6.0_
+_Last updated: 2026-09-28 · app version 0.6.1_
 
 Post-MVP ideas, ranked by how much they improve the one question Heimdall exists to
 answer — **who is carrying too much, and who has room** — against what they cost in a
@@ -28,6 +28,26 @@ the reasons the tool is usable at all.
 5. **Ten-ish people, thousands of rows at most.** Everything re-renders from scratch
    on every change. That is fine at this size and is why the code has no framework;
    an idea that only pays off at 10,000 rows is solving someone else's problem.
+
+## Gaps found in the 2026-09-28 full review
+
+Not fixed in 0.6.1 because each is a product decision rather than a bug. Recorded so
+they are not rediscovered as surprises.
+
+- **Projects cannot be removed.** A project entered by mistake stays in the Projects
+  list forever; closing it out is the only exit, and it then shows as a completed
+  project. Needs a project `archived` flag threaded through scoring, the assign
+  dialogs, the related-project select, and a "show archived" toggle.
+- **`relatedProjectId` is write-only.** Work items record a related project, but
+  nothing displays it: not the project card, the queue, or the drawer. Either show it
+  (e.g. "3 open items" on the project card) or stop asking for it.
+- **One Lead per project is not enforced.** The README and Help say a team has one
+  Lead; the team builder accepts several, and each scores as a lead. Decide whether
+  co-leads are legitimate; if not, block or warn on save.
+- **Sync conflicts are still last-write-wins.** 0.6.1 stops a background tab from
+  overwriting a newer local save, and stops a form open across a sync from dropping
+  its edit, but two people editing the shared file inside the same few seconds still
+  lose one side. That is constraint #3, and it is what #6 and #11 below address.
 
 ## Near-term — small, high leverage
 

@@ -1,13 +1,13 @@
 # Project Context: Heimdall
-_Last updated: 2026-09-18_
+_Last updated: 2026-09-28_
 _This file changes rarely. If the stack or architecture shifts significantly, re-run /first-principles._
 
 ## Stack
 Vanilla JS, HTML, and CSS — no framework, no build step, no package manager,
 no dependencies of any kind. The entire application is one file,
-`heimdall.html` (~2,120 lines: inlined `<style>` + a single IIFE `<script>`
+`heimdall.html` (~2,280 lines: inlined `<style>` + a single IIFE `<script>`
 using ES5-style `function` expressions, not classes/modules). Currently at
-`APP_VERSION = "0.6.0"`. Double-clicking the file runs it — there is no
+`APP_VERSION = "0.6.1"`. Double-clicking the file runs it — there is no
 `npm install`, no dev server, no compiler.
 
 ## Deployment
@@ -47,19 +47,33 @@ No server, no port, no Electron wrapper.
   multiplies), so one landing between two whole-number bands resolves
   *downward*, to the highest band it has reached — see `bandFor`.
 - **Archiving** — the app's only form of deletion. Nothing is hard-deleted;
-  archived managers/projects/items are preserved for history.
+  archived managers, assignments, and work items are preserved for history.
+  Projects are never archived — they are closed out (and cannot currently be
+  removed at all; see the roadmap's review gaps).
+- **Orphaned work** — an open work item whose owner is archived. It is off the
+  board and not in the Backlog, so Needs attention lists it ("Owner archived")
+  until it is reassigned.
 
 ## Conventions
 - Single IIFE, ES5-style function declarations (`function () {}`, `var`, no
   `class`/`let`/arrow functions in the core — see heimdall.html for the
   established style before adding new code).
 - Small DOM helper functions instead of a templating library: `el()`,
-  `elem()`, `clear()`, `pill()`, `miniBtn()`, `notice()` (heimdall.html:688,
-  792–806).
+  `elem()`, `clear()`, `pill()`, `miniBtn()`, `notice()` (heimdall.html:699,
+  832–846).
 - Data validated/normalized through a single `validate(parsed)` function
-  (heimdall.html:735) whenever loading from IndexedDB, an imported file, or
+  (heimdall.html:746) whenever loading from IndexedDB, an imported file, or
   a synced shared file — new fields on any entity should be threaded
-  through there.
+  through there. It also coerces weights / multipliers / bands to numbers
+  (a string weight concatenates instead of adding) and fills missing keys
+  from the defaults.
+- `ensureName()` resolves to `null` when the name prompt is cancelled, and
+  every mutation returns on that: cancelling the prompt cancels the edit.
+- Anything that `await`s user input (`openForm`, the name prompt) must
+  re-find its record by id afterwards (`findById(data.…, id)`), never keep
+  writing to the object it held before the await: returning to the tab runs
+  `syncFromLocal` / `syncFromFile`, which can replace `data` wholesale while
+  a form is open, and an edit written to the old object is silently lost.
 - No test framework, no linter config present — this is a hand-verified,
   manually-tested single file. Changes are best verified by driving the real
   file over `file://` in Chromium (Playwright), seeding IndexedDB
@@ -74,7 +88,7 @@ No server, no port, no Electron wrapper.
   `file://` — don't tighten this without testing `file://` loads, not just
   `http://`.
 - Live shared-file sync (via `showDirectoryPicker`/File System Access API)
-  is Chromium-only (`DIR_API` check at heimdall.html:657). Firefox/Safari
+  is Chromium-only (`DIR_API` check at heimdall.html:667). Firefox/Safari
   get full local (IndexedDB) functionality but must use manual JSON
   Export/Import to share — there is no feature-equivalent fallback to
   build, this is a real platform gap the README documents deliberately.
@@ -82,6 +96,12 @@ No server, no port, no Electron wrapper.
   best-effort sync layer with last-write-wins conflict resolution (by save
   timestamp) — not a CRDT or merge strategy. Don't assume concurrent edits
   merge cleanly.
+- IndexedDB is shared by every Heimdall tab and window in the browser — and,
+  because `file://` pages share one origin in Chromium, by every copy of
+  `heimdall.html` on the machine. Returning to a tab adopts a newer local
+  save (`syncFromLocal`); last write still wins between them.
+- Heat-label colors follow a band's *position* (lowest → highest), not its
+  name, so renaming a band in Settings keeps its color.
 - Clearing browser site data destroys the local copy with no server-side
   backup; only a linked shared file or manual export protects against this.
 - `connect-src 'none'` in the CSP is intentional and load-bearing for the
