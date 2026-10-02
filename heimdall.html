@@ -164,11 +164,18 @@
            padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow); }
   .pcard .p-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .pcard .p-name { font-size: 16px; font-weight: 650; }
-  .pcard .p-acts { display: flex; gap: 6px; align-items: flex-start; flex-shrink: 0; }
+  .pcard .p-acts { display: flex; gap: 6px; align-items: flex-start; flex-wrap: wrap; justify-content: flex-end; }
   .pcard .p-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; color: var(--muted); font-size: 13px; }
   .pcard .p-team { margin-top: 12px; font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .pcard .p-team .lead-tag { font-weight: 650; }
   .pcard .p-link a { font-size: 13px; }
+  .pcard .p-work { margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .pcard.archived { opacity: .6; border-style: dashed; }
+  .head-acts { display: flex; align-items: center; gap: 12px; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
+  .toggle[hidden] { display: none; }
+  /* Related project shown under a work item's title in the queue. */
+  .wi-proj { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
 
   /* Tables */
   table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border);
@@ -398,7 +405,10 @@
   <section class="view" id="view-projects" hidden>
     <div class="view-head">
       <h2>Projects <span class="count" id="projCount"></span></h2>
-      <button id="btnAddProject" class="primary">Add project</button>
+      <div class="head-acts">
+        <label class="toggle" id="projArchivedToggle" hidden><input type="checkbox" id="projShowArchived"> Show archived</label>
+        <button id="btnAddProject" class="primary">Add project</button>
+      </div>
     </div>
     <div id="projList"></div>
   </section>
@@ -417,6 +427,7 @@
       </select></label>
       <label>Type <select id="fType"></select></label>
       <label>Manager <select id="fManager"></select></label>
+      <label>Project <select id="fProject"></select></label>
       <label>Status <select id="fStatus"></select></label>
       <label>Opened from <input type="date" id="fFrom"></label>
       <label>to <input type="date" id="fTo"></label>
@@ -495,7 +506,7 @@
       <h3>Quick start</h3>
       <ul>
         <li><strong>1.</strong> Add your managers (Board → “Add manager”, or the “+ Add” button top right).</li>
-        <li><strong>2.</strong> Add projects and build the team inline — pick a Lead, Contributors, and an effort level for each person.</li>
+        <li><strong>2.</strong> Add projects and build the team inline — pick a Lead (occasionally two), Contributors, and an effort level for each person.</li>
         <li><strong>3.</strong> Log work items (escalations, DITL requests, one-offs) as they arrive. Leave the owner as “— none —” to park an item in the Backlog until you decide who takes it.</li>
         <li><strong>4.</strong> Read the Board: each card shows a weighted heat label — who is overloaded, who has room.</li>
       </ul>
@@ -512,7 +523,15 @@
     <div class="panel">
       <h3>Projects, leads &amp; effort</h3>
       <p>A project has a status (Active / On hold / Complete), a priority, dates, and an optional Jira epic link. Its team is managed on the project itself: one entry per person with a role (Lead or Contributor) and an effort (Light / Medium / Heavy). A person can appear only once per project; removing someone archives their assignment rather than deleting it, and so does switching a row to a different person (the new person gets a fresh assignment). Each team member can have an optional <em>until</em> date — the assignment's roll-off date.</p>
+      <p>Most projects have one Lead; a project with two co-leads is fine — mark both as Lead and each scores as a lead.</p>
       <p>Only <em>Active</em> projects count toward workload.</p>
+      <p><strong>Archiving a project</strong> is for one that shouldn't be on the list at all — entered by mistake, a
+        duplicate, or cancelled before it started. (Finished work is closed out instead.) An archived project leaves the
+        Projects list and stops counting toward workload, roll-offs, and Needs attention, but its team and related work
+        items are kept: tick <em>Show archived</em> on the Projects view and click <em>Restore</em> to bring it back as it was.</p>
+      <p><strong>Related work:</strong> a work item can name a related project. The project card counts its related
+        work items (click the count to see them in the queue, filtered to that project), <em>+ Work item</em> on the card
+        logs one already linked, and the queue, the drawer, and the 1:1 summary show the project beside the item.</p>
       <p><strong>Closing a project out:</strong> every project card has a <em>Close out</em> button, and a project
         whose target date has passed also shows up under <em>Needs attention</em> with the same action. Closing out
         asks for a completion date (today by default, backdate it if you like) and sets the status to Complete — it
@@ -656,7 +675,7 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.6.1";
+  var APP_VERSION = "0.7.0";
   var MAX_BACKUPS = 10;
   // Minimum spacing between backups. One per save meant ten quick edits rotated out
   // every older backup, so the ten on disk only ever covered the last few minutes.
@@ -703,10 +722,11 @@
   var guardEl = el("guard"), guardMsg = el("guardMsg");
   var btnLoadBackup = el("btnLoadBackup"), btnGuardUnlink = el("btnGuardUnlink");
   var btnAddManager = el("btnAddManager"), boardCards = el("boardCards"), mgrCount = el("mgrCount");
-  var btnAddProject = el("btnAddProject"), projList = el("projList"), projCount = el("projCount");
+  var btnAddProject = el("btnAddProject"), projList = el("projList"), projCount = el("projCount"),
+      projArchivedToggle = el("projArchivedToggle"), projShowArchived = el("projShowArchived");
   var btnAddWorkItem = el("btnAddWorkItem"), wiRows = el("wiRows"), wiCount = el("wiCount");
   var fType = el("fType"), fManager = el("fManager"), fStatus = el("fStatus"),
-      fFrom = el("fFrom"), fTo = el("fTo"), fClear = el("fClear");
+      fFrom = el("fFrom"), fTo = el("fTo"), fClear = el("fClear"), fProject = el("fProject");
   var repGran = el("repGran"), reportBody = el("reportBody");
   var weightsBody = el("weightsBody"), btnSaveSettings = el("btnSaveSettings"),
       btnResetSettings = el("btnResetSettings"), settingsManagers = el("settingsManagers"),
@@ -821,6 +841,21 @@
   function findById(arr, id) { for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i]; return null; }
   function safeHref(url) { return /^(https?:|mailto:)/i.test(url || "") ? url : null; }
   function managerName(id) { var m = id && findById(data.managers, id); return m ? m.name : (id ? "(unknown)" : "—"); }
+  // A project's display name, flagged when archived — for places that still name an
+  // archived project (a work item's related project, search, filters).
+  function projectLabel(p) { return p.name + (p.archived ? " (archived)" : ""); }
+  // The project a work item is related to, or null when it has none (or it is unknown).
+  function relatedProject(w) { return (w && w.relatedProjectId) ? findById(data.projects, w.relatedProjectId) : null; }
+  // Options for choosing a project: archived ones are left out, except includeId — the
+  // current value of the record being edited, so opening its form can't silently unlink it.
+  function projectOpts(blank, includeId, allArchived) {
+    var o = blank ? [{ value: "", label: blank }] : [];
+    data.projects.forEach(function (p) {
+      if (p.archived && !allArchived && p.id !== includeId) return;
+      o.push({ value: p.id, label: projectLabel(p) });
+    });
+    return o;
+  }
   function isActiveManager(id) { var m = findById(data.managers, id); return !!(m && m.active); }
   function activeAssignments(projectId) {
     return data.assignments.filter(function (a) { return a.projectId === projectId && !a.archived; });
@@ -938,6 +973,13 @@
   function goToProject(id) { closeDrawer(); showView("projects"); openProjectModal(id); }
   function goToWorkItem(id) { closeDrawer(); showView("workitems"); editWorkItem(id); }
   function goToManager(id) { openManager(id); } // drawer is an overlay; no view switch needed
+  // The work item queue filtered to one project's related items — every scope, so done
+  // and archived ones are included, and no other filter hiding any of them.
+  function goToProjectWork(id) {
+    closeDrawer(); showView("workitems");
+    fScope.value = "all"; fType.value = ""; fManager.value = ""; fStatus.value = ""; fFrom.value = ""; fTo.value = "";
+    fProject.value = id; renderWorkItemsView();
+  }
 
   // ---- Selects ---------------------------------------------------------
   function fillSelectOpts(sel, opts, keep) {
@@ -965,6 +1007,7 @@
     fillSelectOpts(fType, enumOpts(WORK_TYPES, "type", "All"), true);
     fillSelectOpts(fStatus, enumOpts(WORK_STATUS, "wstatus", "All"), true);
     fillSelectOpts(fManager, managerOpts(false, "All"), true);
+    fillSelectOpts(fProject, projectOpts("All", null, true), true);
   }
 
   // ---- Weighting (brief §6) --------------------------------------------
@@ -975,7 +1018,8 @@
     data.assignments.forEach(function (a) {
       if (a.archived || a.managerId !== id) return;
       var p = findById(data.projects, a.projectId);
-      if (!p || p.status !== "active") return;
+      // An archived project is out of the picture entirely, whatever its status says.
+      if (!p || p.archived || p.status !== "active") return;
       var base = (a.role === "lead") ? (w.projectLead || 0) : (w.projectContributor || 0);
       var mult = (eff[a.effort] != null) ? eff[a.effort] : 1;
       score += base * mult;
@@ -1102,16 +1146,22 @@
     return span;
   }
   function renderProjectsView() {
-    var list = (data && data.projects) || [];
-    projCount.textContent = list.length ? ("(" + list.length + ")") : "";
+    var all = (data && data.projects) || [];
+    var archivedN = all.filter(function (p) { return p.archived; }).length;
+    // Archived projects stay out of the list unless asked for, like the work item History.
+    projArchivedToggle.hidden = !archivedN;
+    if (!archivedN) projShowArchived.checked = false;
+    var list = projShowArchived.checked ? all : all.filter(function (p) { return !p.archived; });
+    projCount.textContent = !all.length ? "" : "(" + (all.length - archivedN) + (archivedN ? " · " + archivedN + " archived" : "") + ")";
     clear(projList);
-    if (!list.length) { projList.appendChild(elem("div", "empty", "No projects yet — click “Add project”.")); return; }
+    if (!list.length) { projList.appendChild(elem("div", "empty", all.length ? "Every project is archived — tick “Show archived” to see them." : "No projects yet — click “Add project”.")); return; }
     list.forEach(function (p) {
-      var card = elem("div", "pcard"); if (p.status === "complete") card.style.opacity = ".65";
+      var card = elem("div", "pcard" + (p.archived ? " archived" : "")); if (p.status === "complete" && !p.archived) card.style.opacity = ".65";
       var top = elem("div", "p-top");
       var left = elem("div");
       left.appendChild(elem("div", "p-name", p.name));
       var meta = elem("div", "p-meta");
+      if (p.archived) meta.appendChild(pill("status", "Archived"));
       meta.appendChild(pill("status", lab("pstatus", p.status || "active")));
       meta.appendChild(elem("span", null, lab("priority", p.priority || "med") + " priority"));
       if (p.targetDate) meta.appendChild(elem("span", null, "target " + p.targetDate));
@@ -1121,16 +1171,37 @@
       top.appendChild(left);
       // Closing a project out is a one-click action on the card itself, not something
       // you have to find inside the edit form (issue #6).
+      // Archived: Restore is the only action that makes sense until it comes back.
       var acts = elem("div", "p-acts");
-      acts.appendChild(miniBtn("Edit", function () { openProjectModal(p.id); }));
-      if (p.status === "complete") acts.appendChild(miniBtn("Reopen", function () { reopenProject(p.id); }, "ghost"));
-      else acts.appendChild(miniBtn("Close out", function () { closeOutProject(p.id); }, "ghost"));
+      if (p.archived) acts.appendChild(miniBtn("Restore", function () { toggleProjectArchived(p.id); }));
+      else {
+        acts.appendChild(miniBtn("Edit", function () { openProjectModal(p.id); }));
+        if (p.status === "complete") acts.appendChild(miniBtn("Reopen", function () { reopenProject(p.id); }, "ghost"));
+        else acts.appendChild(miniBtn("Close out", function () { closeOutProject(p.id); }, "ghost"));
+        acts.appendChild(miniBtn("+ Work item", function () { addWorkItem(null, p.id); }, "ghost"));
+        acts.appendChild(miniBtn("Archive", function () { toggleProjectArchived(p.id); }, "ghost danger"));
+      }
       top.appendChild(acts);
       card.appendChild(top);
       var team = elem("div", "p-team"); team.appendChild(teamFrag(activeAssignments(p.id)));
       card.appendChild(team);
+      card.appendChild(projectWorkLine(p));
       projList.appendChild(card);
     });
+  }
+
+  // "3 open work items · 5 in total": the work items that name this project as related,
+  // linking to the queue filtered to them.
+  function projectWorkLine(p) {
+    var line = elem("div", "p-work");
+    var related = data.workItems.filter(function (w) { return w.relatedProjectId === p.id; });
+    if (!related.length) { line.textContent = "No related work items."; return line; }
+    var open = related.filter(function (w) { return !w.archived && (w.status === "open" || w.status === "in-progress"); }).length;
+    var text = open + " open work item" + (open === 1 ? "" : "s") + (related.length !== open ? " · " + related.length + " in total" : "");
+    var b = elem("button", "lnk", text); b.type = "button";
+    b.addEventListener("click", function () { goToProjectWork(p.id); });
+    line.appendChild(b);
+    return line;
   }
 
   // ---- Work Items view -------------------------------------------------
@@ -1149,12 +1220,13 @@
   function ageText(w) { if (w.status === "done") return "—"; var d = daysSince(w.openedDate); return (d == null) ? "—" : (d + "d"); }
   function isStale(w) { if (w.archived || w.status === "done") return false; var d = daysSince(w.openedDate); return d != null && d >= 14; }
   function applyWiFilters(all) {
-    var sc = fScope.value, t = fType.value, m = fManager.value, s = fStatus.value, from = fFrom.value, to = fTo.value;
+    var sc = fScope.value, t = fType.value, m = fManager.value, pr = fProject.value, s = fStatus.value, from = fFrom.value, to = fTo.value;
     return all.filter(function (w) {
       if (sc === "active" && w.archived) return false;
       if (sc === "history" && !w.archived) return false;
       if (t && w.type !== t) return false;
       if (m && w.managerId !== m) return false;
+      if (pr && w.relatedProjectId !== pr) return false;
       if (s && (w.status || "open") !== s) return false;
       if (from && (w.openedDate || "") < from) return false;
       if (to && (w.openedDate || "") > to) return false;
@@ -1178,6 +1250,13 @@
       var titleTd = tdc(w.title || "");
       var wHref = w.link ? safeHref(w.link) : null;
       if (wHref) { titleTd.textContent = ""; var a = elem("a", null, w.title || "(item)"); a.href = wHref; a.target = "_blank"; a.rel = "noopener"; titleTd.appendChild(a); }
+      var rp = relatedProject(w);
+      if (rp) {
+        var sub = elem("span", "wi-proj", "↳ ");
+        var pb = elem("button", "lnk", projectLabel(rp)); pb.type = "button";
+        pb.addEventListener("click", function () { goToProject(rp.id); });
+        sub.appendChild(pb); titleTd.appendChild(sub);
+      }
       tr.appendChild(titleTd);
       // Owner click-through to that manager's drawer; unassigned items just show "—".
       var ownerTd = elem("td");
@@ -1517,7 +1596,7 @@
   }
 
   // Work items
-  function workItemFields(currentManagerId) {
+  function workItemFields(currentManagerId, currentProjectId) {
     return [
       { key: "type", label: "Type", type: "select", options: enumOpts(WORK_TYPES, "type") },
       // Shown only when Type is "Other": the free-text label used everywhere in place of "Other".
@@ -1527,7 +1606,7 @@
       { key: "title", label: "Title", type: "text", required: true, full: true },
       { key: "managerId", label: "Owner (manager)", type: "select", options: managerOpts(true, "— none —", currentManagerId) },
       { key: "relatedProjectId", label: "Related project", type: "select",
-        options: [{ value: "", label: "— none —" }].concat(data.projects.map(function (p) { return { value: p.id, label: p.name }; })) },
+        options: projectOpts("— none —", currentProjectId) },
       { key: "status", label: "Status", type: "select", options: enumOpts(WORK_STATUS, "wstatus") },
       { key: "priority", label: "Priority", type: "select", options: enumOpts(PRIORITY, "priority") },
       { key: "openedDate", label: "Opened date", type: "date" },
@@ -1543,11 +1622,12 @@
     if (o.openedDate && o.rollOffDate && o.rollOffDate < o.openedDate) return "The roll-off date is before the opened date.";
     return "";
   }
-  async function addWorkItem(presetManager) {
+  async function addWorkItem(presetManager, presetProject) {
     if (!(await ensureName())) return;
     var defaults = { type: "escalation", status: "open", priority: "med", openedDate: todayISO() };
     if (presetManager) defaults.managerId = presetManager;
-    var v = await openForm("Add work item", workItemFields(presetManager), defaults, { wide: true, check: workItemDateCheck });
+    if (presetProject) defaults.relatedProjectId = presetProject;
+    var v = await openForm("Add work item", workItemFields(presetManager, presetProject), defaults, { wide: true, check: workItemDateCheck });
     if (!v) return;
     data.workItems.push({
       id: genId(), type: v.type, typeOther: typeOtherOf(v), title: v.title, managerId: v.managerId, relatedProjectId: v.relatedProjectId,
@@ -1560,7 +1640,10 @@
   async function editWorkItem(id) {
     var w = findById(data.workItems, id); if (!w) return;
     if (!(await ensureName())) return;
-    var v = await openForm("Edit work item", workItemFields(w.managerId), w, { wide: true, check: workItemDateCheck });
+    // Items saved without a priority or status display as Med / Open; seed the form with
+    // the same, or it falls back to the first option (Low) and saves that instead.
+    var shown = Object.assign({}, w, { priority: w.priority || "med", status: w.status || "open" });
+    var v = await openForm("Edit work item", workItemFields(w.managerId, w.relatedProjectId), shown, { wide: true, check: workItemDateCheck });
     if (!v) return;
     // A sync can replace `data` while the form is open (returning to the tab pulls the
     // shared file); writing to the object captured before it would silently drop the edit.
@@ -1586,7 +1669,7 @@
   async function assignManagerToProject(managerId) {
     var taken = {};
     activeForManager(managerId).forEach(function (a) { taken[a.projectId] = true; });
-    var avail = data.projects.filter(function (p) { return p.status !== "complete" && !taken[p.id]; });
+    var avail = data.projects.filter(function (p) { return p.status !== "complete" && !p.archived && !taken[p.id]; });
     if (!avail.length) { notice("No available projects to assign (already on all active ones, or none exist).", "err"); return; }
     if (!(await ensureName())) return;
     var v = await openForm("Assign to a project", [
@@ -1774,6 +1857,22 @@
     notice("“" + p.name + "” reopened — it counts toward workload again.", "ok");
   }
 
+  // Archiving is for a project that should not be on the list at all — entered by
+  // mistake, a duplicate, cancelled before it started. Finished work is closed out
+  // instead. The team, its assignments, and related work items are left untouched, so
+  // Restore brings the project back exactly as it was.
+  async function toggleProjectArchived(id) {
+    var p = findById(data.projects, id); if (!p) return;
+    if (!p.archived && !window.confirm("Archive “" + p.name + "”? It leaves the Projects list and stops counting toward " +
+        "anyone's workload. Its team and related work items are kept, and Projects → Show archived → Restore brings it back.\n\n" +
+        "(Finished projects are usually closed out instead.)")) return;
+    if (!(await ensureName())) return;
+    p = findById(data.projects, id); if (!p) { notice(GONE_MSG, "err"); return; }
+    p.archived = !p.archived;
+    commit();
+    notice(p.archived ? "“" + p.name + "” archived. Projects → Show archived lists it." : "“" + p.name + "” restored.", "ok");
+  }
+
   // ---- Manager detail drawer -------------------------------------------
   // body.drawer-open lets the print stylesheet print the 1:1 drawer on its own.
   function openManager(id) { openManagerId = id; renderDrawer(); drawerOverlay.className = "drawer-overlay show"; document.body.classList.add("drawer-open"); }
@@ -1840,7 +1939,7 @@
     var current = [], wins = [], roll = [];
     data.assignments.forEach(function (a) {
       if (a.archived || a.managerId !== id) return;
-      var p = findById(data.projects, a.projectId); if (!p) return;
+      var p = findById(data.projects, a.projectId); if (!p || p.archived) return;
       if (p.status === "active") current.push({ text: "Project: " + p.name + " — " + lab("role", a.role) + " (" + lab("effort", a.effort) + ")", projectId: p.id });
       // Closing out a project settles its assignments (as in Needs attention), so their
       // end dates are no longer something to roll off.
@@ -1848,7 +1947,9 @@
     });
     data.workItems.forEach(function (w) {
       if (w.managerId !== id) return;
-      if (!w.archived && (w.status === "open" || w.status === "in-progress")) current.push({ text: typeLabel(w) + ": " + w.title + " [" + lab("wstatus", w.status) + "]", wiId: w.id });
+      // Name the related project, so the drawer and the 1:1 summary say what it is for.
+      var rp = relatedProject(w), forP = rp ? " · " + projectLabel(rp) : "";
+      if (!w.archived && (w.status === "open" || w.status === "in-progress")) current.push({ text: typeLabel(w) + ": " + w.title + forP + " [" + lab("wstatus", w.status) + "]", wiId: w.id });
       if (w.status === "done" && w.completedDate) wins.push({ text: typeLabel(w) + ": " + w.title + " (done " + w.completedDate + ")", wiId: w.id, date: w.completedDate });
       if (!w.archived && w.status !== "done" && w.rollOffDate && soon(w.rollOffDate)) roll.push({ text: typeLabel(w) + ": " + w.title + " rolls off " + w.rollOffDate, wiId: w.id });
     });
@@ -1927,12 +2028,12 @@
       var p = findById(data.projects, a.projectId);
       // A closed-out project settled its assignments already — don't keep nagging
       // about end dates on work that is finished.
-      if (p && p.status === "complete") return;
+      if (p && (p.status === "complete" || p.archived)) return;
       out.push({ kind: "as-roll", id: a.id, why: "Ended " + a.endDate, projectId: p ? p.id : null,
                  text: "Assignment: " + managerName(a.managerId) + " on " + (p ? p.name : "(project)") });
     });
     data.projects.forEach(function (p) {
-      if (p.status !== "active" || !p.targetDate || p.targetDate >= today) return;
+      if (p.archived || p.status !== "active" || !p.targetDate || p.targetDate >= today) return;
       out.push({ kind: "proj-past", id: p.id, projectId: p.id, why: "Past target " + p.targetDate,
                  text: "Project: " + p.name });
     });
@@ -2017,7 +2118,7 @@
     }
     if (ps.length) {
       searchPop.appendChild(elem("div", "sr-group", "Projects"));
-      ps.slice(0, 5).forEach(function (p) { item(p.name, function () { goToProject(p.id); }); });
+      ps.slice(0, 5).forEach(function (p) { item(projectLabel(p), function () { goToProject(p.id); }); });
     }
     if (ws.length) {
       searchPop.appendChild(elem("div", "sr-group", "Work items"));
@@ -2196,13 +2297,14 @@
   btnGuardUnlink.addEventListener("click", unlinkSharedFile);
   btnAddManager.addEventListener("click", addManager);
   btnAddProject.addEventListener("click", function () { openProjectModal(null); });
+  projShowArchived.addEventListener("change", renderProjectsView);
   btnAddWorkItem.addEventListener("click", function () { addWorkItem(null); });
   btnExport.addEventListener("click", exportJson);
   btnImport.addEventListener("click", importJson);
   importInput.addEventListener("change", onImportFile);
   navEl.addEventListener("click", function (e) { var v = e.target && e.target.getAttribute && e.target.getAttribute("data-view"); if (v) showView(v); });
-  [fScope, fType, fManager, fStatus, fFrom, fTo].forEach(function (s) { s.addEventListener("change", renderWorkItemsView); });
-  fClear.addEventListener("click", function () { fScope.value = "active"; fType.value = ""; fManager.value = ""; fStatus.value = ""; fFrom.value = ""; fTo.value = ""; renderWorkItemsView(); });
+  [fScope, fType, fManager, fProject, fStatus, fFrom, fTo].forEach(function (s) { s.addEventListener("change", renderWorkItemsView); });
+  fClear.addEventListener("click", function () { fScope.value = "active"; fType.value = ""; fManager.value = ""; fProject.value = ""; fStatus.value = ""; fFrom.value = ""; fTo.value = ""; renderWorkItemsView(); });
   repGran.addEventListener("change", renderReports);
   btnSaveSettings.addEventListener("click", saveSettings);
   btnResetSettings.addEventListener("click", resetSettings);

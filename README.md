@@ -15,8 +15,8 @@ it and it runs.
 
 1. Open `heimdall.html` in a modern browser (Microsoft Edge or Chrome recommended).
 2. Add your managers (name, title, location).
-3. Add projects and build each team inline: one Lead, any Contributors, and an
-   effort level (Light / Medium / Heavy) per person.
+3. Add projects and build each team inline: a Lead (occasionally two co-leads), any
+   Contributors, and an effort level (Light / Medium / Heavy) per person.
 4. Log work items as they arrive. Leave the owner blank to park an item in the
    **Backlog** until you decide who takes it.
 5. Read the **Board**: each manager card shows a color-coded heat label
@@ -35,7 +35,12 @@ once so the "Last saved by" banner can attribute changes.
   print **1:1 summary** for weekly one-on-ones (printing from the drawer prints the
   drawer alone).
 - **Projects** — status, priority, dates, Jira epic link, and the team with the
-  lead highlighted. A person can appear only once per project.
+  lead highlighted (co-leads are allowed). A person can appear only once per project.
+  Each card counts its related work items and links to them; *+ Work item* logs one
+  already linked to the project.
+- **Archive / Restore projects** — for a project entered by mistake, duplicated, or
+  cancelled. It leaves the list and stops counting anywhere, but keeps its team and
+  related work; *Show archived* lists it again with a *Restore* button.
 - **Close out / Reopen** — one click on the project card. Closing out asks for a
   completion date (today by default, backdate it freely) and never requires a start,
   target, or end date, so open-ended and non-time-bound projects close the same way.
@@ -45,7 +50,8 @@ once so the "Last saved by" banner can attribute changes.
   ("Vendor audit", "Hiring loop"), which then replaces "Other" wherever the item is shown
   and is included in search. Reports still group these under Other.
 - **Work Items queue** — filterable by scope (Active / All / History), type, owner,
-  status, and date range, with an aging flag for items open 14+ days.
+  related project, status, and date range, with an aging flag for items open 14+ days.
+  An item's related project shows under its title and links to it.
 - **Backlog** — unassigned items surface next to the board so distribution
   decisions happen where the load is visible.
 - **Needs attention** — items past their roll-off / end date or overdue are never
@@ -119,7 +125,7 @@ band it has actually reached. One medium-effort lead role is 3 × 1.5 = 4.5, whi
 ## Data model (in `heimdall-data.json`)
 
 `managers[]` (id, name, title, location, active) · `projects[]` (id, name,
-description, status, priority, startDate, targetDate, completedDate, link) ·
+description, status, priority, startDate, targetDate, completedDate, link, archived) ·
 `assignments[]` (id, projectId, managerId, role, effort, startDate, endDate,
 archived) · `workItems[]` (id, type, typeOther, title, managerId, relatedProjectId,
 status, priority, openedDate, dueDate, rollOffDate, completedDate, archived, link,

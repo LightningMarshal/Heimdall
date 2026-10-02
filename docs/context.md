@@ -1,13 +1,13 @@
 # Project Context: Heimdall
-_Last updated: 2026-09-28_
+_Last updated: 2026-10-02_
 _This file changes rarely. If the stack or architecture shifts significantly, re-run /first-principles._
 
 ## Stack
 Vanilla JS, HTML, and CSS — no framework, no build step, no package manager,
 no dependencies of any kind. The entire application is one file,
-`heimdall.html` (~2,280 lines: inlined `<style>` + a single IIFE `<script>`
+`heimdall.html` (~2,390 lines: inlined `<style>` + a single IIFE `<script>`
 using ES5-style `function` expressions, not classes/modules). Currently at
-`APP_VERSION = "0.6.1"`. Double-clicking the file runs it — there is no
+`APP_VERSION = "0.7.0"`. Double-clicking the file runs it — there is no
 `npm install`, no dev server, no compiler.
 
 ## Deployment
@@ -21,7 +21,9 @@ No server, no port, no Electron wrapper.
 - **Manager** — a person on the team being tracked (name, title, location,
   active/archived). The unit the Workload Board reports on.
 - **Project** — has status, priority, dates, an optional Jira epic link, and
-  a team of Assignments. A person can appear only once per project.
+  a team of Assignments. A person can appear only once per project. Usually
+  one Lead, but co-leads are legitimate (owner decision, 2026-10-02) — do not
+  enforce a single Lead.
 - **Assignment** — links a Manager to a Project with a **role** (Lead or
   Contributor) and an **effort** level (Light / Medium / Heavy). Effort is a
   multiplier on the role's base weight (×1 / ×1.5 / ×2).
@@ -47,9 +49,16 @@ No server, no port, no Electron wrapper.
   multiplies), so one landing between two whole-number bands resolves
   *downward*, to the highest band it has reached — see `bandFor`.
 - **Archiving** — the app's only form of deletion. Nothing is hard-deleted;
-  archived managers, assignments, and work items are preserved for history.
-  Projects are never archived — they are closed out (and cannot currently be
-  removed at all; see the roadmap's review gaps).
+  archived managers, assignments, work items, and projects are preserved for
+  history. A project is *closed out* when finished and *archived* only when it
+  should not be on the list at all (mistake, duplicate, cancelled). An
+  archived project counts nowhere — scoring, the drawer, Needs attention, the
+  assign dialogs — but its assignments are left un-archived so Restore brings
+  the team back intact; any new code that walks `assignments` must check
+  `project.archived` as well as `assignment.archived`.
+- **Related project** — a work item's optional `relatedProjectId`. Shown under
+  the title in the queue, beside the item in the drawer and 1:1 summary, and
+  counted on the project card; the queue's Project filter selects by it.
 - **Orphaned work** — an open work item whose owner is archived. It is off the
   board and not in the Backlog, so Needs attention lists it ("Owner archived")
   until it is reassigned.
