@@ -92,6 +92,9 @@ once so the "Last saved by" banner can attribute changes.
   are kept, so a lost edit can be seen and redone.
 - **Settings** — every weight, effort multiplier, and heat band is editable and
   stored in the data file; manager archive lives here (off the board) on purpose.
+- **Dark mode** — follows the operating system's light / dark setting; Settings →
+  Appearance can force Light or Dark for this browser (a personal preference kept in
+  the browser, not in the shared data). Printing is always light.
 - **Help** — a full in-app guide (Help tab).
 
 ## Workload scoring (defaults, all editable)
@@ -203,7 +206,9 @@ are not shipped with it.
 
 ## Possible future enhancements
 
-See **[docs/roadmap.md](docs/roadmap.md)** for the ranked list of post-MVP ideas —
-soft-locking, a change log, a roll-off timeline, recurring-item templates, capacity
-targets per manager, dark mode, and more — along with what each one would cost and
-which ones would break the "one file, no network" constraints.
+See **[docs/roadmap.md](docs/roadmap.md)** for the ranked list of post-MVP ideas and
+what each costs against the "one file, no network" constraints. Built so far (0.8.0 –
+0.15.0): the test harness, capacity per manager, undo, report CSV, the timeline, the
+change log, reassignment history, the workload trend, and dark mode. Still open:
+recurring work items, honouring assignment dates in scoring, soft-locking, and a
+multi-team rollup.

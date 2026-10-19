@@ -5,9 +5,9 @@ _This file changes rarely. If the stack or architecture shifts significantly, re
 ## Stack
 Vanilla JS, HTML, and CSS — no framework, no build step, no runtime package manager,
 no runtime dependencies of any kind (npm is used only for the dev-time test suite). The entire application is one file,
-`heimdall.html` (~2,390 lines: inlined `<style>` + a single IIFE `<script>`
+`heimdall.html` (~3,240 lines: inlined `<style>` + a single IIFE `<script>`
 using ES5-style `function` expressions, not classes/modules). Currently at
-`APP_VERSION = "0.14.0"`. Double-clicking the file runs it — there is no
+`APP_VERSION = "0.15.0"`. Double-clicking the file runs it — there is no
 `npm install`, no dev server, no compiler.
 
 ## Deployment
@@ -160,6 +160,14 @@ No server, no port, no Electron wrapper.
   because `file://` pages share one origin in Chromium, by every copy of
   `heimdall.html` on the machine. Returning to a tab adopts a newer local
   save (`syncFromLocal`); last write still wins between them.
+- **Colors are tokens.** Every color is a CSS custom property on `:root`
+  (including heat bands `--h-*`, the warm `--warn*` accents, and the type
+  colors JS uses via `var(--t-…)`). Dark mode redefines them twice — once
+  under `prefers-color-scheme: dark` (unless `data-theme="light"`), once for
+  `:root[data-theme="dark"]` — and the two blocks must stay identical. Both
+  are `@media screen`, so print stays light. Don't add a hard-coded hex in
+  a rule; add a token and give it a dark value. The theme choice lives in
+  `localStorage` (`heimdall-theme`), applied by a small script in `<head>`.
 - Heat-label colors follow a band's *position* (lowest → highest), not its
   name, so renaming a band in Settings keeps its color.
 - Clearing browser site data destroys the local copy with no server-side

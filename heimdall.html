@@ -15,6 +15,11 @@
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'">
 <title>Heimdall — Team Workload Tracker</title>
+<script>
+  // Appearance is a per-browser preference, not team data, so it lives in localStorage
+  // rather than the data file. Applied here, before the page paints, to avoid a flash.
+  try { var t = localStorage.getItem("heimdall-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+</script>
 <style>
   :root {
     --bg: #f5f6f8;
@@ -40,8 +45,78 @@
     --t-ditl: #2563eb;       --t-ditl-bg: #e8f0fe;
     --t-oneoff: #d97706;     --t-oneoff-bg: #fdf3e2;
     --t-other: #6b7280;      --t-other-bg: #eef0f3;
+    /* heat bands (text / background) */
+    --h-light: #15803d;      --h-light-bg: #e7f7ee;
+    --h-balanced: #a16207;   --h-balanced-bg: #fbf3df;
+    --h-heavy: #c2410c;      --h-heavy-bg: #fdeede;
+    --h-over: #b91c1c;       --h-over-bg: #fde4e4;
+    --h-na: #6b7280;         --h-na-bg: #eef0f3;
+    /* warm "needs a look" accents: attention chip, backlog, warn dot, high priority */
+    --warn: #9a6a16; --warn-bg: #fdf3e2; --warn-border: #f0dcb8; --warn-border-strong: #d9b877;
+    --warn-dot: #d97706; --pri-high: #b45309; --backlog-bg: #fffdf7;
+    --danger-border: #f0c8c8; --danger-border-2: #f3c6c1; --guard-bg: #fff7f6;
+    --ok-border: #c2e8d2; --info-border: #d4d8fb;
+    --on-accent: #ffffff;
+    --scrim: rgba(16,24,40,.45);
+    color-scheme: light;
+  }
+  /* Dark theme: follows the system unless Settings → Appearance picks one. Screen only,
+     so printing (the 1:1 summary, the timeline) always comes out light on white. */
+  @media screen and (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1115; --surface: #181b21; --surface-2: #1e2128; --border: #2a2e37; --border-strong: #3a3f4a;
+      --text: #e6e8ec; --muted: #a0a6b1; --faint: #737a86;
+      --accent: #8b85ff; --accent-hover: #a29dff; --accent-weak: #25234a;
+      --danger: #f87171; --danger-weak: #3a1d1f; --ok: #4ade80;
+      --shadow: 0 1px 2px rgba(0,0,0,.4); --shadow-lg: 0 10px 30px rgba(0,0,0,.55);
+      --t-escalation: #f87171; --t-escalation-bg: #3a1d1f;
+      --t-ditl: #7aa7ff;       --t-ditl-bg: #1c2742;
+      --t-oneoff: #f0a748;     --t-oneoff-bg: #3a2a15;
+      --t-other: #a0a6b1;      --t-other-bg: #262a32;
+      --h-light: #4ade80;      --h-light-bg: #16301f;
+      --h-balanced: #facc15;   --h-balanced-bg: #33290f;
+      --h-heavy: #fb923c;      --h-heavy-bg: #3a2312;
+      --h-over: #f87171;       --h-over-bg: #3d1a1a;
+      --h-na: #a0a6b1;         --h-na-bg: #262a32;
+      --warn: #f0b75e; --warn-bg: #33270f; --warn-border: #5c4519; --warn-border-strong: #8a6a2a;
+      --warn-dot: #f0a748; --pri-high: #f0a748; --backlog-bg: #1f1b12;
+      --danger-border: #5c2a2a; --danger-border-2: #5c2a2a; --guard-bg: #241515;
+      --ok-border: #24503a; --info-border: #3a3870;
+      --on-accent: #0f1115;
+      --scrim: rgba(0,0,0,.6);
+      color-scheme: dark;
+    }
+  }
+  /* The same palette again for an explicit Settings → Appearance → Dark. Keep the two
+     blocks identical. */
+  @media screen {
+    :root[data-theme="dark"] {
+      --bg: #0f1115; --surface: #181b21; --surface-2: #1e2128; --border: #2a2e37; --border-strong: #3a3f4a;
+      --text: #e6e8ec; --muted: #a0a6b1; --faint: #737a86;
+      --accent: #8b85ff; --accent-hover: #a29dff; --accent-weak: #25234a;
+      --danger: #f87171; --danger-weak: #3a1d1f; --ok: #4ade80;
+      --shadow: 0 1px 2px rgba(0,0,0,.4); --shadow-lg: 0 10px 30px rgba(0,0,0,.55);
+      --t-escalation: #f87171; --t-escalation-bg: #3a1d1f;
+      --t-ditl: #7aa7ff;       --t-ditl-bg: #1c2742;
+      --t-oneoff: #f0a748;     --t-oneoff-bg: #3a2a15;
+      --t-other: #a0a6b1;      --t-other-bg: #262a32;
+      --h-light: #4ade80;      --h-light-bg: #16301f;
+      --h-balanced: #facc15;   --h-balanced-bg: #33290f;
+      --h-heavy: #fb923c;      --h-heavy-bg: #3a2312;
+      --h-over: #f87171;       --h-over-bg: #3d1a1a;
+      --h-na: #a0a6b1;         --h-na-bg: #262a32;
+      --warn: #f0b75e; --warn-bg: #33270f; --warn-border: #5c4519; --warn-border-strong: #8a6a2a;
+      --warn-dot: #f0a748; --pri-high: #f0a748; --backlog-bg: #1f1b12;
+      --danger-border: #5c2a2a; --danger-border-2: #5c2a2a; --guard-bg: #241515;
+      --ok-border: #24503a; --info-border: #3a3870;
+      --on-accent: #0f1115;
+      --scrim: rgba(0,0,0,.6);
+      color-scheme: dark;
+    }
   }
   * { box-sizing: border-box; }
+  /* Form controls take the theme's colors rather than the browser's defaults. */
+  input, select, textarea { background-color: var(--surface); color: var(--text); }
   html, body { margin: 0; padding: 0; }
   body {
     font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -72,7 +147,7 @@
   .save-status.saved { color: var(--ok); }
   .save-status.error { color: var(--danger); font-weight: 600; }
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
-  .dot.on { background: var(--ok); } .dot.off { background: var(--faint); } .dot.warn { background: #d97706; }
+  .dot.on { background: var(--ok); } .dot.off { background: var(--faint); } .dot.warn { background: var(--warn-dot); }
 
   /* Nav */
   .nav { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 22px; }
@@ -82,7 +157,7 @@
     transition: background .12s, color .12s;
   }
   .nav button:hover { background: var(--surface); color: var(--text); }
-  .nav button.active { background: var(--accent); color: #fff; }
+  .nav button.active { background: var(--accent); color: var(--on-accent); }
 
   /* Buttons */
   button {
@@ -93,12 +168,12 @@
   }
   button:hover { border-color: var(--faint); }
   button:active { transform: translateY(1px); }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
   button.mini { padding: 4px 10px; font-size: 13px; border-radius: 7px; }
   button.ghost { background: transparent; border-color: transparent; color: var(--accent); padding: 6px 8px; }
   button.ghost:hover { background: var(--accent-weak); }
-  button.danger { color: var(--danger); border-color: #f0c8c8; }
+  button.danger { color: var(--danger); border-color: var(--danger-border); }
   button.danger:hover { background: var(--danger-weak); }
   button:disabled { opacity: .5; cursor: not-allowed; }
 
@@ -129,11 +204,11 @@
   .heat { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: 999px;
           font-size: 12px; font-weight: 700; }
   .heat::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .9; }
-  .heat-light      { background: #e7f7ee; color: #15803d; }
-  .heat-balanced   { background: #fbf3df; color: #a16207; }
-  .heat-heavy      { background: #fdeede; color: #c2410c; }
-  .heat-overloaded { background: #fde4e4; color: #b91c1c; }
-  .heat-na         { background: #eef0f3; color: #6b7280; }
+  .heat-light      { background: var(--h-light-bg); color: var(--h-light); }
+  .heat-balanced   { background: var(--h-balanced-bg); color: var(--h-balanced); }
+  .heat-heavy      { background: var(--h-heavy-bg); color: var(--h-heavy); }
+  .heat-overloaded { background: var(--h-over-bg); color: var(--h-over); }
+  .heat-na         { background: var(--h-na-bg); color: var(--h-na); }
   .mcard .m-score { font-variant-numeric: tabular-nums; color: var(--faint); font-size: 12px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .m-trend { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 11px; color: var(--faint); white-space: nowrap; }
@@ -142,14 +217,14 @@
   .d-trend { margin: 6px 0 4px; }
   svg.trend { width: 100%; height: 70px; display: block; border-radius: 7px; overflow: hidden; }
   svg.trend .line { stroke-width: 2; }
-  svg.trend rect.heat-light { fill: #e7f7ee; } svg.trend rect.heat-balanced { fill: #fbf3df; }
-  svg.trend rect.heat-heavy { fill: #fdeede; }  svg.trend rect.heat-overloaded { fill: #fde4e4; }
+  svg.trend rect.heat-light { fill: var(--h-light-bg); } svg.trend rect.heat-balanced { fill: var(--h-balanced-bg); }
+  svg.trend rect.heat-heavy { fill: var(--h-heavy-bg); }  svg.trend rect.heat-overloaded { fill: var(--h-over-bg); }
   .d-trend-lab { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--faint); margin-top: 3px; }
   .d-trend-lab span:nth-child(2) { color: var(--muted); font-weight: 600; text-align: center; }
   .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 3px 9px;
           border-radius: 7px; background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); }
   .chip b { color: var(--text); font-variant-numeric: tabular-nums; }
-  .chip.alert { background: var(--danger-weak); border-color: #f3c6c1; color: var(--danger); }
+  .chip.alert { background: var(--danger-weak); border-color: var(--danger-border-2); color: var(--danger); }
   .chip.alert b { color: var(--danger); }
 
   /* Pills (type taxonomy) */
@@ -262,7 +337,7 @@
 
   /* Forms (modal + generic) */
   /* Sits above the manager drawer (z-index 60) so a form opened from the drawer is usable. */
-  .overlay { position: fixed; inset: 0; background: rgba(16,24,40,.45); display: none; align-items: center;
+  .overlay { position: fixed; inset: 0; background: var(--scrim); display: none; align-items: center;
              justify-content: center; padding: 20px; z-index: 80; }
   .overlay.show { display: flex; }
   /* Header and actions stay put; only .modal-body scrolls, so a tall form is never cut off. */
@@ -300,7 +375,7 @@
   .trow .t-end input { font: inherit; font-size: 13px; padding: 6px 6px; border: 1px solid var(--border-strong); border-radius: 8px; }
 
   /* Manager detail drawer */
-  .drawer-overlay { position: fixed; inset: 0; background: rgba(16,24,40,.4); display: none; z-index: 60; }
+  .drawer-overlay { position: fixed; inset: 0; background: var(--scrim); display: none; z-index: 60; }
   .drawer-overlay.show { display: block; }
   .drawer { position: fixed; top: 0; right: 0; height: 100%; width: 440px; max-width: 92vw;
             background: var(--surface); box-shadow: var(--shadow-lg); overflow-y: auto;
@@ -326,9 +401,9 @@
   .navrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 22px; }
   .navrow .nav { margin-bottom: 0; }
   .nav-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-  .attn-chip { background: #fdf3e2; border: 1px solid #f0dcb8; color: #9a6a16; font-weight: 600;
+  .attn-chip { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn); font-weight: 600;
                font-size: 13px; border-radius: 999px; padding: 6px 13px; display: none; }
-  .attn-chip:hover { border-color: #d9b877; }
+  .attn-chip:hover { border-color: var(--warn-border-strong); }
   .attn-chip.show { display: inline-block; }
   .searchbox { position: relative; }
   .searchbox input { font: inherit; padding: 7px 12px; border: 1px solid var(--border-strong);
@@ -346,7 +421,7 @@
   .search-pop .sr-none { padding: 12px; color: var(--muted); font-size: 13px; }
 
   /* Backlog (unassigned work) */
-  .backlog { border-color: #f0dcb8; background: #fffdf7; }
+  .backlog { border-color: var(--warn-border); background: var(--backlog-bg); }
   .backlog .b-row { display: flex; align-items: center; gap: 10px; padding: 7px 0;
                     border-bottom: 1px solid var(--border); font-size: 14px; }
   .backlog .b-row:last-child { border-bottom: none; }
@@ -365,7 +440,7 @@
   .help p, .help li { font-size: 14px; }
   .help ul { margin: 6px 0 0 18px; padding: 0; }
   .help li { margin-bottom: 4px; }
-  td.pri-high { color: #b45309; font-weight: 600; }
+  td.pri-high { color: var(--pri-high); font-weight: 600; }
 
   @media print {
     .appbar, .banner, .nav, .nav-right, .notice, .footer-note, .drawer .d-actions, .drawer .d-close, .tl-sort { display: none !important; }
@@ -380,13 +455,13 @@
 
   .notice { font-size: 14px; padding: 11px 15px; border-radius: var(--radius-sm); margin-bottom: 16px; display: none; }
   .notice.show { display: block; }
-  .notice.info { background: var(--accent-weak); border: 1px solid #d4d8fb; }
-  .notice.ok { background: #e7f7ee; border: 1px solid #c2e8d2; color: #15803d; }
-  .notice.err { background: var(--danger-weak); border: 1px solid #f3c6c1; color: var(--danger); }
+  .notice.info { background: var(--accent-weak); border: 1px solid var(--info-border); }
+  .notice.ok { background: var(--h-light-bg); border: 1px solid var(--ok-border); color: var(--h-light); }
+  .notice.err { background: var(--danger-weak); border: 1px solid var(--danger-border-2); color: var(--danger); }
 
   .guard { display: none; margin-bottom: 16px; }
   .guard.show { display: block; }
-  .guard .panel { border-color: #f3c6c1; background: #fff7f6; }
+  .guard .panel { border-color: var(--danger-border-2); background: var(--guard-bg); }
   .guard .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 </style>
 </head>
@@ -543,6 +618,19 @@
         <button id="btnSaveSettings" class="primary">Save weighting</button>
         <button id="btnResetSettings" class="mini">Reset to defaults</button>
       </div>
+    </div>
+
+    <div class="panel">
+      <h3 class="sec">Appearance</h3>
+      <p class="hint">Light or dark. “Match system” follows your operating system's setting. Saved in this browser only —
+        it's a personal preference, not part of the shared data. Printing is always light.</p>
+      <label class="toggle">Theme
+        <select id="themeSel" style="font:inherit;padding:6px 9px;border:1px solid var(--border-strong);border-radius:8px;margin-left:6px;">
+          <option value="system">Match system</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
     </div>
 
     <div class="panel">
@@ -714,6 +802,7 @@
         <li>Firefox / Safari work fully in local mode; live shared-file sync requires Edge or Chrome.</li>
         <li>If “Reconnect shared file” appears, the browser wants permission confirmed — one click resumes syncing.</li>
         <li>Escape closes any dialog or menu; Enter confirms the name prompt.</li>
+        <li>Dark mode follows your system setting; Settings → Appearance can force Light or Dark for this browser.</li>
         <li>Nothing leaves your machine: no network calls, no analytics — a strict Content-Security-Policy blocks them by design.</li>
       </ul>
     </div>
@@ -802,7 +891,7 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.14.0";
+  var APP_VERSION = "0.15.0";
   var MAX_BACKUPS = 10;
   // Minimum spacing between backups. One per save meant ten quick edits rotated out
   // every older backup, so the ten on disk only ever covered the last few minutes.
@@ -828,7 +917,8 @@
     role: { lead: "Lead", contributor: "Contributor" },
     effort: { light: "Light", medium: "Medium", heavy: "Heavy" }
   };
-  var TYPE_COLOR = { escalation: "#dc2626", ditl: "#2563eb", oneoff: "#d97706", other: "#6b7280" };
+  // CSS variables, so report bars and the legend follow the light / dark theme.
+  var TYPE_COLOR = { escalation: "var(--t-escalation)", ditl: "var(--t-ditl)", oneoff: "var(--t-oneoff)", other: "var(--t-other)" };
   var TYPE_OTHER_MAX = 60;   // free-text label captured when Type is "Other"
   var CHANGE_CAP = 500;      // change-log entries kept; the oldest drop off first
   var TREND_KEEP = 400;      // score snapshots kept per manager (one per day at most)
@@ -866,6 +956,7 @@
   var weightsBody = el("weightsBody"), btnSaveSettings = el("btnSaveSettings"),
       btnResetSettings = el("btnResetSettings"), settingsManagers = el("settingsManagers"),
       syncHint = el("syncHint"), syncControls = el("syncControls"), changeLogEl = el("changeLog");
+  var themeSel = el("themeSel");
   var btnExport = el("btnExport"), btnImport = el("btnImport"), importInput = el("importInput"),
       appVersionEl = el("appVersion");
   var nameOverlay = el("nameOverlay"), nameInput = el("nameInput"), nameOk = el("nameOk"), nameCancel = el("nameCancel");
@@ -3064,6 +3155,14 @@
   repGran.addEventListener("change", renderReports);
   btnReportCsv.addEventListener("click", downloadReportCsv);
   btnSaveSettings.addEventListener("click", saveSettings);
+  function currentTheme() { var t = document.documentElement.getAttribute("data-theme"); return (t === "light" || t === "dark") ? t : "system"; }
+  themeSel.value = currentTheme();
+  themeSel.addEventListener("change", function () {
+    var t = themeSel.value;
+    if (t === "system") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", t);
+    try { if (t === "system") localStorage.removeItem("heimdall-theme"); else localStorage.setItem("heimdall-theme", t); } catch (e) {}
+  });
   btnResetSettings.addEventListener("click", resetSettings);
   projAddMember.addEventListener("click", addTeamMember);
   projOk.addEventListener("click", saveProject);

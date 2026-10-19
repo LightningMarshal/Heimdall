@@ -1,6 +1,6 @@
 # Heimdall — Roadmap
 
-_Last updated: 2026-10-19 · app version 0.14.0_
+_Last updated: 2026-10-19 · app version 0.15.0_
 
 Post-MVP ideas, ranked by how much they improve the one question Heimdall exists to
 answer — **who is carrying too much, and who has room** — against what they cost in a
@@ -182,7 +182,11 @@ A second level of hierarchy (teams, or skip-level grouping) so a director sees s
 managers-of-managers at once. Straightforward data-wise, and a serious change to every
 view's information density. Only worth it if the tool is actually adopted a level up.
 
-### 13. Dark mode
+### 13. Dark mode — *built in 0.15.0*
+**Built:** every hard-coded color moved to a token; a dark palette follows the system
+setting, Settings → Appearance can force Light or Dark (per browser), and print is
+always light. Original note:
+
 All colors already live in CSS custom properties on `:root`, so this is a
 `prefers-color-scheme` block plus a check of every hard-coded value — the type pill
 colors and heat backgrounds in particular. Low risk, moderate tedium, purely cosmetic:
