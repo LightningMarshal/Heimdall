@@ -78,6 +78,10 @@ once so the "Last saved by" banner can attribute changes.
   segmented by type. The chart shows the 20 most recent periods; **Download CSV**
   saves every period at the chosen grouping (Period, Total, one column per type,
   oldest first; UTF-8 with a byte-order mark so Excel reads it correctly).
+- **Change log** — Settings → Change log: every saved change, field by field (when,
+  who, record, old → new), the last 500 kept, downloadable as CSV. When one copy
+  overwrites another, the data is still last-write-wins but both copies' log entries
+  are kept, so a lost edit can be seen and redone.
 - **Settings** — every weight, effort multiplier, and heat band is editable and
   stored in the data file; manager archive lives here (off the board) on purpose.
 - **Help** — a full in-app guide (Help tab).
@@ -120,6 +124,11 @@ band it has actually reached. One medium-effort lead role is 3 × 1.5 = 4.5, whi
   to a tab loads anything newer the other saved, instead of overwriting it.
 - **Conflict model:** last write wins by save timestamp (documented and accepted —
   the banner always shows who saved last, and *Reload latest* re-reads on demand).
+  The change log is the exception: it is union-merged by entry, so an overwritten
+  edit is still on record.
+- **Upgrade together:** everyone on a shared file should run the same version of
+  `heimdall.html`. An older copy keeps only the data it knows about, so its next save
+  drops newer top-level data such as `changes[]`.
 - **Backups:** synced saves also write `heimdall-data.backup-YYYYMMDD-HHMM.json`
   beside the shared file, at most one every 30 minutes; the 10 most recent are kept. A corrupted shared file is
   never overwritten — the app offers to restore from a backup instead.
@@ -153,6 +162,7 @@ description, status, priority, startDate, targetDate, completedDate, link, archi
 archived) · `workItems[]` (id, type, typeOther, title, managerId, relatedProjectId,
 status, priority, openedDate, dueDate, rollOffDate, completedDate, archived, link,
 notes) ·
+`changes[]` (id, at, by, entity, entityId, label, field, from, to — capped at 500) ·
 `settings` (weights, effort, bands, appVersion, lastSavedBy, lastSavedAt).
 
 Nothing is hard-deleted — archiving preserves the historical record.

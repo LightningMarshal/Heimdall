@@ -185,6 +185,8 @@
              background: var(--surface-2); }
   tbody tr:last-child td { border-bottom: none; }
   tr.archived td { opacity: .5; }
+  table.changelog td { font-size: 13px; vertical-align: top; }
+  table.changelog td:first-child { white-space: nowrap; color: var(--muted); }
   td.actions { white-space: nowrap; text-align: right; }
   td.actions button + button { margin-left: 4px; }
   td.age.old { color: var(--danger); font-weight: 600; }
@@ -539,6 +541,13 @@
     </div>
 
     <div class="panel">
+      <h3 class="sec">Change log</h3>
+      <p class="hint">Every saved change, field by field — who, when, old → new — for working out what happened when two
+        people's edits crossed. The last 500 changes are kept, in the data file, and merged from every copy that syncs.</p>
+      <div id="changeLog"></div>
+    </div>
+
+    <div class="panel">
       <h3 class="sec">Shared file &amp; sync</h3>
       <p class="hint" id="syncHint"></p>
       <div id="syncControls"></div>
@@ -663,6 +672,11 @@
         <li><strong>Local first:</strong> data is stored in this browser (IndexedDB) and saves automatically. The app opens instantly, with zero prompts, in any modern browser.</li>
         <li><strong>Team sync (Edge / Chrome):</strong> Settings → “Link shared file” points Heimdall at a folder in a synced drive (OneDrive / SharePoint / Google Drive). It keeps a shared <code>heimdall-data.json</code> there, pulls teammates' changes when you return to the tab, and remembers the link across sessions.</li>
         <li><strong>Conflicts:</strong> last write wins, decided by save timestamp. The banner always shows who saved last; “Reload latest” re-reads the shared file on demand.</li>
+        <li><strong>Change log:</strong> Settings → Change log lists every saved change field by field — when, who, which
+          record, old → new — newest first, and downloads as CSV. It doesn't prevent a lost edit, but it lets you see what
+          was lost and redo it: when one copy overwrites another, the data is last-write-wins, but both copies' log entries
+          are kept. The last 500 changes are kept. Everyone sharing a file should run the same Heimdall version — an older
+          copy (before 0.12) drops the log when it saves.</li>
         <li><strong>Other tabs:</strong> two Heimdall tabs or windows in the same browser share one local copy; switching to a tab loads anything newer the other one saved.</li>
         <li><strong>Backups:</strong> synced saves also write a timestamped <code>heimdall-data.backup-…json</code> beside the shared file — at most one every 30 minutes, so the 10 that are kept span hours of work rather than the last ten edits. If the shared file is ever corrupted, Heimdall refuses to overwrite it and offers to restore from a backup.</li>
         <li><strong>Export / Import:</strong> Settings → Export downloads the full dataset as JSON — a manual backup and the sharing route for non-Chromium browsers. Import loads one back in.</li>
@@ -766,7 +780,7 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.11.0";
+  var APP_VERSION = "0.12.0";
   var MAX_BACKUPS = 10;
   // Minimum spacing between backups. One per save meant ten quick edits rotated out
   // every older backup, so the ten on disk only ever covered the last few minutes.
@@ -794,6 +808,7 @@
   };
   var TYPE_COLOR = { escalation: "#dc2626", ditl: "#2563eb", oneoff: "#d97706", other: "#6b7280" };
   var TYPE_OTHER_MAX = 60;   // free-text label captured when Type is "Other"
+  var CHANGE_CAP = 500;      // change-log entries kept; the oldest drop off first
   var MAX_WINS = 10;         // "Recently completed" entries shown in the drawer and 1:1 summary
   // Capacity is entered as a percentage of a full load (100 = full time, 50 = half,
   // a new hire still ramping) and stored as a fraction on the manager.
@@ -825,7 +840,7 @@
   var repGran = el("repGran"), reportBody = el("reportBody"), btnReportCsv = el("btnReportCsv");
   var weightsBody = el("weightsBody"), btnSaveSettings = el("btnSaveSettings"),
       btnResetSettings = el("btnResetSettings"), settingsManagers = el("settingsManagers"),
-      syncHint = el("syncHint"), syncControls = el("syncControls");
+      syncHint = el("syncHint"), syncControls = el("syncControls"), changeLogEl = el("changeLog");
   var btnExport = el("btnExport"), btnImport = el("btnImport"), importInput = el("importInput"),
       appVersionEl = el("appVersion");
   var nameOverlay = el("nameOverlay"), nameInput = el("nameInput"), nameOk = el("nameOk"), nameCancel = el("nameCancel");
@@ -843,7 +858,7 @@
   // ---- Default schema --------------------------------------------------
   function defaultData() {
     return {
-      managers: [], projects: [], assignments: [], workItems: [],
+      managers: [], projects: [], assignments: [], workItems: [], changes: [],
       settings: {
         appVersion: APP_VERSION, lastSavedBy: null, lastSavedAt: null,
         weights: { projectLead: 3, projectContributor: 1, escalation: 4, ditl: 2, oneoff: 1, other: 1 },
@@ -867,6 +882,8 @@
     }
     if ("settings" in parsed && !isPlainObject(parsed.settings))
       return { ok: false, error: '"settings" must be an object.' };
+    // The change log is best-effort history: a malformed one is dropped, not fatal.
+    var changes = Array.isArray(parsed.changes) ? parsed.changes : [];
     var out = defaultData();
     // Rows that are not objects would throw mid-render; a row with no id can be neither
     // found nor edited. Drop the former and give the latter one.
@@ -879,6 +896,7 @@
     // divide oddly, and 0 or a negative would put Infinity or nonsense on the board.
     // Anything unusable (including a file from before 0.8.0) means a full load.
     out.managers.forEach(function (m) { var c = toNum(m.capacity); m.capacity = (c != null && c > 0) ? c : 1; });
+    out.changes = mergeChanges([], changes.filter(function (c) { return isPlainObject(c) && typeof c.id === "string" && c.id; }));
     if (isPlainObject(parsed.settings)) {
       var s = parsed.settings;
       out.settings.appVersion = (s.appVersion != null) ? s.appVersion : out.settings.appVersion;
@@ -1614,17 +1632,22 @@
       var b = rb.map[k];
       lines.push([k, b.total].concat(WORK_TYPES.map(function (t) { return b.types[t]; })));
     });
-    // CRLF and a byte-order mark, so Excel opens it as UTF-8 with the rows split.
-    return "\ufeff" + lines.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n") + "\r\n";
+    return csvText(lines);
+  }
+  // CRLF and a byte-order mark, so Excel opens it as UTF-8 with the rows split.
+  function csvText(rows) { return "\ufeff" + rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n") + "\r\n"; }
+  function downloadCsv(name, rows) { downloadBlob(name, csvText(rows), "text/csv;charset=utf-8"); }
+  function downloadBlob(name, text, type) {
+    var blob = new Blob([text], { type: type }); var url = URL.createObjectURL(blob);
+    var a = elem("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    notice("Downloaded " + name + ".", "ok");
   }
   function downloadReportCsv() {
     var items = (data && data.workItems) || [];
     if (!items.length) { notice("No work items to export yet.", "info"); return; }
     var gran = repGran.value, d = new Date();
     var name = "heimdall-report-" + gran + "-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + ".csv";
-    var blob = new Blob([reportCsv(gran)], { type: "text/csv;charset=utf-8" }); var url = URL.createObjectURL(blob);
-    var a = elem("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    notice("Downloaded " + name + ".", "ok");
+    downloadBlob(name, reportCsv(gran), "text/csv;charset=utf-8");
   }
 
   // ---- Settings view ---------------------------------------------------
@@ -1657,7 +1680,39 @@
     weightsBody.appendChild(bb);
 
     renderSettingsManagers();
+    renderChangeLog();
     renderSyncControls();
+  }
+  var changeLogAll = false;   // show every entry, not just the latest CHANGE_SHOWN
+  var CHANGE_SHOWN = 50;
+  function fmtWhen(iso) { var t = tsValue(iso); return t ? new Date(t).toLocaleString() : (iso || "—"); }
+  function changeWhat(c) { return (ENTITY_WORD[c.entity] || c.entity || "") + (c.label ? ": " + c.label : ""); }
+  function renderChangeLog() {
+    clear(changeLogEl);
+    var list = ((data && data.changes) || []).slice().reverse();   // newest first
+    if (!list.length) { changeLogEl.appendChild(elem("div", "empty", "No changes logged yet.")); return; }
+    var shown = changeLogAll ? list : list.slice(0, CHANGE_SHOWN);
+    var tbl = elem("table", "changelog"), thead = elem("thead"), hr = elem("tr");
+    ["When", "Who", "What", "Field", "From", "To"].forEach(function (h) { hr.appendChild(elem("th", null, h)); });
+    thead.appendChild(hr); tbl.appendChild(thead);
+    var tb = elem("tbody");
+    shown.forEach(function (c) {
+      var tr = elem("tr");
+      [fmtWhen(c.at), c.by || "—", changeWhat(c), c.field || "", c.from, c.to].forEach(function (v) { tr.appendChild(tdc(v == null ? "" : String(v))); });
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb); changeLogEl.appendChild(tbl);
+    var bar = elem("div"); bar.style.marginTop = "10px";
+    if (list.length > CHANGE_SHOWN) bar.appendChild(miniBtn(changeLogAll ? "Show latest " + CHANGE_SHOWN : "Show all " + list.length,
+      function () { changeLogAll = !changeLogAll; renderChangeLog(); }));
+    bar.appendChild(document.createTextNode(" "));
+    bar.appendChild(miniBtn("Download CSV", downloadChangeLogCsv));
+    changeLogEl.appendChild(bar);
+  }
+  function downloadChangeLogCsv() {
+    var rows = [["When (UTC)", "Who", "Entity", "Record", "Field", "From", "To"]];
+    ((data && data.changes) || []).forEach(function (c) { rows.push([c.at, c.by, ENTITY_WORD[c.entity] || c.entity, c.label, c.field, c.from, c.to]); });
+    downloadCsv("heimdall-changes-" + stamp(new Date()) + ".csv", rows);
   }
   function renderSettingsManagers() {
     clear(settingsManagers);
@@ -1828,6 +1883,84 @@
     });
   }
 
+  // ---- Change log ------------------------------------------------------
+  // Last write wins on the shared file, so a teammate's edit can vanish. The log does
+  // not prevent that; it makes it diagnosable: every commit() diffs the data against
+  // the state at the previous commit (the baseline) and appends one entry per changed
+  // field — {id, at, by, entity, entityId, label, field, from, to} — keeping the last
+  // CHANGE_CAP. It is computed generically, so no mutation needs to remember to log.
+  // Whenever data is replaced (sync, other tab, import, backup), the two logs are
+  // union-merged by entry id: the losing side of a last-write-wins overwrite keeps its
+  // entries, which is the whole point.
+  var COLLS = ["managers", "projects", "assignments", "workItems"];
+  var LOG_SKIP = { id: 1, ownerHistory: 1, scoreHistory: 1 };   // derived or bookkeeping fields
+  var ENTITY_WORD = { managers: "Manager", projects: "Project", assignments: "Assignment", workItems: "Work item", settings: "Settings" };
+  var baseline = null;
+  function snapshotData(d) {
+    var o = {}; COLLS.forEach(function (k) { o[k] = d[k]; });
+    o.settings = { weights: d.settings.weights, effort: d.settings.effort, bands: d.settings.bands };
+    return JSON.parse(JSON.stringify(o));
+  }
+  function resetBaseline() { baseline = data ? snapshotData(data) : null; }
+  function mergeChanges(a, b) {
+    var seen = {}, out = [];
+    (a || []).concat(b || []).forEach(function (c) { if (c && c.id && !seen[c.id]) { seen[c.id] = true; out.push(c); } });
+    out.sort(function (x, y) { return x.at < y.at ? -1 : x.at > y.at ? 1 : 0; });
+    return out.slice(-CHANGE_CAP);
+  }
+  // Data replaced from elsewhere: keep both logs, and diff future commits from here.
+  function replaceData(next) {
+    next.changes = mergeChanges(data && data.changes, next.changes);
+    data = next; resetBaseline();
+  }
+  function recordLabel(coll, r) {
+    if (!r) return "";
+    if (coll === "assignments") {
+      var p = findById(data.projects, r.projectId);
+      return managerName(r.managerId) + " on " + (p ? p.name : "(project)");
+    }
+    return (coll === "workItems") ? (r.title || "(untitled)") : (r.name || "(unnamed)");
+  }
+  // A value as the log shows it: ids resolved to names, long text shortened.
+  function logValue(field, v) {
+    if (v == null || v === "") return "—";
+    if (field === "managerId") return managerName(v);
+    if (field === "projectId" || field === "relatedProjectId") { var p = findById(data.projects, v); return p ? p.name : "(unknown project)"; }
+    var t = (typeof v === "object") ? JSON.stringify(v) : String(v);
+    return t.length > 80 ? t.slice(0, 79) + "…" : t;
+  }
+  function logChanges() {
+    if (!baseline || !data) { resetBaseline(); return; }
+    var at = new Date().toISOString(), by = userName || data.settings.lastSavedBy || "Unknown", out = [];
+    function add(entity, id, label, field, from, to) {
+      out.push({ id: genId(), at: at, by: by, entity: entity, entityId: id, label: label, field: field,
+                 from: logValue(field, from), to: logValue(field, to) });
+    }
+    COLLS.forEach(function (coll) {
+      var before = {}; baseline[coll].forEach(function (r) { before[r.id] = r; });
+      data[coll].forEach(function (r) {
+        var b = before[r.id], label = recordLabel(coll, r);
+        if (!b) { add(coll, r.id, label, "(added)", null, null); return; }
+        var keys = {}; Object.keys(b).concat(Object.keys(r)).forEach(function (k) { keys[k] = true; });
+        Object.keys(keys).forEach(function (k) {
+          if (LOG_SKIP[k]) return;
+          var x = (b[k] === undefined) ? null : b[k], y = (r[k] === undefined) ? null : r[k];
+          if (JSON.stringify(x) !== JSON.stringify(y)) add(coll, r.id, label, k, x, y);
+        });
+      });
+    });
+    ["weights", "effort"].forEach(function (grp) {
+      var x = baseline.settings[grp] || {}, y = data.settings[grp] || {};
+      Object.keys(y).forEach(function (k) { if (x[k] !== y[k]) add("settings", grp, "Weighting", grp + "." + k, x[k], y[k]); });
+    });
+    if (JSON.stringify(baseline.settings.bands) !== JSON.stringify(data.settings.bands))
+      add("settings", "bands", "Weighting", "bands", (baseline.settings.bands || []).map(bandRangeLabel).join(", "),
+          (data.settings.bands || []).map(bandRangeLabel).join(", "));
+    if (out.length) data.changes = mergeChanges(data.changes, out);
+    resetBaseline();
+  }
+  function bandRangeLabel(b) { return b.label + " " + bandRange(b); }
+
   // ---- Undo (most recent archive action only) ---------------------------
   // Archiving is reversible in principle, but Restore lives in History or Settings, and
   // "Archive all past roll-off" touches many records at once. The last archive-type
@@ -1875,7 +2008,7 @@
   // Every change ends the window for undoing the previous archive action.
   function commit() {
     if (lastUndo) { lastUndo = null; var ub = el("btnUndo"); if (ub) noticeEl.className = "notice"; updateUndoUI(); }
-    renderAll(); scheduleSave();
+    logChanges(); renderAll(); scheduleSave();
   }
 
   // Managers
@@ -2596,8 +2729,8 @@
       var fileTs = tsValue(v.data.settings.lastSavedAt), localTs = tsValue(data && data.settings && data.settings.lastSavedAt);
       // renderAll, not just the current view: the filter selects and the Needs attention
       // chip are derived from the data too, and were left showing the old copy.
-      if (fileTs > localTs) { data = v.data; await saveLocal(); updateBanner(); renderAll(); setSaveStatus("saved"); notice(interactive ? "Loaded the latest from the shared file." : "Updated with a teammate's latest changes.", interactive ? "ok" : "info"); }
-      else if (localTs > fileTs) { await writeToFile(); setSaveStatus("saved"); if (interactive) notice("Your local changes were newer — synced them to the shared file.", "ok"); }
+      if (fileTs > localTs) { replaceData(v.data); await saveLocal(); updateBanner(); renderAll(); setSaveStatus("saved"); notice(interactive ? "Loaded the latest from the shared file." : "Updated with a teammate's latest changes.", interactive ? "ok" : "info"); }
+      else if (localTs > fileTs) { data.changes = mergeChanges(data.changes, v.data.changes); await saveLocal(); await writeToFile(); setSaveStatus("saved"); if (interactive) notice("Your local changes were newer — synced them to the shared file.", "ok"); }
       else if (interactive) notice("Already up to date.", "ok");
     } catch (e) { if (interactive) notice("Sync failed: " + (e && e.message ? e.message : e), "err"); }
     finally { syncing = false; }
@@ -2614,7 +2747,7 @@
       var stored = await idbGet("data"); if (stored == null) return;
       var v = validate(stored); if (!v.ok) return;
       if (tsValue(v.data.settings.lastSavedAt) > tsValue(data.settings.lastSavedAt)) {
-        data = v.data; updateBanner(); renderAll();
+        replaceData(v.data); updateBanner(); renderAll();
         notice("Loaded newer changes saved from another Heimdall tab or window.", "info");
       }
     } catch (e) {} finally { localSyncing = false; }
@@ -2637,7 +2770,7 @@
     try { parsed = JSON.parse(text); } catch (e) { notice("Import failed — not valid JSON (" + e.message + ").", "err"); return; }
     var v = validate(parsed); if (!v.ok) { notice("Import failed — not a valid Heimdall data file: " + v.error, "err"); return; }
     if (hasContent(data) && !window.confirm("Importing will replace all current data in this browser with the contents of the selected file. Continue?")) return;
-    data = v.data; await ensureName();
+    replaceData(v.data); await ensureName();
     data.settings.lastSavedBy = userName || data.settings.lastSavedBy || "Unknown"; data.settings.lastSavedAt = new Date().toISOString();
     await saveLocal(); updateBanner(); renderAll(); scheduleSave(); notice("Imported and saved.", "ok");
   }
@@ -2649,7 +2782,7 @@
       try { parsed = JSON.parse(text); } catch (e) { notice("That backup is also invalid JSON (" + e.message + ").", "err"); return; }
       var v = validate(parsed); if (!v.ok) { notice("That backup is not a valid Heimdall data file: " + v.error, "err"); return; }
       if (hasContent(data) && !window.confirm("Loading this backup will replace all current data in this browser. Continue?")) return;
-      data = v.data; fileBlocked = false; hideGuard(); await saveLocal(); updateBanner(); renderAll(); scheduleSave();
+      replaceData(v.data); fileBlocked = false; hideGuard(); await saveLocal(); updateBanner(); renderAll(); scheduleSave();
       notice("Loaded from backup — restoring the shared file.", "ok");
     } catch (e) { if (e && e.name === "AbortError") return; notice("Could not load backup: " + (e && e.message ? e.message : e), "err"); }
   }
@@ -2726,6 +2859,7 @@
       } catch (e) { dbReady = false; }
     }
     if (!data) data = defaultData();
+    resetBaseline();
     updateBanner(); renderAll(); setSaveStatus(hasContent(data) ? "saved" : "");
     if (DIR_API && dbReady) {
       var savedDir = null; try { savedDir = await idbGet("dirHandle"); } catch (e) {}

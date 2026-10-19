@@ -7,7 +7,7 @@ Vanilla JS, HTML, and CSS — no framework, no build step, no runtime package ma
 no runtime dependencies of any kind (npm is used only for the dev-time test suite). The entire application is one file,
 `heimdall.html` (~2,390 lines: inlined `<style>` + a single IIFE `<script>`
 using ES5-style `function` expressions, not classes/modules). Currently at
-`APP_VERSION = "0.11.0"`. Double-clicking the file runs it — there is no
+`APP_VERSION = "0.12.0"`. Double-clicking the file runs it — there is no
 `npm install`, no dev server, no compiler.
 
 ## Deployment
@@ -106,6 +106,18 @@ No server, no port, no Electron wrapper.
   checks run in several time zones with `page.clock.setFixedTime()` given a
   UTC instant. `package.json` exists only for this dev tooling; the shipped
   artifact is still the one HTML file with no dependencies. No linter config.
+- **Change log** (`data.changes[]`) is generated, not written by hand:
+  `commit()` calls `logChanges()`, which diffs the data against `baseline`
+  (a snapshot taken at the previous commit) and appends one entry per
+  changed field. Any code that **replaces** `data` must go through
+  `replaceData(next)`, which union-merges both logs by entry id and resets
+  the baseline — assigning `data = …` directly would either lose the other
+  side's log or log the whole incoming copy as one user's edits. Fields that
+  are bookkeeping rather than user edits go in `LOG_SKIP`.
+- New **top-level** keys must be added to `defaultData()` and copied in
+  `validate()` — it rebuilds the object from defaults and drops anything it
+  doesn't know. Older app versions drop them too, so everyone on a shared
+  file must upgrade together; new per-row fields survive older clients.
 - Archive-type actions go through `applyWithUndo(label, changes, message)`
   with changes built by `fieldChange(coll, record, field, next)`, so the
   last one can be undone. Undo re-finds each record by id and restores a
