@@ -210,6 +210,42 @@
   .bucket .seg { height: 100%; }
   .bucket .n { width: 34px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
 
+  /* Timeline: one 90-day lane per manager */
+  .tl-head { display: grid; grid-template-columns: 240px 1fr; gap: 14px; margin-bottom: 4px; }
+  .tl-axis { position: relative; height: 18px; font-size: 11px; color: var(--faint); margin: 0 70px 0 52px; }
+  .tl-axis span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+  .tl-axis span.first { transform: none; }
+  .tl-lane { display: grid; grid-template-columns: 240px 1fr; gap: 14px; align-items: center;
+             background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+             padding: 10px 12px; margin-bottom: 8px; box-shadow: var(--shadow); break-inside: avoid; }
+  .tl-who { min-width: 0; }
+  .tl-who .lnk { font-weight: 650; }
+  .tl-who .tl-now { display: flex; align-items: center; gap: 6px; margin-top: 3px; flex-wrap: wrap; }
+  .tl-now .m-score { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tl-proj { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+  .tl-proj span { padding: 1px 7px; border-radius: 999px; font-weight: 600; }
+  .tl-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .tl-gut { flex: 0 0 46px; font-size: 11px; line-height: 1.25; text-align: center; color: var(--faint); }
+  .tl-gut.right { flex-basis: 64px; }
+  .tl-gut.past { color: var(--danger); font-weight: 600; }
+  .tl-track { position: relative; flex: 1 1 auto; height: 30px; background: var(--surface-2);
+              border: 1px solid var(--border); border-radius: 7px; }
+  .tl-grid { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border); }
+  .tl-mark { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
+             border: 2px solid currentColor; background: currentColor; padding: 0; cursor: pointer; }
+  .tl-mark.target, .tl-mark.due { background: var(--surface); }
+  .tl-mark:hover, .tl-mark:focus-visible { transform: scale(1.35); outline: none; box-shadow: 0 0 0 3px var(--accent-weak); }
+  .tl-mark.project { color: var(--accent); }
+  .tl-mark.escalation { color: var(--t-escalation); } .tl-mark.ditl { color: var(--t-ditl); }
+  .tl-mark.oneoff { color: var(--t-oneoff); }         .tl-mark.other { color: var(--t-other); }
+  .tl-note { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+  .tl-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 0 0 14px; }
+  .tl-legend .tl-mark { position: static; display: inline-block; margin: 0 4px 0 0; vertical-align: -1px; cursor: default; }
+  @media (max-width: 720px) {
+    .tl-head { display: none; }
+    .tl-lane { grid-template-columns: 1fr; }
+  }
+
   /* Forms (modal + generic) */
   /* Sits above the manager drawer (z-index 60) so a form opened from the drawer is usable. */
   .overlay { position: fixed; inset: 0; background: rgba(16,24,40,.45); display: none; align-items: center;
@@ -318,7 +354,9 @@
   td.pri-high { color: #b45309; font-weight: 600; }
 
   @media print {
-    .appbar, .banner, .nav, .notice, .footer-note, .drawer .d-actions, .drawer .d-close { display: none !important; }
+    .appbar, .banner, .nav, .nav-right, .notice, .footer-note, .drawer .d-actions, .drawer .d-close, .tl-sort { display: none !important; }
+    /* Heat chips and timeline markers carry meaning in their color. */
+    .heat, .tl-mark, .tl-proj span { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .drawer-overlay { position: static; background: none; }
     .drawer { position: static; width: auto; max-width: none; height: auto; box-shadow: none; transform: none; }
     /* Print from the drawer prints the 1:1 summary, not the board underneath it. */
@@ -358,6 +396,7 @@
   <div class="navrow">
     <nav class="nav" id="nav">
       <button data-view="board" class="active">Board</button>
+      <button data-view="timeline">Timeline</button>
       <button data-view="projects">Projects</button>
       <button data-view="workitems">Work Items</button>
       <button data-view="reports">Reports</button>
@@ -400,6 +439,20 @@
     </div>
     <div id="backlogPanel"></div>
     <div id="boardCards" class="cards"></div>
+  </section>
+
+  <!-- TIMELINE -->
+  <section class="view" id="view-timeline" hidden>
+    <div class="view-head">
+      <h2>Who frees up when <span class="count">next 90 days</span></h2>
+      <label class="tl-sort" style="font-size:13px;color:var(--muted);">Sort
+        <select id="tlSort" style="font:inherit;padding:6px 9px;border:1px solid var(--border-strong);border-radius:8px;margin-left:6px;">
+          <option value="board">Board order</option>
+          <option value="room">Most room in 6 weeks</option>
+        </select>
+      </label>
+    </div>
+    <div id="tlBody"></div>
   </section>
 
   <!-- PROJECTS -->
@@ -523,6 +576,25 @@
       <p>The Board shows one card per active manager: weighted workload heat (Light → Overloaded), the numeric score, and counts for projects leading / supporting, escalations (red), DITL, and one-offs. Hover the heat label to see which score range that band covers.</p>
       <p>Click any card (or Tab to it and press Enter) to open that manager's drawer: everything they're carrying, their ten most recent wins, and what's rolling off soon. From the drawer you can add a work item (owner pre-filled), assign them to a project, mark items done, edit their details, and copy / export / print a 1:1 summary — built for weekly 1:1s. Print from the drawer prints the drawer alone.</p>
       <p>Archiving a manager (Settings) takes them off the board. If they still own open work, you're asked first, and those items then appear under <em>Needs attention</em> as “Owner archived” until you reassign them.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Timeline — who frees up when</h3>
+      <p>The Board answers “who is loaded now”; the <em>Timeline</em> answers “who has room in six weeks”. Each active
+        manager gets a 90-day lane with a marker wherever something they carry is expected to come off:</p>
+      <ul>
+        <li><strong>Solid marker</strong> — a project role's <em>until</em> (end) date, or a work item's roll-off date.</li>
+        <li><strong>Hollow marker</strong> — no end date was set, so the project's target date (for a role) or the item's
+          due date stands in for it.</li>
+        <li><strong>Left gutter</strong> (“1 past”) — dates already gone by: things that should have rolled off. Review them
+          under <em>Needs attention</em>. <strong>Right gutter</strong> — “later” than 90 days, and “no date” for anything
+          with none of those dates.</li>
+      </ul>
+      <p>Under each name, <em>now</em> is the board's score, and <em>2 wk / 6 wk / 12 wk</em> are projected loads (colored by
+        heat band, capacity included), assuming every dated item comes off on its date and nothing new arrives. Sort by
+        <em>Most room in 6 weeks</em> to see who to hand the next project to. Hover a marker for what it is; click it to
+        open that project or work item, or click a name for the manager's drawer. Projections are a planning aid only — they
+        never change the Board, which keeps counting an item until it is done or archived.</p>
     </div>
 
     <div class="panel">
@@ -694,7 +766,7 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.10.0";
+  var APP_VERSION = "0.11.0";
   var MAX_BACKUPS = 10;
   // Minimum spacing between backups. One per save meant ten quick edits rotated out
   // every older backup, so the ten on disk only ever covered the last few minutes.
@@ -749,6 +821,7 @@
   var btnAddWorkItem = el("btnAddWorkItem"), wiRows = el("wiRows"), wiCount = el("wiCount");
   var fType = el("fType"), fManager = el("fManager"), fStatus = el("fStatus"),
       fFrom = el("fFrom"), fTo = el("fTo"), fClear = el("fClear"), fProject = el("fProject");
+  var tlSort = el("tlSort"), tlBody = el("tlBody");
   var repGran = el("repGran"), reportBody = el("reportBody"), btnReportCsv = el("btnReportCsv");
   var weightsBody = el("weightsBody"), btnSaveSettings = el("btnSaveSettings"),
       btnResetSettings = el("btnResetSettings"), settingsManagers = el("settingsManagers"),
@@ -974,7 +1047,7 @@
   }
 
   // ---- View switching --------------------------------------------------
-  var VIEWS = ["board", "projects", "workitems", "reports", "settings", "help"];
+  var VIEWS = ["board", "timeline", "projects", "workitems", "reports", "settings", "help"];
   function showView(name) {
     currentView = name;
     VIEWS.forEach(function (v) { el("view-" + v).hidden = (v !== name); });
@@ -984,6 +1057,7 @@
   }
   function renderCurrent() {
     if (currentView === "board") renderBoard();
+    else if (currentView === "timeline") renderTimeline();
     else if (currentView === "projects") renderProjectsView();
     else if (currentView === "workitems") renderWorkItemsView();
     else if (currentView === "reports") renderReports();
@@ -1042,9 +1116,13 @@
 
   // ---- Weighting (brief §6) --------------------------------------------
   function round1(n) { return Math.round(n * 10) / 10; }
-  function managerScore(id) {
-    var w = data.settings.weights || {}, eff = data.settings.effort || {};
-    var score = 0, c = { led: 0, supporting: 0, escalation: 0, ditl: 0, oneoff: 0, other: 0 };
+  // Everything that counts toward a manager's score right now, one entry per item:
+  // { weight, count (a key of managerScore's counts), end, endKind, text, projectId | wiId }.
+  // end is the date it is expected to come off — an assignment's end date (else its
+  // project's target date), a work item's roll-off date (else its due date) — and is
+  // used only by the timeline's projection; the board's score ignores it.
+  function scoreItems(id) {
+    var w = data.settings.weights || {}, eff = data.settings.effort || {}, out = [];
     data.assignments.forEach(function (a) {
       if (a.archived || a.managerId !== id) return;
       var p = findById(data.projects, a.projectId);
@@ -1052,17 +1130,23 @@
       if (!p || p.archived || p.status !== "active") return;
       var base = (a.role === "lead") ? (w.projectLead || 0) : (w.projectContributor || 0);
       var mult = (eff[a.effort] != null) ? eff[a.effort] : 1;
-      score += base * mult;
-      if (a.role === "lead") c.led++; else c.supporting++;
+      out.push({ weight: base * mult, count: (a.role === "lead") ? "led" : "supporting",
+                 end: a.endDate || p.targetDate || null, endKind: a.endDate ? "roll-off" : (p.targetDate ? "target" : null),
+                 text: p.name + " — " + lab("role", a.role) + " (" + lab("effort", a.effort) + ")", projectId: p.id, kind: "project" });
     });
     data.workItems.forEach(function (wi) {
       if (wi.archived || wi.managerId !== id) return;
       if (wi.status !== "open" && wi.status !== "in-progress") return;
-      if (wi.type === "escalation") { score += (w.escalation || 0); c.escalation++; }
-      else if (wi.type === "ditl") { score += (w.ditl || 0); c.ditl++; }
-      else if (wi.type === "oneoff") { score += (w.oneoff || 0); c.oneoff++; }
-      else { score += (w.other || 0); c.other++; }
+      var t = (wi.type === "escalation" || wi.type === "ditl" || wi.type === "oneoff") ? wi.type : "other";
+      out.push({ weight: (w[t] || 0), count: t,
+                 end: wi.rollOffDate || wi.dueDate || null, endKind: wi.rollOffDate ? "roll-off" : (wi.dueDate ? "due" : null),
+                 text: typeLabel(wi) + ": " + (wi.title || ""), wiId: wi.id, kind: t });
     });
+    return out;
+  }
+  function managerScore(id) {
+    var score = 0, c = { led: 0, supporting: 0, escalation: 0, ditl: 0, oneoff: 0, other: 0 };
+    scoreItems(id).forEach(function (it) { score += it.weight; c[it.count]++; });
     // score is the raw weighted total; load is that score divided by the manager's
     // capacity, and is what decides the heat band. At full capacity they are equal.
     var m = findById(data.managers, id), capacity = capacityOf(m);
@@ -1171,6 +1255,117 @@
       card.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openManager(m.id); } });
       boardCards.appendChild(card);
     });
+  }
+
+  // ---- Timeline view ("who frees up when") -----------------------------
+  // A 90-day lane per active manager with a marker wherever something they carry is
+  // expected to come off: an assignment's end date (or, lacking one, its project's
+  // target date — hollow marker), a work item's roll-off date (or due date — hollow).
+  // Already-past dates sit in the left gutter, anything later than 90 days in the
+  // right one. The projected load at 2 / 6 / 12 weeks assumes each dated item comes
+  // off on its date and nothing new arrives; it is a planning aid only and never
+  // changes the board's score, which still counts everything until it is archived.
+  var TL_DAYS = 90, TL_POINTS = [14, 42, 84];
+  function tlOffset(iso) { var d = parseISODate(iso); return d ? dayDiff(startOfToday(), d) : null; }
+  // Load (score ÷ capacity) still carried `days` from today, under the assumption above.
+  function projectedLoad(items, capacity, days) {
+    var score = 0;
+    items.forEach(function (it) { var o = it.end ? tlOffset(it.end) : null; if (o == null || o >= days) score += it.weight; });
+    return score / capacity;
+  }
+  function fmtShort(d) { return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
+  function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+  var END_WORD = { "roll-off": "rolls off", target: "project target", due: "due" };
+  function renderTimeline() {
+    clear(tlBody);
+    var managers = ((data && data.managers) || []).filter(function (m) { return m.active; });
+    if (!managers.length) { tlBody.appendChild(elem("div", "empty", "No active managers yet — add one on the Board.")); return; }
+    var today = startOfToday();
+    var legend = elem("div", "tl-legend");
+    [["project", "Project role"], ["escalation", "Escalation"], ["ditl", "DITL"], ["oneoff", "One-off"], ["other", "Other"]].forEach(function (x) {
+      var sp = elem("span"); sp.appendChild(elem("span", "tl-mark " + x[0])); sp.appendChild(document.createTextNode(x[1])); legend.appendChild(sp);
+    });
+    var hs = elem("span"); hs.appendChild(elem("span", "tl-mark project target")); hs.appendChild(document.createTextNode("Hollow: no end date — project target or due date"));
+    legend.appendChild(hs);
+    tlBody.appendChild(legend);
+
+    // Axis: today, then the 1st of each month inside the window.
+    var head = elem("div", "tl-head"); head.appendChild(elem("div"));
+    var axis = elem("div", "tl-axis"), ticks = [];
+    var t0 = elem("span", "first", "Today"); t0.style.left = "0%"; axis.appendChild(t0);
+    for (var i = 1; i <= TL_DAYS; i++) {
+      var d = addDays(today, i);
+      if (d.getDate() === 1 && i > 6 && i < TL_DAYS - 4) {
+        ticks.push(i);
+        var tk = elem("span", null, d.toLocaleDateString(undefined, { month: "short" })); tk.style.left = (i / TL_DAYS * 100) + "%"; axis.appendChild(tk);
+      }
+    }
+    head.appendChild(axis); tlBody.appendChild(head);
+
+    var rows = managers.map(function (m) {
+      var items = scoreItems(m.id), sc = managerScore(m.id);
+      return { m: m, items: items, sc: sc, proj: TL_POINTS.map(function (n) { return projectedLoad(items, sc.capacity, n); }) };
+    });
+    if (tlSort.value === "room") rows.sort(function (a, b) { return a.proj[1] - b.proj[1]; });
+
+    rows.forEach(function (r) {
+      var lane = elem("div", "tl-lane");
+      var who = elem("div", "tl-who");
+      var nb = elem("button", "lnk", r.m.name); nb.type = "button"; nb.addEventListener("click", function () { goToManager(r.m.id); });
+      who.appendChild(nb);
+      var now = elem("div", "tl-now");
+      now.appendChild(heatLabelEl(bandFor(r.sc.load), r.sc));
+      now.appendChild(elem("span", "m-score", "now " + round1(r.sc.load)));
+      who.appendChild(now);
+      var pj = elem("div", "tl-proj");
+      ["2 wk", "6 wk", "12 wk"].forEach(function (lbl, k) {
+        var b = bandFor(r.proj[k]);
+        var sp = elem("span", b.heat || "heat-na", lbl + " " + round1(r.proj[k]));
+        sp.title = "Projected in " + lbl.replace("wk", "weeks") + " (" + fmtShort(addDays(today, TL_POINTS[k])) + "): " + b.label + ", load " + round1(r.proj[k]);
+        pj.appendChild(sp);
+      });
+      who.appendChild(pj);
+      lane.appendChild(who);
+
+      var row = elem("div", "tl-row");
+      var past = [], later = [], undated = 0, inWin = [];
+      r.items.forEach(function (it) {
+        if (!it.end) { undated++; return; }
+        var o = tlOffset(it.end); if (o == null) { undated++; return; }
+        if (o < 0) past.push(it); else if (o > TL_DAYS) later.push(it); else inWin.push({ it: it, o: o });
+      });
+      function gutter(list, cls, word) {
+        var g = elem("div", "tl-gut" + (list.length && cls ? " " + cls : ""), list.length ? list.length + " " + word : "");
+        if (list.length) g.title = list.map(function (it) { return it.text + " — " + END_WORD[it.endKind] + " " + it.end; }).join("\n");
+        return g;
+      }
+      row.appendChild(gutter(past, "past", "past"));
+      var track = elem("div", "tl-track");
+      ticks.forEach(function (i) { var g = elem("div", "tl-grid"); g.style.left = (i / TL_DAYS * 100) + "%"; track.appendChild(g); });
+      inWin.forEach(function (x) {
+        var it = x.it;
+        var mk = elem("button", "tl-mark " + it.kind + " " + it.endKind); mk.type = "button";
+        mk.style.left = (x.o / TL_DAYS * 100) + "%";
+        var label = it.text + " — " + END_WORD[it.endKind] + " " + it.end + " (" + (x.o === 0 ? "today" : "in " + x.o + " day" + (x.o === 1 ? "" : "s")) + ")";
+        mk.title = label; mk.setAttribute("aria-label", label);
+        mk.addEventListener("click", function () { if (it.projectId) goToProject(it.projectId); else goToWorkItem(it.wiId); });
+        track.appendChild(mk);
+      });
+      row.appendChild(track);
+      var lg = gutter(later, "right", "later");
+      if (undated) {
+        if (later.length) lg.appendChild(elem("br"));
+        lg.appendChild(document.createTextNode(undated + " no date"));
+        lg.title = (lg.title ? lg.title + "\n" : "") + undated + " item" + (undated === 1 ? "" : "s") +
+          " with no end, target, roll-off, or due date — counted in every projection.";
+      }
+      lg.className = "tl-gut right";
+      row.appendChild(lg);
+      lane.appendChild(row);
+      tlBody.appendChild(lane);
+    });
+    tlBody.appendChild(elem("p", "tl-note", "Projections assume everything dated comes off on that date and nothing new arrives. " +
+      "They are for planning only — the Board keeps counting an item until it is archived or done."));
   }
 
   // ---- Projects view ---------------------------------------------------
@@ -2474,6 +2669,7 @@
   navEl.addEventListener("click", function (e) { var v = e.target && e.target.getAttribute && e.target.getAttribute("data-view"); if (v) showView(v); });
   [fScope, fType, fManager, fProject, fStatus, fFrom, fTo].forEach(function (s) { s.addEventListener("change", renderWorkItemsView); });
   fClear.addEventListener("click", function () { fScope.value = "active"; fType.value = ""; fManager.value = ""; fProject.value = ""; fStatus.value = ""; fFrom.value = ""; fTo.value = ""; renderWorkItemsView(); });
+  tlSort.addEventListener("change", renderTimeline);
   repGran.addEventListener("change", renderReports);
   btnReportCsv.addEventListener("click", downloadReportCsv);
   btnSaveSettings.addEventListener("click", saveSettings);

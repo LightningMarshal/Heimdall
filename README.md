@@ -39,6 +39,13 @@ once so the "Last saved by" banner can attribute changes.
   wins, and upcoming roll-offs, plus in-context quick-add and a copy / export /
   print **1:1 summary** for weekly one-on-ones (printing from the drawer prints the
   drawer alone).
+- **Timeline — who frees up when** — a 90-day lane per active manager with a marker
+  wherever something they carry comes off: an assignment's end date (else its
+  project's target date, hollow marker) or a work item's roll-off date (else its due
+  date, hollow). Past dates sit in a left gutter, later ones and undated ones in a
+  right gutter. Each lane shows the load now and projected at 2 / 6 / 12 weeks
+  (assuming dated items come off on time and nothing new arrives), and can be sorted
+  by most room in six weeks. Projections never change the board's score. Prints.
 - **Projects** — status, priority, dates, Jira epic link, and the team with the
   lead highlighted (co-leads are allowed). A person can appear only once per project.
   Each card counts its related work items and links to them; *+ Work item* logs one

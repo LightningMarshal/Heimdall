@@ -1,6 +1,6 @@
 # Heimdall — Roadmap
 
-_Last updated: 2026-10-19 · app version 0.10.0_
+_Last updated: 2026-10-19 · app version 0.11.0_
 
 Post-MVP ideas, ranked by how much they improve the one question Heimdall exists to
 answer — **who is carrying too much, and who has room** — against what they cost in a
@@ -101,7 +101,13 @@ makes the tool feed the quarterly review deck instead of being retyped into it.
 
 ## Medium — worth doing, bigger surface
 
-### 5. Roll-off timeline / "who frees up when"
+### 5. Roll-off timeline / "who frees up when" — *built in 0.11.0*
+**Built:** a *Timeline* view: a 90-day lane per active manager, markers at end /
+roll-off dates (hollow where a target or due date stands in), past and later gutters,
+projected load at 2 / 6 / 12 weeks with a *Most room in 6 weeks* sort, click-through
+markers, and a print layout. Projections are display-only; the board's scoring is
+unchanged (#10 remains on hold). Original note:
+
 Today the board answers "who is loaded **now**". The recurring planning question is
 "who has room in six weeks", and the data to answer it already exists — assignment
 `endDate`, work-item `rollOffDate`, project `targetDate`. A horizontal 90-day lane per

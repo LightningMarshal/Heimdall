@@ -7,7 +7,7 @@ Vanilla JS, HTML, and CSS — no framework, no build step, no runtime package ma
 no runtime dependencies of any kind (npm is used only for the dev-time test suite). The entire application is one file,
 `heimdall.html` (~2,390 lines: inlined `<style>` + a single IIFE `<script>`
 using ES5-style `function` expressions, not classes/modules). Currently at
-`APP_VERSION = "0.10.0"`. Double-clicking the file runs it — there is no
+`APP_VERSION = "0.11.0"`. Double-clicking the file runs it — there is no
 `npm install`, no dev server, no compiler.
 
 ## Deployment
@@ -48,6 +48,14 @@ No server, no port, no Electron wrapper.
   data file, not hardcoded assumptions. Scores are fractional (effort
   multiplies), so one landing between two whole-number bands resolves
   *downward*, to the highest band it has reached — see `bandFor`.
+- **Timeline** — the "who frees up when" view. Built on `scoreItems(id)`,
+  which lists every item counting toward a manager's score with its weight
+  and expected end date (`a.endDate || project.targetDate`,
+  `w.rollOffDate || w.dueDate`); `managerScore` just sums it, so the board
+  and the timeline cannot disagree about what counts. Projections
+  (`projectedLoad`) drop dated items after their date and are display-only:
+  never feed them back into `managerScore` — honouring dates in scoring is
+  roadmap #10, deliberately on hold.
 - **Capacity** — `managers[].capacity`, a fraction of a full load (1 = 100%,
   entered as a percentage 10–300 in the manager form; validate() turns a
   missing, non-numeric, or non-positive value into 1). `managerScore`
