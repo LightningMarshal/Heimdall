@@ -15,6 +15,11 @@
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'">
 <title>Heimdall — Team Workload Tracker</title>
+<script>
+  // Appearance is a per-browser preference, not team data, so it lives in localStorage
+  // rather than the data file. Applied here, before the page paints, to avoid a flash.
+  try { var t = localStorage.getItem("heimdall-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+</script>
 <style>
   :root {
     --bg: #f5f6f8;
@@ -40,8 +45,78 @@
     --t-ditl: #2563eb;       --t-ditl-bg: #e8f0fe;
     --t-oneoff: #d97706;     --t-oneoff-bg: #fdf3e2;
     --t-other: #6b7280;      --t-other-bg: #eef0f3;
+    /* heat bands (text / background) */
+    --h-light: #15803d;      --h-light-bg: #e7f7ee;
+    --h-balanced: #a16207;   --h-balanced-bg: #fbf3df;
+    --h-heavy: #c2410c;      --h-heavy-bg: #fdeede;
+    --h-over: #b91c1c;       --h-over-bg: #fde4e4;
+    --h-na: #6b7280;         --h-na-bg: #eef0f3;
+    /* warm "needs a look" accents: attention chip, backlog, warn dot, high priority */
+    --warn: #9a6a16; --warn-bg: #fdf3e2; --warn-border: #f0dcb8; --warn-border-strong: #d9b877;
+    --warn-dot: #d97706; --pri-high: #b45309; --backlog-bg: #fffdf7;
+    --danger-border: #f0c8c8; --danger-border-2: #f3c6c1; --guard-bg: #fff7f6;
+    --ok-border: #c2e8d2; --info-border: #d4d8fb;
+    --on-accent: #ffffff;
+    --scrim: rgba(16,24,40,.45);
+    color-scheme: light;
+  }
+  /* Dark theme: follows the system unless Settings → Appearance picks one. Screen only,
+     so printing (the 1:1 summary, the timeline) always comes out light on white. */
+  @media screen and (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1115; --surface: #181b21; --surface-2: #1e2128; --border: #2a2e37; --border-strong: #3a3f4a;
+      --text: #e6e8ec; --muted: #a0a6b1; --faint: #737a86;
+      --accent: #8b85ff; --accent-hover: #a29dff; --accent-weak: #25234a;
+      --danger: #f87171; --danger-weak: #3a1d1f; --ok: #4ade80;
+      --shadow: 0 1px 2px rgba(0,0,0,.4); --shadow-lg: 0 10px 30px rgba(0,0,0,.55);
+      --t-escalation: #f87171; --t-escalation-bg: #3a1d1f;
+      --t-ditl: #7aa7ff;       --t-ditl-bg: #1c2742;
+      --t-oneoff: #f0a748;     --t-oneoff-bg: #3a2a15;
+      --t-other: #a0a6b1;      --t-other-bg: #262a32;
+      --h-light: #4ade80;      --h-light-bg: #16301f;
+      --h-balanced: #facc15;   --h-balanced-bg: #33290f;
+      --h-heavy: #fb923c;      --h-heavy-bg: #3a2312;
+      --h-over: #f87171;       --h-over-bg: #3d1a1a;
+      --h-na: #a0a6b1;         --h-na-bg: #262a32;
+      --warn: #f0b75e; --warn-bg: #33270f; --warn-border: #5c4519; --warn-border-strong: #8a6a2a;
+      --warn-dot: #f0a748; --pri-high: #f0a748; --backlog-bg: #1f1b12;
+      --danger-border: #5c2a2a; --danger-border-2: #5c2a2a; --guard-bg: #241515;
+      --ok-border: #24503a; --info-border: #3a3870;
+      --on-accent: #0f1115;
+      --scrim: rgba(0,0,0,.6);
+      color-scheme: dark;
+    }
+  }
+  /* The same palette again for an explicit Settings → Appearance → Dark. Keep the two
+     blocks identical. */
+  @media screen {
+    :root[data-theme="dark"] {
+      --bg: #0f1115; --surface: #181b21; --surface-2: #1e2128; --border: #2a2e37; --border-strong: #3a3f4a;
+      --text: #e6e8ec; --muted: #a0a6b1; --faint: #737a86;
+      --accent: #8b85ff; --accent-hover: #a29dff; --accent-weak: #25234a;
+      --danger: #f87171; --danger-weak: #3a1d1f; --ok: #4ade80;
+      --shadow: 0 1px 2px rgba(0,0,0,.4); --shadow-lg: 0 10px 30px rgba(0,0,0,.55);
+      --t-escalation: #f87171; --t-escalation-bg: #3a1d1f;
+      --t-ditl: #7aa7ff;       --t-ditl-bg: #1c2742;
+      --t-oneoff: #f0a748;     --t-oneoff-bg: #3a2a15;
+      --t-other: #a0a6b1;      --t-other-bg: #262a32;
+      --h-light: #4ade80;      --h-light-bg: #16301f;
+      --h-balanced: #facc15;   --h-balanced-bg: #33290f;
+      --h-heavy: #fb923c;      --h-heavy-bg: #3a2312;
+      --h-over: #f87171;       --h-over-bg: #3d1a1a;
+      --h-na: #a0a6b1;         --h-na-bg: #262a32;
+      --warn: #f0b75e; --warn-bg: #33270f; --warn-border: #5c4519; --warn-border-strong: #8a6a2a;
+      --warn-dot: #f0a748; --pri-high: #f0a748; --backlog-bg: #1f1b12;
+      --danger-border: #5c2a2a; --danger-border-2: #5c2a2a; --guard-bg: #241515;
+      --ok-border: #24503a; --info-border: #3a3870;
+      --on-accent: #0f1115;
+      --scrim: rgba(0,0,0,.6);
+      color-scheme: dark;
+    }
   }
   * { box-sizing: border-box; }
+  /* Form controls take the theme's colors rather than the browser's defaults. */
+  input, select, textarea { background-color: var(--surface); color: var(--text); }
   html, body { margin: 0; padding: 0; }
   body {
     font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -72,7 +147,7 @@
   .save-status.saved { color: var(--ok); }
   .save-status.error { color: var(--danger); font-weight: 600; }
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
-  .dot.on { background: var(--ok); } .dot.off { background: var(--faint); } .dot.warn { background: #d97706; }
+  .dot.on { background: var(--ok); } .dot.off { background: var(--faint); } .dot.warn { background: var(--warn-dot); }
 
   /* Nav */
   .nav { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 22px; }
@@ -82,7 +157,7 @@
     transition: background .12s, color .12s;
   }
   .nav button:hover { background: var(--surface); color: var(--text); }
-  .nav button.active { background: var(--accent); color: #fff; }
+  .nav button.active { background: var(--accent); color: var(--on-accent); }
 
   /* Buttons */
   button {
@@ -93,12 +168,12 @@
   }
   button:hover { border-color: var(--faint); }
   button:active { transform: translateY(1px); }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
   button.mini { padding: 4px 10px; font-size: 13px; border-radius: 7px; }
   button.ghost { background: transparent; border-color: transparent; color: var(--accent); padding: 6px 8px; }
   button.ghost:hover { background: var(--accent-weak); }
-  button.danger { color: var(--danger); border-color: #f0c8c8; }
+  button.danger { color: var(--danger); border-color: var(--danger-border); }
   button.danger:hover { background: var(--danger-weak); }
   button:disabled { opacity: .5; cursor: not-allowed; }
 
@@ -129,17 +204,27 @@
   .heat { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: 999px;
           font-size: 12px; font-weight: 700; }
   .heat::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .9; }
-  .heat-light      { background: #e7f7ee; color: #15803d; }
-  .heat-balanced   { background: #fbf3df; color: #a16207; }
-  .heat-heavy      { background: #fdeede; color: #c2410c; }
-  .heat-overloaded { background: #fde4e4; color: #b91c1c; }
-  .heat-na         { background: #eef0f3; color: #6b7280; }
+  .heat-light      { background: var(--h-light-bg); color: var(--h-light); }
+  .heat-balanced   { background: var(--h-balanced-bg); color: var(--h-balanced); }
+  .heat-heavy      { background: var(--h-heavy-bg); color: var(--h-heavy); }
+  .heat-overloaded { background: var(--h-over-bg); color: var(--h-over); }
+  .heat-na         { background: var(--h-na-bg); color: var(--h-na); }
   .mcard .m-score { font-variant-numeric: tabular-nums; color: var(--faint); font-size: 12px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .m-trend { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 11px; color: var(--faint); white-space: nowrap; }
+  svg.spark { width: 100%; height: 22px; flex: 1 1 auto; overflow: visible; }
+  svg.spark .line, svg.trend .line { fill: none; stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  .d-trend { margin: 6px 0 4px; }
+  svg.trend { width: 100%; height: 70px; display: block; border-radius: 7px; overflow: hidden; }
+  svg.trend .line { stroke-width: 2; }
+  svg.trend rect.heat-light { fill: var(--h-light-bg); } svg.trend rect.heat-balanced { fill: var(--h-balanced-bg); }
+  svg.trend rect.heat-heavy { fill: var(--h-heavy-bg); }  svg.trend rect.heat-overloaded { fill: var(--h-over-bg); }
+  .d-trend-lab { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--faint); margin-top: 3px; }
+  .d-trend-lab span:nth-child(2) { color: var(--muted); font-weight: 600; text-align: center; }
   .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 3px 9px;
           border-radius: 7px; background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); }
   .chip b { color: var(--text); font-variant-numeric: tabular-nums; }
-  .chip.alert { background: var(--danger-weak); border-color: #f3c6c1; color: var(--danger); }
+  .chip.alert { background: var(--danger-weak); border-color: var(--danger-border-2); color: var(--danger); }
   .chip.alert b { color: var(--danger); }
 
   /* Pills (type taxonomy) */
@@ -164,11 +249,18 @@
            padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow); }
   .pcard .p-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .pcard .p-name { font-size: 16px; font-weight: 650; }
-  .pcard .p-acts { display: flex; gap: 6px; align-items: flex-start; flex-shrink: 0; }
+  .pcard .p-acts { display: flex; gap: 6px; align-items: flex-start; flex-wrap: wrap; justify-content: flex-end; }
   .pcard .p-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; color: var(--muted); font-size: 13px; }
   .pcard .p-team { margin-top: 12px; font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .pcard .p-team .lead-tag { font-weight: 650; }
   .pcard .p-link a { font-size: 13px; }
+  .pcard .p-work { margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .pcard.archived { opacity: .6; border-style: dashed; }
+  .head-acts { display: flex; align-items: center; gap: 12px; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
+  .toggle[hidden] { display: none; }
+  /* Related project shown under a work item's title in the queue. */
+  .wi-proj { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
 
   /* Tables */
   table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border);
@@ -178,6 +270,10 @@
              background: var(--surface-2); }
   tbody tr:last-child td { border-bottom: none; }
   tr.archived td { opacity: .5; }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .panel.carried { margin-top: 22px; }
+  table.changelog td { font-size: 13px; vertical-align: top; }
+  table.changelog td:first-child { white-space: nowrap; color: var(--muted); }
   td.actions { white-space: nowrap; text-align: right; }
   td.actions button + button { margin-left: 4px; }
   td.age.old { color: var(--danger); font-weight: 600; }
@@ -203,9 +299,45 @@
   .bucket .seg { height: 100%; }
   .bucket .n { width: 34px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
 
+  /* Timeline: one 90-day lane per manager */
+  .tl-head { display: grid; grid-template-columns: 240px 1fr; gap: 14px; margin-bottom: 4px; }
+  .tl-axis { position: relative; height: 18px; font-size: 11px; color: var(--faint); margin: 0 70px 0 52px; }
+  .tl-axis span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+  .tl-axis span.first { transform: none; }
+  .tl-lane { display: grid; grid-template-columns: 240px 1fr; gap: 14px; align-items: center;
+             background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+             padding: 10px 12px; margin-bottom: 8px; box-shadow: var(--shadow); break-inside: avoid; }
+  .tl-who { min-width: 0; }
+  .tl-who .lnk { font-weight: 650; }
+  .tl-who .tl-now { display: flex; align-items: center; gap: 6px; margin-top: 3px; flex-wrap: wrap; }
+  .tl-now .m-score { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tl-proj { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+  .tl-proj span { padding: 1px 7px; border-radius: 999px; font-weight: 600; }
+  .tl-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .tl-gut { flex: 0 0 46px; font-size: 11px; line-height: 1.25; text-align: center; color: var(--faint); }
+  .tl-gut.right { flex-basis: 64px; }
+  .tl-gut.past { color: var(--danger); font-weight: 600; }
+  .tl-track { position: relative; flex: 1 1 auto; height: 30px; background: var(--surface-2);
+              border: 1px solid var(--border); border-radius: 7px; }
+  .tl-grid { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border); }
+  .tl-mark { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
+             border: 2px solid currentColor; background: currentColor; padding: 0; cursor: pointer; }
+  .tl-mark.target, .tl-mark.due { background: var(--surface); }
+  .tl-mark:hover, .tl-mark:focus-visible { transform: scale(1.35); outline: none; box-shadow: 0 0 0 3px var(--accent-weak); }
+  .tl-mark.project { color: var(--accent); }
+  .tl-mark.escalation { color: var(--t-escalation); } .tl-mark.ditl { color: var(--t-ditl); }
+  .tl-mark.oneoff { color: var(--t-oneoff); }         .tl-mark.other { color: var(--t-other); }
+  .tl-note { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+  .tl-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 0 0 14px; }
+  .tl-legend .tl-mark { position: static; display: inline-block; margin: 0 4px 0 0; vertical-align: -1px; cursor: default; }
+  @media (max-width: 720px) {
+    .tl-head { display: none; }
+    .tl-lane { grid-template-columns: 1fr; }
+  }
+
   /* Forms (modal + generic) */
   /* Sits above the manager drawer (z-index 60) so a form opened from the drawer is usable. */
-  .overlay { position: fixed; inset: 0; background: rgba(16,24,40,.45); display: none; align-items: center;
+  .overlay { position: fixed; inset: 0; background: var(--scrim); display: none; align-items: center;
              justify-content: center; padding: 20px; z-index: 80; }
   .overlay.show { display: flex; }
   /* Header and actions stay put; only .modal-body scrolls, so a tall form is never cut off. */
@@ -228,6 +360,7 @@
   .ff input, .ff select, .ff textarea { font: inherit; padding: 9px 11px; border: 1px solid var(--border-strong);
                                          border-radius: 8px; width: 100%; }
   .ff textarea { min-height: 62px; resize: vertical; }
+  .ff .hint { color: var(--muted); font-size: 12px; }
   .ff.check { flex-direction: row; align-items: center; gap: 8px; }
   .ff.check input { width: auto; }
   .ff.check label { font-weight: 500; color: var(--text); }
@@ -242,7 +375,7 @@
   .trow .t-end input { font: inherit; font-size: 13px; padding: 6px 6px; border: 1px solid var(--border-strong); border-radius: 8px; }
 
   /* Manager detail drawer */
-  .drawer-overlay { position: fixed; inset: 0; background: rgba(16,24,40,.4); display: none; z-index: 60; }
+  .drawer-overlay { position: fixed; inset: 0; background: var(--scrim); display: none; z-index: 60; }
   .drawer-overlay.show { display: block; }
   .drawer { position: fixed; top: 0; right: 0; height: 100%; width: 440px; max-width: 92vw;
             background: var(--surface); box-shadow: var(--shadow-lg); overflow-y: auto;
@@ -268,9 +401,9 @@
   .navrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 22px; }
   .navrow .nav { margin-bottom: 0; }
   .nav-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-  .attn-chip { background: #fdf3e2; border: 1px solid #f0dcb8; color: #9a6a16; font-weight: 600;
+  .attn-chip { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn); font-weight: 600;
                font-size: 13px; border-radius: 999px; padding: 6px 13px; display: none; }
-  .attn-chip:hover { border-color: #d9b877; }
+  .attn-chip:hover { border-color: var(--warn-border-strong); }
   .attn-chip.show { display: inline-block; }
   .searchbox { position: relative; }
   .searchbox input { font: inherit; padding: 7px 12px; border: 1px solid var(--border-strong);
@@ -288,7 +421,7 @@
   .search-pop .sr-none { padding: 12px; color: var(--muted); font-size: 13px; }
 
   /* Backlog (unassigned work) */
-  .backlog { border-color: #f0dcb8; background: #fffdf7; }
+  .backlog { border-color: var(--warn-border); background: var(--backlog-bg); }
   .backlog .b-row { display: flex; align-items: center; gap: 10px; padding: 7px 0;
                     border-bottom: 1px solid var(--border); font-size: 14px; }
   .backlog .b-row:last-child { border-bottom: none; }
@@ -307,10 +440,12 @@
   .help p, .help li { font-size: 14px; }
   .help ul { margin: 6px 0 0 18px; padding: 0; }
   .help li { margin-bottom: 4px; }
-  td.pri-high { color: #b45309; font-weight: 600; }
+  td.pri-high { color: var(--pri-high); font-weight: 600; }
 
   @media print {
-    .appbar, .banner, .nav, .notice, .footer-note, .drawer .d-actions, .drawer .d-close { display: none !important; }
+    .appbar, .banner, .nav, .nav-right, .notice, .footer-note, .drawer .d-actions, .drawer .d-close, .tl-sort { display: none !important; }
+    /* Heat chips and timeline markers carry meaning in their color. */
+    .heat, .tl-mark, .tl-proj span, svg.trend rect { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .drawer-overlay { position: static; background: none; }
     .drawer { position: static; width: auto; max-width: none; height: auto; box-shadow: none; transform: none; }
     /* Print from the drawer prints the 1:1 summary, not the board underneath it. */
@@ -320,13 +455,13 @@
 
   .notice { font-size: 14px; padding: 11px 15px; border-radius: var(--radius-sm); margin-bottom: 16px; display: none; }
   .notice.show { display: block; }
-  .notice.info { background: var(--accent-weak); border: 1px solid #d4d8fb; }
-  .notice.ok { background: #e7f7ee; border: 1px solid #c2e8d2; color: #15803d; }
-  .notice.err { background: var(--danger-weak); border: 1px solid #f3c6c1; color: var(--danger); }
+  .notice.info { background: var(--accent-weak); border: 1px solid var(--info-border); }
+  .notice.ok { background: var(--h-light-bg); border: 1px solid var(--ok-border); color: var(--h-light); }
+  .notice.err { background: var(--danger-weak); border: 1px solid var(--danger-border-2); color: var(--danger); }
 
   .guard { display: none; margin-bottom: 16px; }
   .guard.show { display: block; }
-  .guard .panel { border-color: #f3c6c1; background: #fff7f6; }
+  .guard .panel { border-color: var(--danger-border-2); background: var(--guard-bg); }
   .guard .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 </style>
 </head>
@@ -350,6 +485,7 @@
   <div class="navrow">
     <nav class="nav" id="nav">
       <button data-view="board" class="active">Board</button>
+      <button data-view="timeline">Timeline</button>
       <button data-view="projects">Projects</button>
       <button data-view="workitems">Work Items</button>
       <button data-view="reports">Reports</button>
@@ -394,11 +530,28 @@
     <div id="boardCards" class="cards"></div>
   </section>
 
+  <!-- TIMELINE -->
+  <section class="view" id="view-timeline" hidden>
+    <div class="view-head">
+      <h2>Who frees up when <span class="count">next 90 days</span></h2>
+      <label class="tl-sort" style="font-size:13px;color:var(--muted);">Sort
+        <select id="tlSort" style="font:inherit;padding:6px 9px;border:1px solid var(--border-strong);border-radius:8px;margin-left:6px;">
+          <option value="board">Board order</option>
+          <option value="room">Most room in 6 weeks</option>
+        </select>
+      </label>
+    </div>
+    <div id="tlBody"></div>
+  </section>
+
   <!-- PROJECTS -->
   <section class="view" id="view-projects" hidden>
     <div class="view-head">
       <h2>Projects <span class="count" id="projCount"></span></h2>
-      <button id="btnAddProject" class="primary">Add project</button>
+      <div class="head-acts">
+        <label class="toggle" id="projArchivedToggle" hidden><input type="checkbox" id="projShowArchived"> Show archived</label>
+        <button id="btnAddProject" class="primary">Add project</button>
+      </div>
     </div>
     <div id="projList"></div>
   </section>
@@ -417,6 +570,7 @@
       </select></label>
       <label>Type <select id="fType"></select></label>
       <label>Manager <select id="fManager"></select></label>
+      <label>Project <select id="fProject"></select></label>
       <label>Status <select id="fStatus"></select></label>
       <label>Opened from <input type="date" id="fFrom"></label>
       <label>to <input type="date" id="fTo"></label>
@@ -435,15 +589,18 @@
   <section class="view" id="view-reports" hidden>
     <div class="view-head">
       <h2>Reports</h2>
-      <label style="font-size:13px;color:var(--muted);">Group by
-        <select id="repGran" style="font:inherit;padding:6px 9px;border:1px solid var(--border-strong);border-radius:8px;margin-left:6px;">
-          <option value="all">All time</option>
-          <option value="year">Yearly</option>
-          <option value="quarter">Quarterly</option>
-          <option value="month" selected>Monthly</option>
-          <option value="week">Weekly</option>
-        </select>
-      </label>
+      <div class="head-acts">
+        <label style="font-size:13px;color:var(--muted);">Group by
+          <select id="repGran" style="font:inherit;padding:6px 9px;border:1px solid var(--border-strong);border-radius:8px;margin-left:6px;">
+            <option value="all">All time</option>
+            <option value="year">Yearly</option>
+            <option value="quarter">Quarterly</option>
+            <option value="month" selected>Monthly</option>
+            <option value="week">Weekly</option>
+          </select>
+        </label>
+        <button id="btnReportCsv" class="mini">Download CSV</button>
+      </div>
     </div>
     <div id="reportBody"></div>
   </section>
@@ -464,9 +621,30 @@
     </div>
 
     <div class="panel">
+      <h3 class="sec">Appearance</h3>
+      <p class="hint">Light or dark. “Match system” follows your operating system's setting. Saved in this browser only —
+        it's a personal preference, not part of the shared data. Printing is always light.</p>
+      <label class="toggle">Theme
+        <select id="themeSel" style="font:inherit;padding:6px 9px;border:1px solid var(--border-strong);border-radius:8px;margin-left:6px;">
+          <option value="system">Match system</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="panel">
       <h3 class="sec">Managers</h3>
-      <p class="hint">Edit details or archive managers here (kept out of the board to avoid accidental taps).</p>
+      <p class="hint">Edit details, capacity, or archive managers here (archive is kept off the board to avoid accidental taps).
+        Capacity is a percentage of a full load; the heat band uses score ÷ capacity.</p>
       <div id="settingsManagers"></div>
+    </div>
+
+    <div class="panel">
+      <h3 class="sec">Change log</h3>
+      <p class="hint">Every saved change, field by field — who, when, old → new — for working out what happened when two
+        people's edits crossed. The last 500 changes are kept, in the data file, and merged from every copy that syncs.</p>
+      <div id="changeLog"></div>
     </div>
 
     <div class="panel">
@@ -494,8 +672,8 @@
     <div class="panel">
       <h3>Quick start</h3>
       <ul>
-        <li><strong>1.</strong> Add your managers (Board → “Add manager”, or the “+ Add” button top right).</li>
-        <li><strong>2.</strong> Add projects and build the team inline — pick a Lead, Contributors, and an effort level for each person.</li>
+        <li><strong>1.</strong> Add your managers (Board → “Add manager”, or the “+ Add” button top right). Leave capacity at 100% unless someone is part-time or still ramping.</li>
+        <li><strong>2.</strong> Add projects and build the team inline — pick a Lead (occasionally two), Contributors, and an effort level for each person.</li>
         <li><strong>3.</strong> Log work items (escalations, DITL requests, one-offs) as they arrive. Leave the owner as “— none —” to park an item in the Backlog until you decide who takes it.</li>
         <li><strong>4.</strong> Read the Board: each card shows a weighted heat label — who is overloaded, who has room.</li>
       </ul>
@@ -506,13 +684,46 @@
       <h3>The Board and the manager drawer</h3>
       <p>The Board shows one card per active manager: weighted workload heat (Light → Overloaded), the numeric score, and counts for projects leading / supporting, escalations (red), DITL, and one-offs. Hover the heat label to see which score range that band covers.</p>
       <p>Click any card (or Tab to it and press Enter) to open that manager's drawer: everything they're carrying, their ten most recent wins, and what's rolling off soon. From the drawer you can add a work item (owner pre-filled), assign them to a project, mark items done, edit their details, and copy / export / print a 1:1 summary — built for weekly 1:1s. Print from the drawer prints the drawer alone.</p>
+      <p><strong>Trend:</strong> every save also records each active manager's score for that day (the latest save of the
+        day wins). Cards show a 12-week sparkline once there is more than a day of history, and the drawer shows six
+        months against the heat bands with a line like “Heavy since 2026-07-20 (91 days)”, which also goes into the 1:1
+        summary. A day with no saves keeps the previous day's score — the score only moves when the data does. The raw
+        score and capacity are stored separately, so changing someone's capacity later doesn't rewrite their past;
+        changing the band thresholds re-reads the whole history against the new bands.</p>
       <p>Archiving a manager (Settings) takes them off the board. If they still own open work, you're asked first, and those items then appear under <em>Needs attention</em> as “Owner archived” until you reassign them.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Timeline — who frees up when</h3>
+      <p>The Board answers “who is loaded now”; the <em>Timeline</em> answers “who has room in six weeks”. Each active
+        manager gets a 90-day lane with a marker wherever something they carry is expected to come off:</p>
+      <ul>
+        <li><strong>Solid marker</strong> — a project role's <em>until</em> (end) date, or a work item's roll-off date.</li>
+        <li><strong>Hollow marker</strong> — no end date was set, so the project's target date (for a role) or the item's
+          due date stands in for it.</li>
+        <li><strong>Left gutter</strong> (“1 past”) — dates already gone by: things that should have rolled off. Review them
+          under <em>Needs attention</em>. <strong>Right gutter</strong> — “later” than 90 days, and “no date” for anything
+          with none of those dates.</li>
+      </ul>
+      <p>Under each name, <em>now</em> is the board's score, and <em>2 wk / 6 wk / 12 wk</em> are projected loads (colored by
+        heat band, capacity included), assuming every dated item comes off on its date and nothing new arrives. Sort by
+        <em>Most room in 6 weeks</em> to see who to hand the next project to. Hover a marker for what it is; click it to
+        open that project or work item, or click a name for the manager's drawer. Projections are a planning aid only — they
+        never change the Board, which keeps counting an item until it is done or archived.</p>
     </div>
 
     <div class="panel">
       <h3>Projects, leads &amp; effort</h3>
       <p>A project has a status (Active / On hold / Complete), a priority, dates, and an optional Jira epic link. Its team is managed on the project itself: one entry per person with a role (Lead or Contributor) and an effort (Light / Medium / Heavy). A person can appear only once per project; removing someone archives their assignment rather than deleting it, and so does switching a row to a different person (the new person gets a fresh assignment). Each team member can have an optional <em>until</em> date — the assignment's roll-off date.</p>
+      <p>Most projects have one Lead; a project with two co-leads is fine — mark both as Lead and each scores as a lead.</p>
       <p>Only <em>Active</em> projects count toward workload.</p>
+      <p><strong>Archiving a project</strong> is for one that shouldn't be on the list at all — entered by mistake, a
+        duplicate, or cancelled before it started. (Finished work is closed out instead.) An archived project leaves the
+        Projects list and stops counting toward workload, roll-offs, and Needs attention, but its team and related work
+        items are kept: tick <em>Show archived</em> on the Projects view and click <em>Restore</em> to bring it back as it was.</p>
+      <p><strong>Related work:</strong> a work item can name a related project. The project card counts its related
+        work items (click the count to see them in the queue, filtered to that project), <em>+ Work item</em> on the card
+        logs one already linked, and the queue, the drawer, and the 1:1 summary show the project beside the item.</p>
       <p><strong>Closing a project out:</strong> every project card has a <em>Close out</em> button, and a project
         whose target date has passed also shows up under <em>Needs attention</em> with the same action. Closing out
         asks for a completion date (today by default, backdate it if you like) and sets the status to Complete — it
@@ -536,7 +747,19 @@
         <li><strong>Done:</strong> marking an item Done stamps its completion date and moves it to History; it then feeds the owner's “Recently completed” list in the drawer.</li>
         <li><strong>Roll-off:</strong> when an item's roll-off date (or an assignment's end date) passes, nothing disappears silently — a “Needs attention” chip appears in the nav. Open it to review and archive items deliberately, one by one or all at once. Active projects past their target date appear there too, with a <em>Close out</em> action; assignments on a closed-out project stop appearing, because closing out settles them.</li>
         <li><strong>History:</strong> Work Items → “Show: History” lists everything archived. Nothing is ever hard-deleted.</li>
+        <li><strong>Undo:</strong> the most recent archive — a work item, a project, a manager, marking an item Done, or
+          <em>Archive all past roll-off</em> — can be undone with the <em>Undo</em> button on the message bar (or in the
+          Needs attention dialog), until you make another change. Undo puts back only what that action changed; anything
+          edited again since is left as it is.</li>
         <li><strong>Age:</strong> the queue flags items that have been open 14+ days.</li>
+        <li><strong>Reassigning:</strong> changing a work item's owner keeps a record of who had it and when. The queue shows
+          “previously …” under the title, the earlier owner's drawer lists it under <em>Handed off</em> for 90 days, and
+          Reports → <em>Work items carried per manager</em> counts it for everyone who owned it during a period — so “how
+          much did Ada carry last quarter” stays answerable after her work moves on.</li>
+        <li><strong>Reports:</strong> counts work items by the period they were opened in (all time, year, quarter,
+          month, or ISO week), split by type. The chart shows the 20 most recent periods. <em>Download CSV</em> saves
+          every period at the grouping you've picked — one row per period, oldest first, with Total and a column per
+          type (custom “Other” labels count as Other) — ready to paste into a review deck or spreadsheet.</li>
       </ul>
       <p>Reference tickets by ID or short title plus a link — never put sensitive incident details or customer data in this file.</p>
     </div>
@@ -545,6 +768,11 @@
       <h3>How the workload score works</h3>
       <p>Counting items alone is useless — a heavy lead role is not a token one-off. Each item contributes a weight (defaults: project lead 3, contributor 1, escalation 4, DITL 2, one-off 1, other 1), and project weights are multiplied by effort (Light ×1, Medium ×1.5, Heavy ×2). Only active projects and open / in-progress items count toward current load.</p>
       <p>The total maps to a heat band: 0–4 Light · 5–9 Balanced · 10–14 Heavy · 15+ Overloaded. Every weight, multiplier, and band is editable in Settings — calibrate against your real team after a couple of weeks.</p>
+      <p><strong>Capacity:</strong> the bands are the same for everyone, but people are not — a part-timer, a new hire
+        still ramping, someone with a standing commitment outside this tracker. Each manager has a capacity (Edit
+        manager), as a percentage of a full load: 100 by default. The heat band uses the score <em>divided by</em>
+        capacity, so 6 points at 50% capacity reads as 12 — Heavy, not Balanced. Wherever capacity isn't 100%, the
+        card shows both numbers (“score 12 · raw 6”) and a Capacity chip, so the adjustment is never hidden.</p>
       <p>Scores are fractional (effort multiplies them), so a score can land between two whole-number bands — 4.5, say. It belongs to the band below: the highest band it has actually reached. One medium-effort lead role is 3 × 1.5 = 4.5, which is <em>Light</em>, not the next band up. Hover a heat label to see the band's range and the exact score.</p>
     </div>
 
@@ -554,6 +782,11 @@
         <li><strong>Local first:</strong> data is stored in this browser (IndexedDB) and saves automatically. The app opens instantly, with zero prompts, in any modern browser.</li>
         <li><strong>Team sync (Edge / Chrome):</strong> Settings → “Link shared file” points Heimdall at a folder in a synced drive (OneDrive / SharePoint / Google Drive). It keeps a shared <code>heimdall-data.json</code> there, pulls teammates' changes when you return to the tab, and remembers the link across sessions.</li>
         <li><strong>Conflicts:</strong> last write wins, decided by save timestamp. The banner always shows who saved last; “Reload latest” re-reads the shared file on demand.</li>
+        <li><strong>Change log:</strong> Settings → Change log lists every saved change field by field — when, who, which
+          record, old → new — newest first, and downloads as CSV. It doesn't prevent a lost edit, but it lets you see what
+          was lost and redo it: when one copy overwrites another, the data is last-write-wins, but the log is merged — the
+          person whose edit was overwritten still sees it in their log, and it reaches everyone else with their next save. The last 500 changes are kept. Everyone sharing a file should run the same Heimdall version — an older
+          copy (before 0.12) drops the log when it saves.</li>
         <li><strong>Other tabs:</strong> two Heimdall tabs or windows in the same browser share one local copy; switching to a tab loads anything newer the other one saved.</li>
         <li><strong>Backups:</strong> synced saves also write a timestamped <code>heimdall-data.backup-…json</code> beside the shared file — at most one every 30 minutes, so the 10 that are kept span hours of work rather than the last ten edits. If the shared file is ever corrupted, Heimdall refuses to overwrite it and offers to restore from a backup.</li>
         <li><strong>Export / Import:</strong> Settings → Export downloads the full dataset as JSON — a manual backup and the sharing route for non-Chromium browsers. Import loads one back in.</li>
@@ -569,6 +802,7 @@
         <li>Firefox / Safari work fully in local mode; live shared-file sync requires Edge or Chrome.</li>
         <li>If “Reconnect shared file” appears, the browser wants permission confirmed — one click resumes syncing.</li>
         <li>Escape closes any dialog or menu; Enter confirms the name prompt.</li>
+        <li>Dark mode follows your system setting; Settings → Appearance can force Light or Dark for this browser.</li>
         <li>Nothing leaves your machine: no network calls, no analytics — a strict Content-Security-Policy blocks them by design.</li>
       </ul>
     </div>
@@ -627,6 +861,7 @@
       <ul class="attn-list" id="attnList"></ul>
     </div>
     <div class="actions">
+      <button id="attnUndo" class="ghost" hidden>Undo</button>
       <button id="attnArchiveAll">Archive all past roll-off</button>
       <button id="attnClose" class="primary">Close</button>
     </div>
@@ -656,7 +891,7 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.6.1";
+  var APP_VERSION = "0.15.0";
   var MAX_BACKUPS = 10;
   // Minimum spacing between backups. One per save meant ten quick edits rotated out
   // every older backup, so the ten on disk only ever covered the last few minutes.
@@ -682,9 +917,17 @@
     role: { lead: "Lead", contributor: "Contributor" },
     effort: { light: "Light", medium: "Medium", heavy: "Heavy" }
   };
-  var TYPE_COLOR = { escalation: "#dc2626", ditl: "#2563eb", oneoff: "#d97706", other: "#6b7280" };
+  // CSS variables, so report bars and the legend follow the light / dark theme.
+  var TYPE_COLOR = { escalation: "var(--t-escalation)", ditl: "var(--t-ditl)", oneoff: "var(--t-oneoff)", other: "var(--t-other)" };
   var TYPE_OTHER_MAX = 60;   // free-text label captured when Type is "Other"
+  var CHANGE_CAP = 500;      // change-log entries kept; the oldest drop off first
+  var TREND_KEEP = 400;      // score snapshots kept per manager (one per day at most)
+  var TREND_CARD_DAYS = 84, TREND_DRAWER_DAYS = 182;   // sparkline on the card / chart in the drawer
+  var HANDOFF_DAYS = 90;     // the drawer's "Handed off" look-back
   var MAX_WINS = 10;         // "Recently completed" entries shown in the drawer and 1:1 summary
+  // Capacity is entered as a percentage of a full load (100 = full time, 50 = half,
+  // a new hire still ramping) and stored as a fraction on the manager.
+  var CAPACITY_MIN_PCT = 10, CAPACITY_MAX_PCT = 300;
 
   // ---- Session state ---------------------------------------------------
   var data = null, userName = null;
@@ -703,14 +946,17 @@
   var guardEl = el("guard"), guardMsg = el("guardMsg");
   var btnLoadBackup = el("btnLoadBackup"), btnGuardUnlink = el("btnGuardUnlink");
   var btnAddManager = el("btnAddManager"), boardCards = el("boardCards"), mgrCount = el("mgrCount");
-  var btnAddProject = el("btnAddProject"), projList = el("projList"), projCount = el("projCount");
+  var btnAddProject = el("btnAddProject"), projList = el("projList"), projCount = el("projCount"),
+      projArchivedToggle = el("projArchivedToggle"), projShowArchived = el("projShowArchived");
   var btnAddWorkItem = el("btnAddWorkItem"), wiRows = el("wiRows"), wiCount = el("wiCount");
   var fType = el("fType"), fManager = el("fManager"), fStatus = el("fStatus"),
-      fFrom = el("fFrom"), fTo = el("fTo"), fClear = el("fClear");
-  var repGran = el("repGran"), reportBody = el("reportBody");
+      fFrom = el("fFrom"), fTo = el("fTo"), fClear = el("fClear"), fProject = el("fProject");
+  var tlSort = el("tlSort"), tlBody = el("tlBody");
+  var repGran = el("repGran"), reportBody = el("reportBody"), btnReportCsv = el("btnReportCsv");
   var weightsBody = el("weightsBody"), btnSaveSettings = el("btnSaveSettings"),
       btnResetSettings = el("btnResetSettings"), settingsManagers = el("settingsManagers"),
-      syncHint = el("syncHint"), syncControls = el("syncControls");
+      syncHint = el("syncHint"), syncControls = el("syncControls"), changeLogEl = el("changeLog");
+  var themeSel = el("themeSel");
   var btnExport = el("btnExport"), btnImport = el("btnImport"), importInput = el("importInput"),
       appVersionEl = el("appVersion");
   var nameOverlay = el("nameOverlay"), nameInput = el("nameInput"), nameOk = el("nameOk"), nameCancel = el("nameCancel");
@@ -720,7 +966,7 @@
       projTeam = el("projTeam"), projAddMember = el("projAddMember"), projOk = el("projOk"), projCancel = el("projCancel");
   var drawerOverlay = el("drawerOverlay"), drawerBody = el("drawerBody");
   var attnChip = el("attnChip"), attnOverlay = el("attnOverlay"), attnList = el("attnList"),
-      attnArchiveAll = el("attnArchiveAll"), attnClose = el("attnClose");
+      attnArchiveAll = el("attnArchiveAll"), attnClose = el("attnClose"), attnUndo = el("attnUndo");
   var searchInput = el("searchInput"), searchPop = el("searchPop");
   var btnQuickAdd = el("btnQuickAdd"), quickMenu = el("quickMenu");
   var backlogPanel = el("backlogPanel"), fScope = el("fScope");
@@ -728,7 +974,7 @@
   // ---- Default schema --------------------------------------------------
   function defaultData() {
     return {
-      managers: [], projects: [], assignments: [], workItems: [],
+      managers: [], projects: [], assignments: [], workItems: [], changes: [],
       settings: {
         appVersion: APP_VERSION, lastSavedBy: null, lastSavedAt: null,
         weights: { projectLead: 3, projectContributor: 1, escalation: 4, ditl: 2, oneoff: 1, other: 1 },
@@ -752,6 +998,8 @@
     }
     if ("settings" in parsed && !isPlainObject(parsed.settings))
       return { ok: false, error: '"settings" must be an object.' };
+    // The change log is best-effort history: a malformed one is dropped, not fatal.
+    var changes = Array.isArray(parsed.changes) ? parsed.changes : [];
     var out = defaultData();
     // Rows that are not objects would throw mid-render; a row with no id can be neither
     // found nor edited. Drop the former and give the latter one.
@@ -760,6 +1008,13 @@
       out[k] = parsed[k].filter(isPlainObject);
       out[k].forEach(function (r) { if (typeof r.id !== "string" || !r.id) r.id = genId(); });
     });
+    // Capacity divides the score, so it must be a positive number: a string would
+    // divide oddly, and 0 or a negative would put Infinity or nonsense on the board.
+    // Anything unusable (including a file from before 0.8.0) means a full load.
+    out.managers.forEach(function (m) { var c = toNum(m.capacity); m.capacity = (c != null && c > 0) ? c : 1; });
+    out.managers.forEach(function (m) { m.scoreHistory = normalizeScoreHistory(m.scoreHistory); });
+    out.workItems.forEach(normalizeOwnerHistory);
+    out.changes = mergeChanges([], changes.filter(function (c) { return isPlainObject(c) && typeof c.id === "string" && c.id; }));
     if (isPlainObject(parsed.settings)) {
       var s = parsed.settings;
       out.settings.appVersion = (s.appVersion != null) ? s.appVersion : out.settings.appVersion;
@@ -783,6 +1038,50 @@
       }
     }
     return { ok: true, data: out };
+  }
+  // managers[].scoreHistory: [{ d: "YYYY-MM-DD", s: raw score, c: capacity }], oldest
+  // first, at most one per day. Raw score and capacity are stored separately so a later
+  // capacity change does not rewrite how loaded someone was back then.
+  function normalizeScoreHistory(h) {
+    if (!Array.isArray(h)) return [];
+    var byDay = {};
+    h.forEach(function (e) {
+      if (!isPlainObject(e) || !/^\d{4}-\d{2}-\d{2}$/.test(String(e.d))) return;
+      var sc = toNum(e.s), c = toNum(e.c);
+      if (sc == null) return;
+      byDay[e.d] = { d: e.d, s: sc, c: (c != null && c > 0) ? c : 1 };
+    });
+    return Object.keys(byDay).sort().slice(-TREND_KEEP).map(function (k) { return byDay[k]; });
+  }
+  // workItems[].ownerHistory: [{ managerId, from, to }] — who owned the item and when
+  // (plain local dates; to is null for the current owner). Items from before 0.13.0
+  // get one entry for their current owner, starting on the opened date. An older copy
+  // of the app can reassign without updating it, so if the open entry no longer names
+  // the current owner it is closed today and a new one opened.
+  function normalizeOwnerHistory(w) {
+    var h = Array.isArray(w.ownerHistory) ? w.ownerHistory.filter(function (e) {
+      return isPlainObject(e) && typeof e.managerId === "string" && e.managerId;
+    }).map(function (e) {
+      return { managerId: e.managerId, from: (typeof e.from === "string" && e.from) ? e.from : null,
+               to: (typeof e.to === "string" && e.to) ? e.to : null };
+    }) : null;
+    if (!h) h = w.managerId ? [{ managerId: w.managerId, from: w.openedDate || null, to: null }] : [];
+    var last = h.length ? h[h.length - 1] : null;
+    if (last && !last.to && last.managerId !== w.managerId) { last.to = todayISO(); last = null; }
+    var open = (last && !last.to) ? last : null;
+    if (w.managerId && !open) h.push({ managerId: w.managerId, from: todayISO(), to: null });
+    w.ownerHistory = h;
+  }
+  // Record a change of owner on a work item: close the current entry today and open one
+  // for the new owner (none when it goes back to the Backlog).
+  function reassignOwner(w, managerId) {
+    var h = Array.isArray(w.ownerHistory) ? w.ownerHistory : (w.ownerHistory = []), today = todayISO();
+    var last = h.length ? h[h.length - 1] : null;
+    if (last && !last.to) {
+      // Changed the same day it was given: the earlier owner never really carried it.
+      if (last.from === today && h.length > 1) h.pop(); else last.to = today;
+    }
+    if (managerId) h.push({ managerId: managerId, from: today, to: null });
   }
   function toNum(v) { var n = (typeof v === "number") ? v : parseFloat(v); return isFinite(n) ? n : null; }
   function numbersOver(defaults, given) {
@@ -821,6 +1120,23 @@
   function findById(arr, id) { for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i]; return null; }
   function safeHref(url) { return /^(https?:|mailto:)/i.test(url || "") ? url : null; }
   function managerName(id) { var m = id && findById(data.managers, id); return m ? m.name : (id ? "(unknown)" : "—"); }
+  // A project's display name, flagged when archived — for places that still name an
+  // archived project (a work item's related project, search, filters).
+  function projectLabel(p) { return p.name + (p.archived ? " (archived)" : ""); }
+  // The project a work item is related to, or null when it has none (or it is unknown).
+  function relatedProject(w) { return (w && w.relatedProjectId) ? findById(data.projects, w.relatedProjectId) : null; }
+  // Options for choosing a project: archived ones are left out, except includeId — the
+  // current value of the record being edited, so opening its form can't silently unlink it.
+  function projectOpts(blank, includeId, allArchived) {
+    var o = blank ? [{ value: "", label: blank }] : [];
+    data.projects.forEach(function (p) {
+      if (p.archived && !allArchived && p.id !== includeId) return;
+      o.push({ value: p.id, label: projectLabel(p) });
+    });
+    return o;
+  }
+  function capacityOf(m) { var c = m && toNum(m.capacity); return (c != null && c > 0) ? c : 1; }
+  function capacityPct(c) { return Math.round(c * 100) + "%"; }
   function isActiveManager(id) { var m = findById(data.managers, id); return !!(m && m.active); }
   function activeAssignments(projectId) {
     return data.assignments.filter(function (a) { return a.projectId === projectId && !a.archived; });
@@ -844,6 +1160,8 @@
 
   var noticeTimer = null;
   function notice(msg, kind) {
+    // Any other message replaces an Undo offer on the bar (the undo itself stays
+    // available from Needs attention until the next change).
     noticeEl.textContent = msg;
     noticeEl.className = "notice show " + (kind || "info");
     if (noticeTimer) clearTimeout(noticeTimer);
@@ -909,7 +1227,7 @@
   }
 
   // ---- View switching --------------------------------------------------
-  var VIEWS = ["board", "projects", "workitems", "reports", "settings", "help"];
+  var VIEWS = ["board", "timeline", "projects", "workitems", "reports", "settings", "help"];
   function showView(name) {
     currentView = name;
     VIEWS.forEach(function (v) { el("view-" + v).hidden = (v !== name); });
@@ -919,6 +1237,7 @@
   }
   function renderCurrent() {
     if (currentView === "board") renderBoard();
+    else if (currentView === "timeline") renderTimeline();
     else if (currentView === "projects") renderProjectsView();
     else if (currentView === "workitems") renderWorkItemsView();
     else if (currentView === "reports") renderReports();
@@ -938,6 +1257,13 @@
   function goToProject(id) { closeDrawer(); showView("projects"); openProjectModal(id); }
   function goToWorkItem(id) { closeDrawer(); showView("workitems"); editWorkItem(id); }
   function goToManager(id) { openManager(id); } // drawer is an overlay; no view switch needed
+  // The work item queue filtered to one project's related items — every scope, so done
+  // and archived ones are included, and no other filter hiding any of them.
+  function goToProjectWork(id) {
+    closeDrawer(); showView("workitems");
+    fScope.value = "all"; fType.value = ""; fManager.value = ""; fStatus.value = ""; fFrom.value = ""; fTo.value = "";
+    fProject.value = id; renderWorkItemsView();
+  }
 
   // ---- Selects ---------------------------------------------------------
   function fillSelectOpts(sel, opts, keep) {
@@ -965,31 +1291,46 @@
     fillSelectOpts(fType, enumOpts(WORK_TYPES, "type", "All"), true);
     fillSelectOpts(fStatus, enumOpts(WORK_STATUS, "wstatus", "All"), true);
     fillSelectOpts(fManager, managerOpts(false, "All"), true);
+    fillSelectOpts(fProject, projectOpts("All", null, true), true);
   }
 
   // ---- Weighting (brief §6) --------------------------------------------
   function round1(n) { return Math.round(n * 10) / 10; }
-  function managerScore(id) {
-    var w = data.settings.weights || {}, eff = data.settings.effort || {};
-    var score = 0, c = { led: 0, supporting: 0, escalation: 0, ditl: 0, oneoff: 0, other: 0 };
+  // Everything that counts toward a manager's score right now, one entry per item:
+  // { weight, count (a key of managerScore's counts), end, endKind, text, projectId | wiId }.
+  // end is the date it is expected to come off — an assignment's end date (else its
+  // project's target date), a work item's roll-off date (else its due date) — and is
+  // used only by the timeline's projection; the board's score ignores it.
+  function scoreItems(id) {
+    var w = data.settings.weights || {}, eff = data.settings.effort || {}, out = [];
     data.assignments.forEach(function (a) {
       if (a.archived || a.managerId !== id) return;
       var p = findById(data.projects, a.projectId);
-      if (!p || p.status !== "active") return;
+      // An archived project is out of the picture entirely, whatever its status says.
+      if (!p || p.archived || p.status !== "active") return;
       var base = (a.role === "lead") ? (w.projectLead || 0) : (w.projectContributor || 0);
       var mult = (eff[a.effort] != null) ? eff[a.effort] : 1;
-      score += base * mult;
-      if (a.role === "lead") c.led++; else c.supporting++;
+      out.push({ weight: base * mult, count: (a.role === "lead") ? "led" : "supporting",
+                 end: a.endDate || p.targetDate || null, endKind: a.endDate ? "roll-off" : (p.targetDate ? "target" : null),
+                 text: p.name + " — " + lab("role", a.role) + " (" + lab("effort", a.effort) + ")", projectId: p.id, kind: "project" });
     });
     data.workItems.forEach(function (wi) {
       if (wi.archived || wi.managerId !== id) return;
       if (wi.status !== "open" && wi.status !== "in-progress") return;
-      if (wi.type === "escalation") { score += (w.escalation || 0); c.escalation++; }
-      else if (wi.type === "ditl") { score += (w.ditl || 0); c.ditl++; }
-      else if (wi.type === "oneoff") { score += (w.oneoff || 0); c.oneoff++; }
-      else { score += (w.other || 0); c.other++; }
+      var t = (wi.type === "escalation" || wi.type === "ditl" || wi.type === "oneoff") ? wi.type : "other";
+      out.push({ weight: (w[t] || 0), count: t,
+                 end: wi.rollOffDate || wi.dueDate || null, endKind: wi.rollOffDate ? "roll-off" : (wi.dueDate ? "due" : null),
+                 text: typeLabel(wi) + ": " + (wi.title || ""), wiId: wi.id, kind: t });
     });
-    return { score: score, counts: c };
+    return out;
+  }
+  function managerScore(id) {
+    var score = 0, c = { led: 0, supporting: 0, escalation: 0, ditl: 0, oneoff: 0, other: 0 };
+    scoreItems(id).forEach(function (it) { score += it.weight; c[it.count]++; });
+    // score is the raw weighted total; load is that score divided by the manager's
+    // capacity, and is what decides the heat band. At full capacity they are equal.
+    var m = findById(data.managers, id), capacity = capacityOf(m);
+    return { score: score, load: score / capacity, capacity: capacity, counts: c };
   }
   // Heat bands are authored as whole-number ranges (0–4, 5–9, 10–14, 15+), but scores
   // are fractional — the effort multipliers put 4.5 or 9.5 on the board. A plain
@@ -1035,12 +1376,94 @@
     if (!b || typeof b.min !== "number") return "";
     return (b.max == null) ? (b.min + "+") : (b.min + "–" + b.max);
   }
-  function heatLabelEl(b, score) {
+  // sc is a managerScore() result. The band is decided by load (score ÷ capacity).
+  function heatLabelEl(b, sc) {
     var e = elem("span", "heat " + (b.heat || "heat-na"), b.label);
     var r = bandRange(b);
-    e.title = b.label + (r ? " · score " + r : "") + " · this score: " + round1(score);
+    e.title = b.label + (r ? " · score " + r : "") + " · this score: " + scoreText(sc);
     return e;
   }
+  // "6" at full capacity; "12 (6 raw at 50% capacity)" otherwise — both numbers, so
+  // the adjustment is never hidden behind the band it produces.
+  function scoreText(sc) {
+    if (sc.capacity === 1) return String(round1(sc.score));
+    return round1(sc.load) + " (" + round1(sc.score) + " raw at " + capacityPct(sc.capacity) + " capacity)";
+  }
+
+  // ---- Workload trend --------------------------------------------------
+  // Every save writes today's score for each active manager (overwriting today's earlier
+  // one). A score only changes when the data does, so a day with no save carries the
+  // previous value forward; entries equal to the one before are not stored at all.
+  function recordScoreHistory() {
+    var today = todayISO();
+    data.managers.forEach(function (m) {
+      if (!m.active) return;
+      var sc = managerScore(m.id), e = { d: today, s: round1(sc.score), c: sc.capacity };
+      var h = Array.isArray(m.scoreHistory) ? m.scoreHistory : (m.scoreHistory = []);
+      var last = h[h.length - 1];
+      if (last && last.d > today) return;   // clock went backwards; leave history alone
+      if (last && last.d === today) h.pop();
+      var prev = h[h.length - 1];
+      if (!prev || prev.s !== e.s || prev.c !== e.c) h.push(e);
+      if (h.length > TREND_KEEP) h.splice(0, h.length - TREND_KEEP);
+    });
+  }
+  // One load (score ÷ capacity) per day for the last `days` days, oldest first; null
+  // before the first snapshot. Today is the live score, not the last saved one.
+  function trendSeries(m, days) {
+    var h = m.scoreHistory || [], out = [], i = 0, cur = null, t = startOfToday();
+    for (var k = days - 1; k >= 1; k--) {
+      var day = isoOf(addDays(t, -k));
+      while (i < h.length && h[i].d <= day) { cur = h[i].s / h[i].c; i++; }
+      out.push({ d: day, v: cur });
+    }
+    out.push({ d: todayISO(), v: managerScore(m.id).load });
+    return out;
+  }
+  // How long the manager has been in the band they are in now: the first day of the
+  // unbroken run ending today, and whether the run reaches back past the first record.
+  function bandSince(m) {
+    var series = trendSeries(m, TREND_KEEP), now = bandFor(series[series.length - 1].v).label, since = todayISO(), open = false;
+    for (var i = series.length - 2; i >= 0; i--) {
+      if (series[i].v == null) { open = true; break; }
+      if (bandFor(series[i].v).label !== now) break;
+      since = series[i].d;
+    }
+    return { label: now, since: since, days: dayDiff(parseISODate(since), startOfToday()), fromStart: open };
+  }
+  function bandSinceText(m) {
+    var b = bandSince(m);
+    if (b.days < 1) return b.label + " since today";
+    return b.label + (b.fromStart ? " since records began, " : " since ") + b.since + " (" + b.days + " day" + (b.days === 1 ? "" : "s") + ")";
+  }
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function svgEl(tag, attrs) { var e = document.createElementNS(SVGNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  // A load line over the series. With bands, the chart's background is striped by heat
+  // band so "Heavy for three months" can be read straight off it.
+  function trendSvg(series, w, h, withBands, cls) {
+    var bands = normalizedBands(), top = 1;
+    series.forEach(function (p) { if (p.v != null && p.v > top) top = p.v; });
+    bands.forEach(function (b) { if (b.max == null && b.min > top * 0.8) top = Math.max(top, b.min * 1.15); });
+    top *= 1.1;
+    var svg = svgEl("svg", { viewBox: "0 0 " + w + " " + h, preserveAspectRatio: "none", "class": cls, "aria-hidden": "true" });
+    function y(v) { return (h - 2) - (Math.min(v, top) / top) * (h - 4); }
+    if (withBands) bands.forEach(function (b) {
+      var lo = y(b.min), hi = (b.max == null) ? 0 : y(Math.min(b.max + 1, top));
+      if (lo > hi) svg.appendChild(svgEl("rect", { x: 0, y: hi, width: w, height: lo - hi, "class": b.heat }));
+    });
+    var n = series.length, pts = [], k;
+    function flush() { if (pts.length > 1) svg.appendChild(svgEl("polyline", { points: pts.join(" "), "class": "line" })); pts = []; }
+    for (k = 0; k < n; k++) {
+      var p = series[k];
+      if (p.v == null) { flush(); continue; }
+      var x = (n === 1) ? w : (k / (n - 1)) * w;
+      if (pts.length) pts.push(x.toFixed(1) + "," + pts[pts.length - 1].split(",")[1]);   // step: hold until it changes
+      pts.push(x.toFixed(1) + "," + y(p.v).toFixed(1));
+    }
+    flush();
+    return svg;
+  }
+  function hasTrend(m) { return (m.scoreHistory || []).some(function (e) { return e.d < todayISO(); }); }
 
   // ---- Board view ------------------------------------------------------
   function chip(label, n, alert) {
@@ -1062,16 +1485,18 @@
     clear(boardCards);
     if (!active.length) { boardCards.appendChild(elem("div", "empty", list.length ? "All managers are archived. Restore one in Settings, or add a manager." : "No managers yet — click “Add manager”.")); return; }
     active.forEach(function (m) {
-      var sc = managerScore(m.id), b = bandFor(sc.score);
+      var sc = managerScore(m.id), b = bandFor(sc.load);
       var card = elem("div", "mcard");
       card.appendChild(elem("div", "m-name", m.name));
       var sub = [m.title, m.location].filter(Boolean).join(" · ");
       if (sub) card.appendChild(elem("div", "m-sub", sub));
       var hr = elem("div", "m-heat-row");
-      hr.appendChild(heatLabelEl(b, sc.score));
-      hr.appendChild(elem("span", "m-score", "score " + round1(sc.score)));
+      hr.appendChild(heatLabelEl(b, sc));
+      hr.appendChild(elem("span", "m-score", sc.capacity === 1 ? "score " + round1(sc.score)
+        : "score " + round1(sc.load) + " · raw " + round1(sc.score)));
       card.appendChild(hr);
       var chips = elem("div", "chips");
+      if (sc.capacity !== 1) chips.appendChild(chip("Capacity", capacityPct(sc.capacity)));
       if (sc.counts.escalation) chips.appendChild(chip("Escalations", sc.counts.escalation, true));
       chips.appendChild(chip("Leading", sc.counts.led));
       chips.appendChild(chip("Supporting", sc.counts.supporting));
@@ -1079,12 +1504,131 @@
       if (sc.counts.oneoff) chips.appendChild(chip("One-offs", sc.counts.oneoff));
       if (sc.counts.other) chips.appendChild(chip("Other", sc.counts.other));
       card.appendChild(chips);
+      if (hasTrend(m)) {
+        var tr = elem("div", "m-trend");
+        var series = trendSeries(m, TREND_CARD_DAYS);
+        tr.appendChild(trendSvg(series, 100, 22, false, "spark"));
+        tr.appendChild(elem("span", null, "12 wk"));
+        tr.title = bandSinceText(m);
+        card.appendChild(tr);
+      }
       card.addEventListener("click", function () { openManager(m.id); });
       // Reachable and openable from the keyboard, like every other click-through.
-      card.tabIndex = 0; card.setAttribute("role", "button"); card.setAttribute("aria-label", m.name + " — " + b.label + ", score " + round1(sc.score));
+      card.tabIndex = 0; card.setAttribute("role", "button"); card.setAttribute("aria-label", m.name + " — " + b.label + ", score " + scoreText(sc));
       card.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openManager(m.id); } });
       boardCards.appendChild(card);
     });
+  }
+
+  // ---- Timeline view ("who frees up when") -----------------------------
+  // A 90-day lane per active manager with a marker wherever something they carry is
+  // expected to come off: an assignment's end date (or, lacking one, its project's
+  // target date — hollow marker), a work item's roll-off date (or due date — hollow).
+  // Already-past dates sit in the left gutter, anything later than 90 days in the
+  // right one. The projected load at 2 / 6 / 12 weeks assumes each dated item comes
+  // off on its date and nothing new arrives; it is a planning aid only and never
+  // changes the board's score, which still counts everything until it is archived.
+  var TL_DAYS = 90, TL_POINTS = [14, 42, 84];
+  function tlOffset(iso) { var d = parseISODate(iso); return d ? dayDiff(startOfToday(), d) : null; }
+  // Load (score ÷ capacity) still carried `days` from today, under the assumption above.
+  function projectedLoad(items, capacity, days) {
+    var score = 0;
+    items.forEach(function (it) { var o = it.end ? tlOffset(it.end) : null; if (o == null || o >= days) score += it.weight; });
+    return score / capacity;
+  }
+  function fmtShort(d) { return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
+  function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+  var END_WORD = { "roll-off": "rolls off", target: "project target", due: "due" };
+  function renderTimeline() {
+    clear(tlBody);
+    var managers = ((data && data.managers) || []).filter(function (m) { return m.active; });
+    if (!managers.length) { tlBody.appendChild(elem("div", "empty", "No active managers yet — add one on the Board.")); return; }
+    var today = startOfToday();
+    var legend = elem("div", "tl-legend");
+    [["project", "Project role"], ["escalation", "Escalation"], ["ditl", "DITL"], ["oneoff", "One-off"], ["other", "Other"]].forEach(function (x) {
+      var sp = elem("span"); sp.appendChild(elem("span", "tl-mark " + x[0])); sp.appendChild(document.createTextNode(x[1])); legend.appendChild(sp);
+    });
+    var hs = elem("span"); hs.appendChild(elem("span", "tl-mark project target")); hs.appendChild(document.createTextNode("Hollow: no end date — project target or due date"));
+    legend.appendChild(hs);
+    tlBody.appendChild(legend);
+
+    // Axis: today, then the 1st of each month inside the window.
+    var head = elem("div", "tl-head"); head.appendChild(elem("div"));
+    var axis = elem("div", "tl-axis"), ticks = [];
+    var t0 = elem("span", "first", "Today"); t0.style.left = "0%"; axis.appendChild(t0);
+    for (var i = 1; i <= TL_DAYS; i++) {
+      var d = addDays(today, i);
+      if (d.getDate() === 1 && i > 6 && i < TL_DAYS - 4) {
+        ticks.push(i);
+        var tk = elem("span", null, d.toLocaleDateString(undefined, { month: "short" })); tk.style.left = (i / TL_DAYS * 100) + "%"; axis.appendChild(tk);
+      }
+    }
+    head.appendChild(axis); tlBody.appendChild(head);
+
+    var rows = managers.map(function (m) {
+      var items = scoreItems(m.id), sc = managerScore(m.id);
+      return { m: m, items: items, sc: sc, proj: TL_POINTS.map(function (n) { return projectedLoad(items, sc.capacity, n); }) };
+    });
+    if (tlSort.value === "room") rows.sort(function (a, b) { return a.proj[1] - b.proj[1]; });
+
+    rows.forEach(function (r) {
+      var lane = elem("div", "tl-lane");
+      var who = elem("div", "tl-who");
+      var nb = elem("button", "lnk", r.m.name); nb.type = "button"; nb.addEventListener("click", function () { goToManager(r.m.id); });
+      who.appendChild(nb);
+      var now = elem("div", "tl-now");
+      now.appendChild(heatLabelEl(bandFor(r.sc.load), r.sc));
+      now.appendChild(elem("span", "m-score", "now " + round1(r.sc.load)));
+      who.appendChild(now);
+      var pj = elem("div", "tl-proj");
+      ["2 wk", "6 wk", "12 wk"].forEach(function (lbl, k) {
+        var b = bandFor(r.proj[k]);
+        var sp = elem("span", b.heat || "heat-na", lbl + " " + round1(r.proj[k]));
+        sp.title = "Projected in " + lbl.replace("wk", "weeks") + " (" + fmtShort(addDays(today, TL_POINTS[k])) + "): " + b.label + ", load " + round1(r.proj[k]);
+        pj.appendChild(sp);
+      });
+      who.appendChild(pj);
+      lane.appendChild(who);
+
+      var row = elem("div", "tl-row");
+      var past = [], later = [], undated = 0, inWin = [];
+      r.items.forEach(function (it) {
+        if (!it.end) { undated++; return; }
+        var o = tlOffset(it.end); if (o == null) { undated++; return; }
+        if (o < 0) past.push(it); else if (o > TL_DAYS) later.push(it); else inWin.push({ it: it, o: o });
+      });
+      function gutter(list, cls, word) {
+        var g = elem("div", "tl-gut" + (list.length && cls ? " " + cls : ""), list.length ? list.length + " " + word : "");
+        if (list.length) g.title = list.map(function (it) { return it.text + " — " + END_WORD[it.endKind] + " " + it.end; }).join("\n");
+        return g;
+      }
+      row.appendChild(gutter(past, "past", "past"));
+      var track = elem("div", "tl-track");
+      ticks.forEach(function (i) { var g = elem("div", "tl-grid"); g.style.left = (i / TL_DAYS * 100) + "%"; track.appendChild(g); });
+      inWin.forEach(function (x) {
+        var it = x.it;
+        var mk = elem("button", "tl-mark " + it.kind + " " + it.endKind); mk.type = "button";
+        mk.style.left = (x.o / TL_DAYS * 100) + "%";
+        var label = it.text + " — " + END_WORD[it.endKind] + " " + it.end + " (" + (x.o === 0 ? "today" : "in " + x.o + " day" + (x.o === 1 ? "" : "s")) + ")";
+        mk.title = label; mk.setAttribute("aria-label", label);
+        mk.addEventListener("click", function () { if (it.projectId) goToProject(it.projectId); else goToWorkItem(it.wiId); });
+        track.appendChild(mk);
+      });
+      row.appendChild(track);
+      var lg = gutter(later, "right", "later");
+      if (undated) {
+        if (later.length) lg.appendChild(elem("br"));
+        lg.appendChild(document.createTextNode(undated + " no date"));
+        lg.title = (lg.title ? lg.title + "\n" : "") + undated + " item" + (undated === 1 ? "" : "s") +
+          " with no end, target, roll-off, or due date — counted in every projection.";
+      }
+      lg.className = "tl-gut right";
+      row.appendChild(lg);
+      lane.appendChild(row);
+      tlBody.appendChild(lane);
+    });
+    tlBody.appendChild(elem("p", "tl-note", "Projections assume everything dated comes off on that date and nothing new arrives. " +
+      "They are for planning only — the Board keeps counting an item until it is archived or done."));
   }
 
   // ---- Projects view ---------------------------------------------------
@@ -1102,16 +1646,22 @@
     return span;
   }
   function renderProjectsView() {
-    var list = (data && data.projects) || [];
-    projCount.textContent = list.length ? ("(" + list.length + ")") : "";
+    var all = (data && data.projects) || [];
+    var archivedN = all.filter(function (p) { return p.archived; }).length;
+    // Archived projects stay out of the list unless asked for, like the work item History.
+    projArchivedToggle.hidden = !archivedN;
+    if (!archivedN) projShowArchived.checked = false;
+    var list = projShowArchived.checked ? all : all.filter(function (p) { return !p.archived; });
+    projCount.textContent = !all.length ? "" : "(" + (all.length - archivedN) + (archivedN ? " · " + archivedN + " archived" : "") + ")";
     clear(projList);
-    if (!list.length) { projList.appendChild(elem("div", "empty", "No projects yet — click “Add project”.")); return; }
+    if (!list.length) { projList.appendChild(elem("div", "empty", all.length ? "Every project is archived — tick “Show archived” to see them." : "No projects yet — click “Add project”.")); return; }
     list.forEach(function (p) {
-      var card = elem("div", "pcard"); if (p.status === "complete") card.style.opacity = ".65";
+      var card = elem("div", "pcard" + (p.archived ? " archived" : "")); if (p.status === "complete" && !p.archived) card.style.opacity = ".65";
       var top = elem("div", "p-top");
       var left = elem("div");
       left.appendChild(elem("div", "p-name", p.name));
       var meta = elem("div", "p-meta");
+      if (p.archived) meta.appendChild(pill("status", "Archived"));
       meta.appendChild(pill("status", lab("pstatus", p.status || "active")));
       meta.appendChild(elem("span", null, lab("priority", p.priority || "med") + " priority"));
       if (p.targetDate) meta.appendChild(elem("span", null, "target " + p.targetDate));
@@ -1121,16 +1671,87 @@
       top.appendChild(left);
       // Closing a project out is a one-click action on the card itself, not something
       // you have to find inside the edit form (issue #6).
+      // Archived: Restore is the only action that makes sense until it comes back.
       var acts = elem("div", "p-acts");
-      acts.appendChild(miniBtn("Edit", function () { openProjectModal(p.id); }));
-      if (p.status === "complete") acts.appendChild(miniBtn("Reopen", function () { reopenProject(p.id); }, "ghost"));
-      else acts.appendChild(miniBtn("Close out", function () { closeOutProject(p.id); }, "ghost"));
+      if (p.archived) acts.appendChild(miniBtn("Restore", function () { toggleProjectArchived(p.id); }));
+      else {
+        acts.appendChild(miniBtn("Edit", function () { openProjectModal(p.id); }));
+        if (p.status === "complete") acts.appendChild(miniBtn("Reopen", function () { reopenProject(p.id); }, "ghost"));
+        else acts.appendChild(miniBtn("Close out", function () { closeOutProject(p.id); }, "ghost"));
+        acts.appendChild(miniBtn("+ Work item", function () { addWorkItem(null, p.id); }, "ghost"));
+        acts.appendChild(miniBtn("Archive", function () { toggleProjectArchived(p.id); }, "ghost danger"));
+      }
       top.appendChild(acts);
       card.appendChild(top);
       var team = elem("div", "p-team"); team.appendChild(teamFrag(activeAssignments(p.id)));
       card.appendChild(team);
+      card.appendChild(projectWorkLine(p));
       projList.appendChild(card);
     });
+  }
+
+  // "3 open work items · 5 in total": the work items that name this project as related,
+  // linking to the queue filtered to them.
+  function projectWorkLine(p) {
+    var line = elem("div", "p-work");
+    var related = data.workItems.filter(function (w) { return w.relatedProjectId === p.id; });
+    if (!related.length) { line.textContent = "No related work items."; return line; }
+    var open = related.filter(function (w) { return !w.archived && (w.status === "open" || w.status === "in-progress"); }).length;
+    var text = open + " open work item" + (open === 1 ? "" : "s") + (related.length !== open ? " · " + related.length + " in total" : "");
+    var b = elem("button", "lnk", text); b.type = "button";
+    b.addEventListener("click", function () { goToProjectWork(p.id); });
+    line.appendChild(b);
+    return line;
+  }
+
+  // ---- Owner history ---------------------------------------------------
+  // Earlier owners of a work item (not the current one), oldest first, each once.
+  function previousOwners(w) {
+    var seen = {}, out = [];
+    (w.ownerHistory || []).forEach(function (e) {
+      if (e.managerId === w.managerId || seen[e.managerId]) return;
+      seen[e.managerId] = true; out.push(e.managerId);
+    });
+    return out;
+  }
+  // The last day a work item was being carried at all: its completion date when done;
+  // when archived without being done, the day it was archived (archivedDate, recorded
+  // since 0.15.0), else — for older rows — the latest archive in the change log, its
+  // roll-off date, or its due / opened date; otherwise, still open, today.
+  function carriedUntil(w) {
+    if (w.status === "done" && w.completedDate) return w.completedDate;
+    if (!w.archived) return todayISO();
+    if (w.archivedDate) return w.archivedDate;
+    var logged = null;
+    (data.changes || []).forEach(function (c) {
+      if (c.entityId === w.id && c.field === "archived" && c.to === "true") logged = c.at;
+    });
+    if (logged && tsValue(logged)) return isoOf(new Date(tsValue(logged)));
+    return w.rollOffDate || w.dueDate || w.openedDate || "0000-00-00";
+  }
+  // Did manager id own work item w at any point between two local dates (inclusive)?
+  function ownedDuring(w, id, start, end) {
+    var stop = carriedUntil(w);
+    return (w.ownerHistory || []).some(function (e) {
+      if (e.managerId !== id) return false;
+      var from = e.from || w.openedDate || "0000-00-00", to = e.to || stop;
+      if (to > stop) to = stop;
+      return from <= end && to >= start;
+    });
+  }
+  function isoOf(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  // The n most recent periods at a grouping, oldest first: [{ label, start, end }].
+  function recentPeriods(gran, n) {
+    var t = startOfToday(), y = t.getFullYear(), m = t.getMonth(), out = [], k, st, en;
+    if (gran === "all") return [{ label: "All time", start: "0000-00-00", end: todayISO() }];
+    for (k = n - 1; k >= 0; k--) {
+      if (gran === "year") { st = new Date(y - k, 0, 1); en = new Date(y - k, 11, 31); }
+      else if (gran === "quarter") { var q = Math.floor(m / 3) - k; st = new Date(y, q * 3, 1); en = new Date(y, q * 3 + 3, 0); }
+      else if (gran === "week") { st = new Date(y, m, t.getDate() - ((t.getDay() + 6) % 7) - 7 * k); en = new Date(st.getFullYear(), st.getMonth(), st.getDate() + 6); }
+      else { st = new Date(y, m - k, 1); en = new Date(y, m - k + 1, 0); }
+      out.push({ label: periodKey(isoOf(st), gran), start: isoOf(st), end: isoOf(en) });
+    }
+    return out;
   }
 
   // ---- Work Items view -------------------------------------------------
@@ -1149,12 +1770,13 @@
   function ageText(w) { if (w.status === "done") return "—"; var d = daysSince(w.openedDate); return (d == null) ? "—" : (d + "d"); }
   function isStale(w) { if (w.archived || w.status === "done") return false; var d = daysSince(w.openedDate); return d != null && d >= 14; }
   function applyWiFilters(all) {
-    var sc = fScope.value, t = fType.value, m = fManager.value, s = fStatus.value, from = fFrom.value, to = fTo.value;
+    var sc = fScope.value, t = fType.value, m = fManager.value, pr = fProject.value, s = fStatus.value, from = fFrom.value, to = fTo.value;
     return all.filter(function (w) {
       if (sc === "active" && w.archived) return false;
       if (sc === "history" && !w.archived) return false;
       if (t && w.type !== t) return false;
       if (m && w.managerId !== m) return false;
+      if (pr && w.relatedProjectId !== pr) return false;
       if (s && (w.status || "open") !== s) return false;
       if (from && (w.openedDate || "") < from) return false;
       if (to && (w.openedDate || "") > to) return false;
@@ -1178,6 +1800,15 @@
       var titleTd = tdc(w.title || "");
       var wHref = w.link ? safeHref(w.link) : null;
       if (wHref) { titleTd.textContent = ""; var a = elem("a", null, w.title || "(item)"); a.href = wHref; a.target = "_blank"; a.rel = "noopener"; titleTd.appendChild(a); }
+      var prev = previousOwners(w);
+      if (prev.length) titleTd.appendChild(elem("span", "wi-proj", "previously " + prev.map(managerName).join(", ")));
+      var rp = relatedProject(w);
+      if (rp) {
+        var sub = elem("span", "wi-proj", "↳ ");
+        var pb = elem("button", "lnk", projectLabel(rp)); pb.type = "button";
+        pb.addEventListener("click", function () { goToProject(rp.id); });
+        sub.appendChild(pb); titleTd.appendChild(sub);
+      }
       tr.appendChild(titleTd);
       // Owner click-through to that manager's drawer; unassigned items just show "—".
       var ownerTd = elem("td");
@@ -1244,14 +1875,9 @@
     });
     reportBody.appendChild(legend);
 
-    var gran = repGran.value;
-    var map = {};
-    items.forEach(function (w) {
-      var k = periodKey(w.openedDate, gran); if (k == null) k = "(no date)";
-      if (!map[k]) map[k] = { total: 0, types: { escalation: 0, ditl: 0, oneoff: 0, other: 0 } };
-      map[k].total++; if (w.type in map[k].types) map[k].types[w.type]++;
-    });
-    var keys = Object.keys(map).sort().reverse().slice(0, 20);
+    var rb = reportBuckets(items, repGran.value), map = rb.map;
+    // Newest first, and only the most recent REPORT_ROWS on screen; the CSV has them all.
+    var keys = rb.keys.slice().reverse().slice(0, REPORT_ROWS);
     var max = 1; keys.forEach(function (k) { if (map[k].total > max) max = map[k].total; });
     var wrap = elem("div");
     keys.forEach(function (k) {
@@ -1268,6 +1894,85 @@
       wrap.appendChild(row);
     });
     reportBody.appendChild(wrap);
+    if (rb.keys.length > REPORT_ROWS) reportBody.appendChild(elem("p", "hint", "Showing the " + REPORT_ROWS +
+      " most recent of " + rb.keys.length + " periods. Download CSV includes every period."));
+    reportBody.appendChild(carriedTable(items, repGran.value));
+  }
+  // Work items each manager carried — owned at any point — in the latest few periods.
+  // Built from owner history, so an item reassigned mid-quarter counts for both people.
+  function carriedTable(items, gran) {
+    var wrap = elem("div", "panel carried");
+    wrap.appendChild(elem("h3", "sec", "Work items carried per manager"));
+    wrap.appendChild(elem("p", "hint", "Each item counts for everyone who owned it at any point in the period, so work that " +
+      "changed hands counts for both. Project roles aren't included."));
+    var periods = recentPeriods(gran, 4);
+    var rows = data.managers.map(function (m) {
+      return { m: m, n: periods.map(function (p) { return items.filter(function (w) { return ownedDuring(w, m.id, p.start, p.end); }).length; }) };
+    }).filter(function (r) { return r.m.active || r.n.some(function (x) { return x; }); });
+    if (!rows.length) { wrap.appendChild(elem("div", "d-empty", "No managers yet.")); return wrap; }
+    var tbl = elem("table"), thead = elem("thead"), hr = elem("tr");
+    hr.appendChild(elem("th", null, "Manager"));
+    periods.forEach(function (p) { hr.appendChild(elem("th", "num", p.label)); });
+    thead.appendChild(hr); tbl.appendChild(thead);
+    var tb = elem("tbody");
+    rows.forEach(function (r) {
+      var tr = elem("tr"); if (!r.m.active) tr.className = "archived";
+      var nameTd = elem("td"); nameTd.appendChild(linkBtn(r.m.name + (r.m.active ? "" : " (archived)"), function () { goToManager(r.m.id); }));
+      tr.appendChild(nameTd);
+      r.n.forEach(function (x) { tr.appendChild(elem("td", "num", String(x))); });
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb); wrap.appendChild(tbl);
+    return wrap;
+  }
+  var REPORT_ROWS = 20;
+  // Work items counted per period (by opened date) and type. keys come back oldest
+  // first, with "(no date)" — items with no opened date — last.
+  function reportBuckets(items, gran) {
+    var map = {};
+    items.forEach(function (w) {
+      var k = periodKey(w.openedDate, gran); if (k == null) k = NO_DATE;
+      if (!map[k]) map[k] = { total: 0, types: { escalation: 0, ditl: 0, oneoff: 0, other: 0 } };
+      map[k].total++; if (w.type in map[k].types) map[k].types[w.type]++;
+    });
+    var keys = Object.keys(map).filter(function (k) { return k !== NO_DATE; }).sort();
+    if (map[NO_DATE]) keys.push(NO_DATE);
+    return { map: map, keys: keys };
+  }
+  var NO_DATE = "(no date)";
+
+  // ---- CSV export of the report ----------------------------------------
+  // One row per period at the chosen grouping, oldest first, every period (not just
+  // the ones on screen). Same Blob download route as Export JSON — no network.
+  function csvCell(v) {
+    var t = (v == null) ? "" : String(v);
+    // Spreadsheet apps run a cell that starts with = + - @ as a formula.
+    if (/^[=+\-@]/.test(t)) t = "'" + t;
+    return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  }
+  function reportCsv(gran) {
+    var rb = reportBuckets((data && data.workItems) || [], gran);
+    var lines = [["Period", "Total"].concat(WORK_TYPES.map(function (t) { return lab("type", t); }))];
+    rb.keys.forEach(function (k) {
+      var b = rb.map[k];
+      lines.push([k, b.total].concat(WORK_TYPES.map(function (t) { return b.types[t]; })));
+    });
+    return csvText(lines);
+  }
+  // CRLF and a byte-order mark, so Excel opens it as UTF-8 with the rows split.
+  function csvText(rows) { return "\ufeff" + rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n") + "\r\n"; }
+  function downloadCsv(name, rows) { downloadBlob(name, csvText(rows), "text/csv;charset=utf-8"); }
+  function downloadBlob(name, text, type) {
+    var blob = new Blob([text], { type: type }); var url = URL.createObjectURL(blob);
+    var a = elem("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    notice("Downloaded " + name + ".", "ok");
+  }
+  function downloadReportCsv() {
+    var items = (data && data.workItems) || [];
+    if (!items.length) { notice("No work items to export yet.", "info"); return; }
+    var gran = repGran.value, d = new Date();
+    var name = "heimdall-report-" + gran + "-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + ".csv";
+    downloadBlob(name, reportCsv(gran), "text/csv;charset=utf-8");
   }
 
   // ---- Settings view ---------------------------------------------------
@@ -1300,7 +2005,39 @@
     weightsBody.appendChild(bb);
 
     renderSettingsManagers();
+    renderChangeLog();
     renderSyncControls();
+  }
+  var changeLogAll = false;   // show every entry, not just the latest CHANGE_SHOWN
+  var CHANGE_SHOWN = 50;
+  function fmtWhen(iso) { var t = tsValue(iso); return t ? new Date(t).toLocaleString() : (iso || "—"); }
+  function changeWhat(c) { return (ENTITY_WORD[c.entity] || c.entity || "") + (c.label ? ": " + c.label : ""); }
+  function renderChangeLog() {
+    clear(changeLogEl);
+    var list = ((data && data.changes) || []).slice().reverse();   // newest first
+    if (!list.length) { changeLogEl.appendChild(elem("div", "empty", "No changes logged yet.")); return; }
+    var shown = changeLogAll ? list : list.slice(0, CHANGE_SHOWN);
+    var tbl = elem("table", "changelog"), thead = elem("thead"), hr = elem("tr");
+    ["When", "Who", "What", "Field", "From", "To"].forEach(function (h) { hr.appendChild(elem("th", null, h)); });
+    thead.appendChild(hr); tbl.appendChild(thead);
+    var tb = elem("tbody");
+    shown.forEach(function (c) {
+      var tr = elem("tr");
+      [fmtWhen(c.at), c.by || "—", changeWhat(c), c.field || "", c.from, c.to].forEach(function (v) { tr.appendChild(tdc(v == null ? "" : String(v))); });
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb); changeLogEl.appendChild(tbl);
+    var bar = elem("div"); bar.style.marginTop = "10px";
+    if (list.length > CHANGE_SHOWN) bar.appendChild(miniBtn(changeLogAll ? "Show latest " + CHANGE_SHOWN : "Show all " + list.length,
+      function () { changeLogAll = !changeLogAll; renderChangeLog(); }));
+    bar.appendChild(document.createTextNode(" "));
+    bar.appendChild(miniBtn("Download CSV", downloadChangeLogCsv));
+    changeLogEl.appendChild(bar);
+  }
+  function downloadChangeLogCsv() {
+    var rows = [["When (UTC)", "Who", "Entity", "Record", "Field", "From", "To"]];
+    ((data && data.changes) || []).forEach(function (c) { rows.push([c.at, c.by, ENTITY_WORD[c.entity] || c.entity, c.label, c.field, c.from, c.to]); });
+    downloadCsv("heimdall-changes-" + stamp(new Date()) + ".csv", rows);
   }
   function renderSettingsManagers() {
     clear(settingsManagers);
@@ -1308,7 +2045,7 @@
     if (!list.length) { settingsManagers.appendChild(elem("div", "empty", "No managers yet.")); return; }
     var tbl = elem("table");
     var thead = elem("thead"); var hr = elem("tr");
-    ["Name", "Title", "Location", "Active", ""].forEach(function (h) { hr.appendChild(elem("th", null, h)); });
+    ["Name", "Title", "Location", "Capacity", "Active", ""].forEach(function (h) { hr.appendChild(elem("th", null, h)); });
     thead.appendChild(hr); tbl.appendChild(thead);
     var tb = elem("tbody");
     list.forEach(function (m) {
@@ -1316,6 +2053,7 @@
       tr.appendChild(tdc(m.name || ""));
       tr.appendChild(tdc(m.title || "—"));
       tr.appendChild(tdc(m.location || "—"));
+      tr.appendChild(tdc(capacityPct(capacityOf(m))));
       tr.appendChild(tdc(m.active ? "Yes" : "No"));
       var act = elem("td", "actions");
       act.appendChild(miniBtn("Edit", function () { editManager(m.id); }, "ghost"));
@@ -1412,7 +2150,11 @@
         if (f.type === "textarea") input = elem("textarea");
         else if (f.type === "select") { input = elem("select"); (f.options || []).forEach(function (o) { var op = elem("option", null, o.label !== undefined ? o.label : o); op.value = (o.value !== undefined) ? o.value : o; input.appendChild(op); }); }
         else if (f.type === "checkbox") { input = elem("input"); input.type = "checkbox"; }
-        else { input = elem("input"); input.type = (f.type === "date") ? "date" : "text"; if (f.placeholder) input.placeholder = f.placeholder; }
+        else {
+          input = elem("input"); input.type = (f.type === "date" || f.type === "number") ? f.type : "text";
+          if (f.type === "number") { input.step = "any"; if (f.min != null) input.min = f.min; if (f.max != null) input.max = f.max; }
+          if (f.placeholder) input.placeholder = f.placeholder;
+        }
         if (f.maxLength && input.tagName !== "SELECT") input.maxLength = f.maxLength;
         input.id = "ff_" + f.key;
         var v = values[f.key];
@@ -1466,42 +2208,189 @@
     });
   }
 
+  // ---- Change log ------------------------------------------------------
+  // Last write wins on the shared file, so a teammate's edit can vanish. The log does
+  // not prevent that; it makes it diagnosable: every commit() diffs the data against
+  // the state at the previous commit (the baseline) and appends one entry per changed
+  // field — {id, at, by, entity, entityId, label, field, from, to} — keeping the last
+  // CHANGE_CAP. It is computed generically, so no mutation needs to remember to log.
+  // Whenever data is replaced (sync, other tab, import, backup), the two logs are
+  // union-merged by entry id: the losing side of a last-write-wins overwrite keeps its
+  // entries, which is the whole point.
+  var COLLS = ["managers", "projects", "assignments", "workItems"];
+  var LOG_SKIP = { id: 1, ownerHistory: 1, scoreHistory: 1 };   // derived or bookkeeping fields
+  var ENTITY_WORD = { managers: "Manager", projects: "Project", assignments: "Assignment", workItems: "Work item", settings: "Settings" };
+  var baseline = null;
+  function snapshotData(d) {
+    var o = {}; COLLS.forEach(function (k) { o[k] = d[k]; });
+    o.settings = { weights: d.settings.weights, effort: d.settings.effort, bands: d.settings.bands };
+    return JSON.parse(JSON.stringify(o));
+  }
+  function resetBaseline() { baseline = data ? snapshotData(data) : null; }
+  function mergeChanges(a, b) {
+    var seen = {}, out = [];
+    (a || []).concat(b || []).forEach(function (c) { if (c && c.id && !seen[c.id]) { seen[c.id] = true; out.push(c); } });
+    out.sort(function (x, y) { return x.at < y.at ? -1 : x.at > y.at ? 1 : 0; });
+    return out.slice(-CHANGE_CAP);
+  }
+  // Data replaced from elsewhere: keep both logs, and diff future commits from here.
+  function replaceData(next) {
+    next.changes = mergeChanges(data && data.changes, next.changes);
+    // Score snapshots live on the manager row, which is last-write-wins as a whole;
+    // merge them by day (the incoming copy wins a day both have) so the losing side's
+    // days are not lost with it.
+    if (data) next.managers.forEach(function (m) {
+      var old = findById(data.managers, m.id);
+      if (old && old.scoreHistory && old.scoreHistory.length)
+        m.scoreHistory = normalizeScoreHistory(old.scoreHistory.concat(m.scoreHistory || []));
+    });
+    data = next; resetBaseline();
+  }
+  function recordLabel(coll, r) {
+    if (!r) return "";
+    if (coll === "assignments") {
+      var p = findById(data.projects, r.projectId);
+      return managerName(r.managerId) + " on " + (p ? p.name : "(project)");
+    }
+    return (coll === "workItems") ? (r.title || "(untitled)") : (r.name || "(unnamed)");
+  }
+  // A value as the log shows it: ids resolved to names, long text shortened.
+  function logValue(field, v) {
+    if (v == null || v === "") return "—";
+    if (field === "managerId") return managerName(v);
+    if (field === "projectId" || field === "relatedProjectId") { var p = findById(data.projects, v); return p ? p.name : "(unknown project)"; }
+    var t = (typeof v === "object") ? JSON.stringify(v) : String(v);
+    return t.length > 80 ? t.slice(0, 79) + "…" : t;
+  }
+  function logChanges() {
+    if (!baseline || !data) { resetBaseline(); return; }
+    var at = new Date().toISOString(), by = userName || data.settings.lastSavedBy || "Unknown", out = [];
+    function add(entity, id, label, field, from, to) {
+      out.push({ id: genId(), at: at, by: by, entity: entity, entityId: id, label: label, field: field,
+                 from: logValue(field, from), to: logValue(field, to) });
+    }
+    COLLS.forEach(function (coll) {
+      var before = {}; baseline[coll].forEach(function (r) { before[r.id] = r; });
+      data[coll].forEach(function (r) {
+        var b = before[r.id], label = recordLabel(coll, r);
+        if (!b) { add(coll, r.id, label, "(added)", null, null); return; }
+        var keys = {}; Object.keys(b).concat(Object.keys(r)).forEach(function (k) { keys[k] = true; });
+        Object.keys(keys).forEach(function (k) {
+          if (LOG_SKIP[k]) return;
+          var x = (b[k] === undefined) ? null : b[k], y = (r[k] === undefined) ? null : r[k];
+          if (JSON.stringify(x) !== JSON.stringify(y)) add(coll, r.id, label, k, x, y);
+        });
+      });
+    });
+    ["weights", "effort"].forEach(function (grp) {
+      var x = baseline.settings[grp] || {}, y = data.settings[grp] || {};
+      Object.keys(y).forEach(function (k) { if (x[k] !== y[k]) add("settings", grp, "Weighting", grp + "." + k, x[k], y[k]); });
+    });
+    if (JSON.stringify(baseline.settings.bands) !== JSON.stringify(data.settings.bands))
+      add("settings", "bands", "Weighting", "bands", (baseline.settings.bands || []).map(bandRangeLabel).join(", "),
+          (data.settings.bands || []).map(bandRangeLabel).join(", "));
+    if (out.length) data.changes = mergeChanges(data.changes, out);
+    resetBaseline();
+  }
+  function bandRangeLabel(b) { return b.label + " " + bandRange(b); }
+
+  // ---- Undo (most recent archive action only) ---------------------------
+  // Archiving is reversible in principle, but Restore lives in History or Settings, and
+  // "Archive all past roll-off" touches many records at once. The last archive-type
+  // action can be undone from the notice bar (or the Needs attention dialog) until the
+  // next change. It records only the fields it changed — {coll, id, field, prev, next}
+  // per record — and undoes by finding each record again by id and putting back a field
+  // only if it still holds the value the action set. It never restores a snapshot of
+  // the whole data set, which would wipe anything a sync brought in meanwhile.
+  var lastUndo = null;   // { label, changes: [...] }
+  function fieldChange(coll, rec, field, next) {
+    return { coll: coll, id: rec.id, field: field, prev: (rec[field] === undefined ? null : rec[field]), next: next };
+  }
+  // Apply a list of field changes (built by fieldChange) and offer to undo them.
+  function applyWithUndo(label, changes, message) {
+    changes.forEach(function (c) { var r = findById(data[c.coll], c.id); if (r) r[c.field] = c.next; });
+    commit();
+    if (!changes.length) return;
+    lastUndo = { label: label, changes: changes };
+    notice(message, "ok");
+    if (noticeTimer) clearTimeout(noticeTimer);   // stays up until replaced or the next change
+    noticeEl.appendChild(document.createTextNode(" "));
+    var b = miniBtn("Undo", undoLast); b.id = "btnUndo"; noticeEl.appendChild(b);
+    updateUndoUI();
+  }
+  async function undoLast() {
+    var u = lastUndo; if (!u) return;
+    if (!(await ensureName())) return;
+    if (u !== lastUndo) return;   // something else changed while the name prompt was up
+    var restored = 0, skipped = 0;
+    u.changes.forEach(function (c) {
+      var r = findById(data[c.coll], c.id);
+      if (r && r[c.field] === c.next) { r[c.field] = c.prev; restored++; } else skipped++;
+    });
+    commit();
+    notice("Undone: " + u.label + "." + (skipped ? " " + skipped + " change" + (skipped === 1 ? "" : "s") +
+      " not undone — edited again since, or no longer in the data." : ""), skipped ? "info" : "ok");
+  }
+  function updateUndoUI() {
+    attnUndo.hidden = !lastUndo;
+    if (lastUndo) attnUndo.textContent = "Undo: " + lastUndo.label;
+  }
+
   // ---- Mutations -------------------------------------------------------
   var GONE_MSG = "That record is no longer in the data — a newer copy was loaded while the form was open. Nothing was changed.";
-  function commit() { renderAll(); scheduleSave(); }
+  // Every change ends the window for undoing the previous archive action.
+  function commit() {
+    if (lastUndo) { lastUndo = null; var ub = el("btnUndo"); if (ub) noticeEl.className = "notice"; updateUndoUI(); }
+    logChanges(); renderAll(); scheduleSave();
+  }
 
   // Managers
+  var MANAGER_FIELDS = [
+    { key: "name", label: "Name", type: "text", required: true },
+    { key: "title", label: "Title", type: "text" },
+    { key: "location", label: "Location", type: "text", placeholder: "e.g. Austin, TX / Remote" },
+    { key: "capacityPct", label: "Capacity (% of a full load)", type: "number", required: true,
+      min: CAPACITY_MIN_PCT, max: CAPACITY_MAX_PCT,
+      hint: "100 = full load. Lower it for a part-timer or someone still ramping (e.g. 50); the heat band then uses score ÷ capacity." },
+    { key: "active", label: "Active", type: "checkbox" }
+  ];
+  function capacityCheck(o) {
+    var n = parseFloat(o.capacityPct);
+    if (!isFinite(n) || n < CAPACITY_MIN_PCT || n > CAPACITY_MAX_PCT)
+      return "Capacity must be between " + CAPACITY_MIN_PCT + " and " + CAPACITY_MAX_PCT + "%.";
+    return "";
+  }
+  function capacityFrom(o) { return Math.round(parseFloat(o.capacityPct)) / 100; }
   async function addManager() {
     if (!(await ensureName())) return;
-    var v = await openForm("Add manager", [
-      { key: "name", label: "Name", type: "text", required: true },
-      { key: "title", label: "Title", type: "text" },
-      { key: "location", label: "Location", type: "text", placeholder: "e.g. Austin, TX / Remote" },
-      { key: "active", label: "Active", type: "checkbox" }
-    ], { active: true });
+    var v = await openForm("Add manager", MANAGER_FIELDS, { active: true, capacityPct: 100 }, { check: capacityCheck });
     if (!v) return;
-    data.managers.push({ id: genId(), name: v.name, title: v.title, location: v.location, active: v.active });
+    data.managers.push({ id: genId(), name: v.name, title: v.title, location: v.location, capacity: capacityFrom(v), active: v.active });
     commit();
   }
+  function archiveManagerChange(m) { return [fieldChange("managers", m, "active", false)]; }
   async function editManager(id) {
     var m = findById(data.managers, id); if (!m) return;
     if (!(await ensureName())) return;
-    var v = await openForm("Edit manager", [
-      { key: "name", label: "Name", type: "text", required: true },
-      { key: "title", label: "Title", type: "text" },
-      { key: "location", label: "Location", type: "text", placeholder: "e.g. Austin, TX / Remote" },
-      { key: "active", label: "Active", type: "checkbox" }
-    ], { name: m.name, title: m.title, location: m.location, active: m.active });
+    var v = await openForm("Edit manager", MANAGER_FIELDS,
+      { name: m.name, title: m.title, location: m.location, capacityPct: Math.round(capacityOf(m) * 100), active: m.active },
+      { check: capacityCheck });
     if (!v) return;
     m = findById(data.managers, id); if (!m) { notice(GONE_MSG, "err"); return; }
     if (m.active && !v.active && !confirmArchiveManager(m)) return;
-    m.name = v.name; m.title = v.title; m.location = v.location; m.active = v.active;
+    var archiving = m.active && !v.active;
+    m.name = v.name; m.title = v.title; m.location = v.location; m.capacity = capacityFrom(v);
+    if (archiving) { applyWithUndo("archive " + m.name, archiveManagerChange(m), "“" + m.name + "” archived — Settings → Restore brings them back."); return; }
+    m.active = v.active;
     commit();
   }
   async function toggleManagerActive(id) {
     var m = findById(data.managers, id); if (!m) return;
     if (m.active && !confirmArchiveManager(m)) return;
-    if (!(await ensureName())) return; m.active = !m.active; commit();
+    if (!(await ensureName())) return;
+    m = findById(data.managers, id); if (!m) { notice(GONE_MSG, "err"); return; }
+    if (m.active) { applyWithUndo("archive " + m.name, archiveManagerChange(m), "“" + m.name + "” archived — Settings → Restore brings them back."); return; }
+    m.active = true; commit();
   }
   // Archiving takes a manager off the board and out of scoring, but not their work —
   // say what they still carry before it drops out of sight.
@@ -1517,7 +2406,7 @@
   }
 
   // Work items
-  function workItemFields(currentManagerId) {
+  function workItemFields(currentManagerId, currentProjectId) {
     return [
       { key: "type", label: "Type", type: "select", options: enumOpts(WORK_TYPES, "type") },
       // Shown only when Type is "Other": the free-text label used everywhere in place of "Other".
@@ -1527,7 +2416,7 @@
       { key: "title", label: "Title", type: "text", required: true, full: true },
       { key: "managerId", label: "Owner (manager)", type: "select", options: managerOpts(true, "— none —", currentManagerId) },
       { key: "relatedProjectId", label: "Related project", type: "select",
-        options: [{ value: "", label: "— none —" }].concat(data.projects.map(function (p) { return { value: p.id, label: p.name }; })) },
+        options: projectOpts("— none —", currentProjectId) },
       { key: "status", label: "Status", type: "select", options: enumOpts(WORK_STATUS, "wstatus") },
       { key: "priority", label: "Priority", type: "select", options: enumOpts(PRIORITY, "priority") },
       { key: "openedDate", label: "Opened date", type: "date" },
@@ -1543,31 +2432,37 @@
     if (o.openedDate && o.rollOffDate && o.rollOffDate < o.openedDate) return "The roll-off date is before the opened date.";
     return "";
   }
-  async function addWorkItem(presetManager) {
+  async function addWorkItem(presetManager, presetProject) {
     if (!(await ensureName())) return;
     var defaults = { type: "escalation", status: "open", priority: "med", openedDate: todayISO() };
     if (presetManager) defaults.managerId = presetManager;
-    var v = await openForm("Add work item", workItemFields(presetManager), defaults, { wide: true, check: workItemDateCheck });
+    if (presetProject) defaults.relatedProjectId = presetProject;
+    var v = await openForm("Add work item", workItemFields(presetManager, presetProject), defaults, { wide: true, check: workItemDateCheck });
     if (!v) return;
     data.workItems.push({
       id: genId(), type: v.type, typeOther: typeOtherOf(v), title: v.title, managerId: v.managerId, relatedProjectId: v.relatedProjectId,
       status: v.status, priority: v.priority, openedDate: v.openedDate, dueDate: v.dueDate, rollOffDate: v.rollOffDate,
       // Logged as already Done: straight to History, the same as marking it done later.
-      completedDate: (v.status === "done") ? todayISO() : null, archived: (v.status === "done"), link: v.link, notes: v.notes
+      completedDate: (v.status === "done") ? todayISO() : null, archived: (v.status === "done"), link: v.link, notes: v.notes,
+      ownerHistory: v.managerId ? [{ managerId: v.managerId, from: v.openedDate || todayISO(), to: null }] : []
     });
     commit();
   }
   async function editWorkItem(id) {
     var w = findById(data.workItems, id); if (!w) return;
     if (!(await ensureName())) return;
-    var v = await openForm("Edit work item", workItemFields(w.managerId), w, { wide: true, check: workItemDateCheck });
+    // Items saved without a priority or status display as Med / Open; seed the form with
+    // the same, or it falls back to the first option (Low) and saves that instead.
+    var shown = Object.assign({}, w, { priority: w.priority || "med", status: w.status || "open" });
+    var v = await openForm("Edit work item", workItemFields(w.managerId, w.relatedProjectId), shown, { wide: true, check: workItemDateCheck });
     if (!v) return;
     // A sync can replace `data` while the form is open (returning to the tab pulls the
     // shared file); writing to the object captured before it would silently drop the edit.
     w = findById(data.workItems, id); if (!w) { notice(GONE_MSG, "err"); return; }
     var wasDone = (w.status === "done");
     if (v.status === "done") { if (!w.completedDate) w.completedDate = todayISO(); w.archived = true; }
-    else { w.completedDate = null; if (wasDone) w.archived = false; } // reopening restores from history
+    else { w.completedDate = null; if (wasDone) { w.archived = false; w.archivedDate = null; } } // reopening restores from history
+    if ((v.managerId || null) !== (w.managerId || null)) reassignOwner(w, v.managerId);
     w.type = v.type; w.typeOther = typeOtherOf(v); w.title = v.title; w.managerId = v.managerId; w.relatedProjectId = v.relatedProjectId;
     w.status = v.status; w.priority = v.priority; w.openedDate = v.openedDate; w.dueDate = v.dueDate;
     w.rollOffDate = v.rollOffDate; w.link = v.link; w.notes = v.notes;
@@ -1576,17 +2471,31 @@
   async function markWorkItemDone(id) {
     var w = findById(data.workItems, id); if (!w) return;
     if (!(await ensureName())) return;
-    w.status = "done"; w.completedDate = todayISO(); w.archived = true; // done -> history
-    commit();
-    notice("Marked done — moved to History (Work Items → Show: History).", "ok");
+    w = findById(data.workItems, id); if (!w) { notice(GONE_MSG, "err"); return; }
+    // done -> history
+    applyWithUndo("mark “" + w.title + "” done", [
+      fieldChange("workItems", w, "status", "done"), fieldChange("workItems", w, "completedDate", todayISO()),
+      fieldChange("workItems", w, "archived", true)
+    ], "Marked done — moved to History (Work Items → Show: History).");
   }
-  async function toggleWorkItemArchived(id) { var w = findById(data.workItems, id); if (!w) return; if (!(await ensureName())) return; w.archived = !w.archived; commit(); }
+  // Archiving a work item records the day, so "carried" reports know when it stopped.
+  function archiveWorkItemChanges(w) {
+    return [fieldChange("workItems", w, "archived", true), fieldChange("workItems", w, "archivedDate", todayISO())];
+  }
+  async function toggleWorkItemArchived(id) {
+    var w = findById(data.workItems, id); if (!w) return;
+    if (!(await ensureName())) return;
+    w = findById(data.workItems, id); if (!w) { notice(GONE_MSG, "err"); return; }
+    if (w.archived) { w.archived = false; w.archivedDate = null; commit(); return; }
+    applyWithUndo("archive “" + w.title + "”", archiveWorkItemChanges(w),
+      "Archived “" + w.title + "” — it stays in History.");
+  }
 
   // Assign a manager to a project (from the drawer); excludes projects they're already on.
   async function assignManagerToProject(managerId) {
     var taken = {};
     activeForManager(managerId).forEach(function (a) { taken[a.projectId] = true; });
-    var avail = data.projects.filter(function (p) { return p.status !== "complete" && !taken[p.id]; });
+    var avail = data.projects.filter(function (p) { return p.status !== "complete" && !p.archived && !taken[p.id]; });
     if (!avail.length) { notice("No available projects to assign (already on all active ones, or none exist).", "err"); return; }
     if (!(await ensureName())) return;
     var v = await openForm("Assign to a project", [
@@ -1774,6 +2683,24 @@
     notice("“" + p.name + "” reopened — it counts toward workload again.", "ok");
   }
 
+  // Archiving is for a project that should not be on the list at all — entered by
+  // mistake, a duplicate, cancelled before it started. Finished work is closed out
+  // instead. The team, its assignments, and related work items are left untouched, so
+  // Restore brings the project back exactly as it was.
+  async function toggleProjectArchived(id) {
+    var p = findById(data.projects, id); if (!p) return;
+    if (!p.archived && !window.confirm("Archive “" + p.name + "”? It leaves the Projects list and stops counting toward " +
+        "anyone's workload. Its team and related work items are kept, and Projects → Show archived → Restore brings it back.\n\n" +
+        "(Finished projects are usually closed out instead.)")) return;
+    if (!(await ensureName())) return;
+    p = findById(data.projects, id); if (!p) { notice(GONE_MSG, "err"); return; }
+    if (!p.archived) { applyWithUndo("archive “" + p.name + "”", [fieldChange("projects", p, "archived", true)],
+      "“" + p.name + "” archived. Projects → Show archived lists it."); return; }
+    p.archived = false;
+    commit();
+    notice("“" + p.name + "” restored.", "ok");
+  }
+
   // ---- Manager detail drawer -------------------------------------------
   // body.drawer-open lets the print stylesheet print the 1:1 drawer on its own.
   function openManager(id) { openManagerId = id; renderDrawer(); drawerOverlay.className = "drawer-overlay show"; document.body.classList.add("drawer-open"); }
@@ -1803,12 +2730,20 @@
     head.appendChild(miniBtn("✕", closeDrawer, "ghost d-close"));
     drawerBody.appendChild(head);
 
-    var sc = managerScore(m.id), b = bandFor(sc.score);
+    var sc = managerScore(m.id), b = bandFor(sc.load);
     var heatRow = elem("div"); heatRow.style.margin = "12px 0 4px";
-    heatRow.appendChild(heatLabelEl(b, sc.score));
-    var scoreSpan = elem("span", "m-score", "  score " + round1(sc.score)); scoreSpan.style.marginLeft = "8px";
+    heatRow.appendChild(heatLabelEl(b, sc));
+    var scoreSpan = elem("span", "m-score", "  score " + scoreText(sc)); scoreSpan.style.marginLeft = "8px";
     heatRow.appendChild(scoreSpan);
     drawerBody.appendChild(heatRow);
+    var trendBox = elem("div", "d-trend");
+    if (hasTrend(m)) {
+      trendBox.appendChild(trendSvg(trendSeries(m, TREND_DRAWER_DAYS), 400, 70, true, "trend"));
+      var tl = elem("div", "d-trend-lab");
+      tl.appendChild(elem("span", null, "6 months ago")); tl.appendChild(elem("span", null, bandSinceText(m))); tl.appendChild(elem("span", null, "today"));
+      trendBox.appendChild(tl);
+    } else trendBox.appendChild(elem("div", "d-empty", "Trend: builds up from today — one point per day the data is saved."));
+    drawerBody.appendChild(trendBox);
 
     var actions = elem("div", "d-actions");
     actions.appendChild(miniBtn("+ Work item", function () { addWorkItem(m.id); }, "primary"));
@@ -1835,12 +2770,13 @@
     })));
     drawerBody.appendChild(drawerSection("Recently completed (wins)", d.wins.map(carryLine)));
     drawerBody.appendChild(drawerSection("Rolling off soon / overdue", d.roll.map(carryLine)));
+    if (d.handed.length) drawerBody.appendChild(drawerSection("Handed off (last 90 days)", d.handed.map(carryLine)));
   }
   function managerCarry(id) {
     var current = [], wins = [], roll = [];
     data.assignments.forEach(function (a) {
       if (a.archived || a.managerId !== id) return;
-      var p = findById(data.projects, a.projectId); if (!p) return;
+      var p = findById(data.projects, a.projectId); if (!p || p.archived) return;
       if (p.status === "active") current.push({ text: "Project: " + p.name + " — " + lab("role", a.role) + " (" + lab("effort", a.effort) + ")", projectId: p.id });
       // Closing out a project settles its assignments (as in Needs attention), so their
       // end dates are no longer something to roll off.
@@ -1848,24 +2784,37 @@
     });
     data.workItems.forEach(function (w) {
       if (w.managerId !== id) return;
-      if (!w.archived && (w.status === "open" || w.status === "in-progress")) current.push({ text: typeLabel(w) + ": " + w.title + " [" + lab("wstatus", w.status) + "]", wiId: w.id });
+      // Name the related project, so the drawer and the 1:1 summary say what it is for.
+      var rp = relatedProject(w), forP = rp ? " · " + projectLabel(rp) : "";
+      if (!w.archived && (w.status === "open" || w.status === "in-progress")) current.push({ text: typeLabel(w) + ": " + w.title + forP + " [" + lab("wstatus", w.status) + "]", wiId: w.id });
       if (w.status === "done" && w.completedDate) wins.push({ text: typeLabel(w) + ": " + w.title + " (done " + w.completedDate + ")", wiId: w.id, date: w.completedDate });
       if (!w.archived && w.status !== "done" && w.rollOffDate && soon(w.rollOffDate)) roll.push({ text: typeLabel(w) + ": " + w.title + " rolls off " + w.rollOffDate, wiId: w.id });
     });
+    // Work they owned until recently and gave to someone else (or back to the Backlog).
+    var handed = [], since = isoOf(addDays(startOfToday(), -HANDOFF_DAYS));
+    data.workItems.forEach(function (w) {
+      if (w.managerId === id) return;
+      var gave = null;
+      (w.ownerHistory || []).forEach(function (e) { if (e.managerId === id && e.to && e.to >= since) gave = e.to; });
+      if (gave) handed.push({ text: typeLabel(w) + ": " + w.title + " → " + (w.managerId ? managerName(w.managerId) : "Backlog") + " (" + gave + ")", wiId: w.id, date: gave });
+    });
+    handed.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
     // Newest first by completion date — sorting on the text sorted by type label — and
     // only the most recent few, so "Recently completed" stays recent as history grows.
     wins.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
-    return { current: current, wins: wins.slice(0, MAX_WINS), roll: roll };
+    return { current: current, wins: wins.slice(0, MAX_WINS), roll: roll, handed: handed };
   }
   function summaryText(id) {
     var m = findById(data.managers, id); if (!m) return "";
-    var sc = managerScore(id), b = bandFor(sc.score), d = managerCarry(id);
+    var sc = managerScore(id), b = bandFor(sc.load), d = managerCarry(id);
     // Every list managerCarry returns holds {text, …} entries, not strings.
     function block(t, items) { return t + "\n" + (items.length ? items.map(function (x) { return "  - " + x.text; }).join("\n") : "  (none)") + "\n"; }
     return "1:1 Prep — " + m.name + (m.title ? " (" + m.title + ")" : "") + (m.location ? " — " + m.location : "") + "\n" +
-      "Generated " + new Date().toLocaleString() + "\n" + "Workload: " + b.label + " (score " + round1(sc.score) + ")\n\n" +
+      "Generated " + new Date().toLocaleString() + "\n" + "Workload: " + b.label + " (score " + scoreText(sc) + ")\n" +
+      (hasTrend(m) ? "Trend: " + bandSinceText(m) + "\n" : "") + "\n" +
       block("Currently carrying:", d.current) + "\n" +
-      block("Recently completed (wins):", d.wins) + "\n" + block("Rolling off soon / overdue:", d.roll);
+      block("Recently completed (wins):", d.wins) + "\n" + block("Rolling off soon / overdue:", d.roll) +
+      (d.handed.length ? "\n" + block("Handed off (last " + HANDOFF_DAYS + " days):", d.handed) : "");
   }
   async function copySummary(id) {
     var text = summaryText(id);
@@ -1927,12 +2876,12 @@
       var p = findById(data.projects, a.projectId);
       // A closed-out project settled its assignments already — don't keep nagging
       // about end dates on work that is finished.
-      if (p && p.status === "complete") return;
+      if (p && (p.status === "complete" || p.archived)) return;
       out.push({ kind: "as-roll", id: a.id, why: "Ended " + a.endDate, projectId: p ? p.id : null,
                  text: "Assignment: " + managerName(a.managerId) + " on " + (p ? p.name : "(project)") });
     });
     data.projects.forEach(function (p) {
-      if (p.status !== "active" || !p.targetDate || p.targetDate >= today) return;
+      if (p.archived || p.status !== "active" || !p.targetDate || p.targetDate >= today) return;
       out.push({ kind: "proj-past", id: p.id, projectId: p.id, why: "Past target " + p.targetDate,
                  text: "Project: " + p.name });
     });
@@ -1979,20 +2928,27 @@
     });
   }
   function openAttn() { renderAttnList(); attnOverlay.className = "overlay show"; }
+  // The archive changes for a roll-off row in Needs attention ([] if it is gone).
+  function attnArchiveChanges(it) {
+    if (it.kind === "as-roll") { var a = findById(data.assignments, it.id); return a ? [fieldChange("assignments", a, "archived", true)] : []; }
+    var w = findById(data.workItems, it.id); return w ? archiveWorkItemChanges(w) : [];
+  }
   async function archiveFromAttn(it) {
     if (!(await ensureName())) return;
-    if (it.kind === "as-roll") { var a = findById(data.assignments, it.id); if (a) a.archived = true; }
-    else { var w = findById(data.workItems, it.id); if (w) w.archived = true; }
-    commit(); renderAttnList();
+    applyWithUndo("archive 1 item", attnArchiveChanges(it), "Archived — it remains in History.");
+    renderAttnList();
   }
   async function archiveAllPastRollOff() {
     if (!(await ensureName())) return;
+    var changes = [], n = 0;
     attentionItems().forEach(function (it) {
-      if (it.kind === "wi-roll") { var w = findById(data.workItems, it.id); if (w) w.archived = true; }
-      else if (it.kind === "as-roll") { var a = findById(data.assignments, it.id); if (a) a.archived = true; }
+      if (it.kind !== "wi-roll" && it.kind !== "as-roll") return;
+      n++; changes = changes.concat(attnArchiveChanges(it));
     });
-    commit(); renderAttnList();
-    notice("Past roll-off items archived — they remain in History.", "ok");
+    if (!changes.length) { notice("Nothing is past its roll-off date.", "info"); return; }
+    applyWithUndo("archive " + n + " past roll-off", changes,
+      n + " past roll-off item" + (n === 1 ? "" : "s") + " archived — they remain in History.");
+    renderAttnList();
   }
 
   // ---- Global search -----------------------------------------------------
@@ -2017,7 +2973,7 @@
     }
     if (ps.length) {
       searchPop.appendChild(elem("div", "sr-group", "Projects"));
-      ps.slice(0, 5).forEach(function (p) { item(p.name, function () { goToProject(p.id); }); });
+      ps.slice(0, 5).forEach(function (p) { item(projectLabel(p), function () { goToProject(p.id); }); });
     }
     if (ws.length) {
       searchPop.appendChild(elem("div", "sr-group", "Work items"));
@@ -2075,6 +3031,7 @@
     if (!data) return;
     setSaveStatus("saving");
     var who = userName || (data.settings && data.settings.lastSavedBy) || "Unknown";
+    recordScoreHistory();
     data.settings.lastSavedBy = who; data.settings.lastSavedAt = new Date().toISOString();
     data.settings.appVersion = APP_VERSION;
     await saveLocal(); updateBanner();
@@ -2131,8 +3088,8 @@
       var fileTs = tsValue(v.data.settings.lastSavedAt), localTs = tsValue(data && data.settings && data.settings.lastSavedAt);
       // renderAll, not just the current view: the filter selects and the Needs attention
       // chip are derived from the data too, and were left showing the old copy.
-      if (fileTs > localTs) { data = v.data; await saveLocal(); updateBanner(); renderAll(); setSaveStatus("saved"); notice(interactive ? "Loaded the latest from the shared file." : "Updated with a teammate's latest changes.", interactive ? "ok" : "info"); }
-      else if (localTs > fileTs) { await writeToFile(); setSaveStatus("saved"); if (interactive) notice("Your local changes were newer — synced them to the shared file.", "ok"); }
+      if (fileTs > localTs) { replaceData(v.data); await saveLocal(); updateBanner(); renderAll(); setSaveStatus("saved"); notice(interactive ? "Loaded the latest from the shared file." : "Updated with a teammate's latest changes.", interactive ? "ok" : "info"); }
+      else if (localTs > fileTs) { data.changes = mergeChanges(data.changes, v.data.changes); await saveLocal(); await writeToFile(); setSaveStatus("saved"); if (interactive) notice("Your local changes were newer — synced them to the shared file.", "ok"); }
       else if (interactive) notice("Already up to date.", "ok");
     } catch (e) { if (interactive) notice("Sync failed: " + (e && e.message ? e.message : e), "err"); }
     finally { syncing = false; }
@@ -2149,7 +3106,7 @@
       var stored = await idbGet("data"); if (stored == null) return;
       var v = validate(stored); if (!v.ok) return;
       if (tsValue(v.data.settings.lastSavedAt) > tsValue(data.settings.lastSavedAt)) {
-        data = v.data; updateBanner(); renderAll();
+        replaceData(v.data); updateBanner(); renderAll();
         notice("Loaded newer changes saved from another Heimdall tab or window.", "info");
       }
     } catch (e) {} finally { localSyncing = false; }
@@ -2172,7 +3129,7 @@
     try { parsed = JSON.parse(text); } catch (e) { notice("Import failed — not valid JSON (" + e.message + ").", "err"); return; }
     var v = validate(parsed); if (!v.ok) { notice("Import failed — not a valid Heimdall data file: " + v.error, "err"); return; }
     if (hasContent(data) && !window.confirm("Importing will replace all current data in this browser with the contents of the selected file. Continue?")) return;
-    data = v.data; await ensureName();
+    replaceData(v.data); await ensureName();
     data.settings.lastSavedBy = userName || data.settings.lastSavedBy || "Unknown"; data.settings.lastSavedAt = new Date().toISOString();
     await saveLocal(); updateBanner(); renderAll(); scheduleSave(); notice("Imported and saved.", "ok");
   }
@@ -2184,7 +3141,7 @@
       try { parsed = JSON.parse(text); } catch (e) { notice("That backup is also invalid JSON (" + e.message + ").", "err"); return; }
       var v = validate(parsed); if (!v.ok) { notice("That backup is not a valid Heimdall data file: " + v.error, "err"); return; }
       if (hasContent(data) && !window.confirm("Loading this backup will replace all current data in this browser. Continue?")) return;
-      data = v.data; fileBlocked = false; hideGuard(); await saveLocal(); updateBanner(); renderAll(); scheduleSave();
+      replaceData(v.data); fileBlocked = false; hideGuard(); await saveLocal(); updateBanner(); renderAll(); scheduleSave();
       notice("Loaded from backup — restoring the shared file.", "ok");
     } catch (e) { if (e && e.name === "AbortError") return; notice("Could not load backup: " + (e && e.message ? e.message : e), "err"); }
   }
@@ -2196,15 +3153,26 @@
   btnGuardUnlink.addEventListener("click", unlinkSharedFile);
   btnAddManager.addEventListener("click", addManager);
   btnAddProject.addEventListener("click", function () { openProjectModal(null); });
+  projShowArchived.addEventListener("change", renderProjectsView);
   btnAddWorkItem.addEventListener("click", function () { addWorkItem(null); });
   btnExport.addEventListener("click", exportJson);
   btnImport.addEventListener("click", importJson);
   importInput.addEventListener("change", onImportFile);
   navEl.addEventListener("click", function (e) { var v = e.target && e.target.getAttribute && e.target.getAttribute("data-view"); if (v) showView(v); });
-  [fScope, fType, fManager, fStatus, fFrom, fTo].forEach(function (s) { s.addEventListener("change", renderWorkItemsView); });
-  fClear.addEventListener("click", function () { fScope.value = "active"; fType.value = ""; fManager.value = ""; fStatus.value = ""; fFrom.value = ""; fTo.value = ""; renderWorkItemsView(); });
+  [fScope, fType, fManager, fProject, fStatus, fFrom, fTo].forEach(function (s) { s.addEventListener("change", renderWorkItemsView); });
+  fClear.addEventListener("click", function () { fScope.value = "active"; fType.value = ""; fManager.value = ""; fProject.value = ""; fStatus.value = ""; fFrom.value = ""; fTo.value = ""; renderWorkItemsView(); });
+  tlSort.addEventListener("change", renderTimeline);
   repGran.addEventListener("change", renderReports);
+  btnReportCsv.addEventListener("click", downloadReportCsv);
   btnSaveSettings.addEventListener("click", saveSettings);
+  function currentTheme() { var t = document.documentElement.getAttribute("data-theme"); return (t === "light" || t === "dark") ? t : "system"; }
+  themeSel.value = currentTheme();
+  themeSel.addEventListener("change", function () {
+    var t = themeSel.value;
+    if (t === "system") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", t);
+    try { if (t === "system") localStorage.removeItem("heimdall-theme"); else localStorage.setItem("heimdall-theme", t); } catch (e) {}
+  });
   btnResetSettings.addEventListener("click", resetSettings);
   projAddMember.addEventListener("click", addTeamMember);
   projOk.addEventListener("click", saveProject);
@@ -2213,6 +3181,7 @@
   attnChip.addEventListener("click", openAttn);
   attnClose.addEventListener("click", function () { attnOverlay.className = "overlay"; });
   attnArchiveAll.addEventListener("click", archiveAllPastRollOff);
+  attnUndo.addEventListener("click", function () { undoLast().then(renderAttnList); });
   searchInput.addEventListener("input", renderSearch);
   searchInput.addEventListener("focus", renderSearch);
   btnQuickAdd.addEventListener("click", function (e) { e.stopPropagation(); closeSearch(); toggleQuickMenu(); });
@@ -2257,6 +3226,7 @@
       } catch (e) { dbReady = false; }
     }
     if (!data) data = defaultData();
+    resetBaseline();
     updateBanner(); renderAll(); setSaveStatus(hasContent(data) ? "saved" : "");
     if (DIR_API && dbReady) {
       var savedDir = null; try { savedDir = await idbGet("dirHandle"); } catch (e) {}

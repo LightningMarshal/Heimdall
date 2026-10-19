@@ -1,0 +1,11 @@
+{
+  "name": "heimdall-dev",
+  "private": true,
+  "description": "Dev-time tooling only. heimdall.html has no dependencies and needs none of this to run.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}
