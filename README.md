@@ -64,6 +64,10 @@ once so the "Last saved by" banner can attribute changes.
 - **Work Items queue** — filterable by scope (Active / All / History), type, owner,
   related project, status, and date range, with an aging flag for items open 14+ days.
   An item's related project shows under its title and links to it.
+- **Reassignment history** — a work item remembers every owner and when they had it.
+  The queue shows "previously …", the earlier owner's drawer and 1:1 summary list it
+  under *Handed off* for 90 days, and Reports → *Work items carried per manager* counts
+  it for each person who owned it during a period.
 - **Backlog** — unassigned items surface next to the board so distribution
   decisions happen where the load is visible.
 - **Needs attention** — items past their roll-off / end date or overdue are never
@@ -161,7 +165,7 @@ description, status, priority, startDate, targetDate, completedDate, link, archi
 `assignments[]` (id, projectId, managerId, role, effort, startDate, endDate,
 archived) · `workItems[]` (id, type, typeOther, title, managerId, relatedProjectId,
 status, priority, openedDate, dueDate, rollOffDate, completedDate, archived, link,
-notes) ·
+notes, ownerHistory[] of {managerId, from, to}) ·
 `changes[]` (id, at, by, entity, entityId, label, field, from, to — capped at 500) ·
 `settings` (weights, effort, bands, appVersion, lastSavedBy, lastSavedAt).
 

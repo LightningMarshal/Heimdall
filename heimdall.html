@@ -185,6 +185,8 @@
              background: var(--surface-2); }
   tbody tr:last-child td { border-bottom: none; }
   tr.archived td { opacity: .5; }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .panel.carried { margin-top: 22px; }
   table.changelog td { font-size: 13px; vertical-align: top; }
   table.changelog td:first-child { white-space: nowrap; color: var(--muted); }
   td.actions { white-space: nowrap; text-align: right; }
@@ -646,6 +648,10 @@
           Needs attention dialog), until you make another change. Undo puts back only what that action changed; anything
           edited again since is left as it is.</li>
         <li><strong>Age:</strong> the queue flags items that have been open 14+ days.</li>
+        <li><strong>Reassigning:</strong> changing a work item's owner keeps a record of who had it and when. The queue shows
+          “previously …” under the title, the earlier owner's drawer lists it under <em>Handed off</em> for 90 days, and
+          Reports → <em>Work items carried per manager</em> counts it for everyone who owned it during a period — so “how
+          much did Ada carry last quarter” stays answerable after her work moves on.</li>
         <li><strong>Reports:</strong> counts work items by the period they were opened in (all time, year, quarter,
           month, or ISO week), split by type. The chart shows the 20 most recent periods. <em>Download CSV</em> saves
           every period at the grouping you've picked — one row per period, oldest first, with Total and a column per
@@ -780,7 +786,7 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.12.0";
+  var APP_VERSION = "0.13.0";
   var MAX_BACKUPS = 10;
   // Minimum spacing between backups. One per save meant ten quick edits rotated out
   // every older backup, so the ten on disk only ever covered the last few minutes.
@@ -809,6 +815,7 @@
   var TYPE_COLOR = { escalation: "#dc2626", ditl: "#2563eb", oneoff: "#d97706", other: "#6b7280" };
   var TYPE_OTHER_MAX = 60;   // free-text label captured when Type is "Other"
   var CHANGE_CAP = 500;      // change-log entries kept; the oldest drop off first
+  var HANDOFF_DAYS = 90;     // the drawer's "Handed off" look-back
   var MAX_WINS = 10;         // "Recently completed" entries shown in the drawer and 1:1 summary
   // Capacity is entered as a percentage of a full load (100 = full time, 50 = half,
   // a new hire still ramping) and stored as a fraction on the manager.
@@ -896,6 +903,7 @@
     // divide oddly, and 0 or a negative would put Infinity or nonsense on the board.
     // Anything unusable (including a file from before 0.8.0) means a full load.
     out.managers.forEach(function (m) { var c = toNum(m.capacity); m.capacity = (c != null && c > 0) ? c : 1; });
+    out.workItems.forEach(normalizeOwnerHistory);
     out.changes = mergeChanges([], changes.filter(function (c) { return isPlainObject(c) && typeof c.id === "string" && c.id; }));
     if (isPlainObject(parsed.settings)) {
       var s = parsed.settings;
@@ -920,6 +928,36 @@
       }
     }
     return { ok: true, data: out };
+  }
+  // workItems[].ownerHistory: [{ managerId, from, to }] — who owned the item and when
+  // (plain local dates; to is null for the current owner). Items from before 0.13.0
+  // get one entry for their current owner, starting on the opened date. An older copy
+  // of the app can reassign without updating it, so if the open entry no longer names
+  // the current owner it is closed today and a new one opened.
+  function normalizeOwnerHistory(w) {
+    var h = Array.isArray(w.ownerHistory) ? w.ownerHistory.filter(function (e) {
+      return isPlainObject(e) && typeof e.managerId === "string" && e.managerId;
+    }).map(function (e) {
+      return { managerId: e.managerId, from: (typeof e.from === "string" && e.from) ? e.from : null,
+               to: (typeof e.to === "string" && e.to) ? e.to : null };
+    }) : null;
+    if (!h) h = w.managerId ? [{ managerId: w.managerId, from: w.openedDate || null, to: null }] : [];
+    var last = h.length ? h[h.length - 1] : null;
+    if (last && !last.to && last.managerId !== w.managerId) { last.to = todayISO(); last = null; }
+    var open = (last && !last.to) ? last : null;
+    if (w.managerId && !open) h.push({ managerId: w.managerId, from: todayISO(), to: null });
+    w.ownerHistory = h;
+  }
+  // Record a change of owner on a work item: close the current entry today and open one
+  // for the new owner (none when it goes back to the Backlog).
+  function reassignOwner(w, managerId) {
+    var h = Array.isArray(w.ownerHistory) ? w.ownerHistory : (w.ownerHistory = []), today = todayISO();
+    var last = h.length ? h[h.length - 1] : null;
+    if (last && !last.to) {
+      // Changed the same day it was given: the earlier owner never really carried it.
+      if (last.from === today && h.length > 1) h.pop(); else last.to = today;
+    }
+    if (managerId) h.push({ managerId: managerId, from: today, to: null });
   }
   function toNum(v) { var n = (typeof v === "number") ? v : parseFloat(v); return isFinite(n) ? n : null; }
   function numbersOver(defaults, given) {
@@ -1459,6 +1497,49 @@
     return line;
   }
 
+  // ---- Owner history ---------------------------------------------------
+  // Earlier owners of a work item (not the current one), oldest first, each once.
+  function previousOwners(w) {
+    var seen = {}, out = [];
+    (w.ownerHistory || []).forEach(function (e) {
+      if (e.managerId === w.managerId || seen[e.managerId]) return;
+      seen[e.managerId] = true; out.push(e.managerId);
+    });
+    return out;
+  }
+  // The last day a work item was being carried at all: its completion date when done,
+  // its roll-off date when archived without being done (the archive day itself is not
+  // recorded), otherwise today.
+  function carriedUntil(w) {
+    if (w.status === "done" && w.completedDate) return w.completedDate;
+    if (w.archived && w.rollOffDate) return w.rollOffDate;
+    return todayISO();
+  }
+  // Did manager id own work item w at any point between two local dates (inclusive)?
+  function ownedDuring(w, id, start, end) {
+    var stop = carriedUntil(w);
+    return (w.ownerHistory || []).some(function (e) {
+      if (e.managerId !== id) return false;
+      var from = e.from || w.openedDate || "0000-00-00", to = e.to || stop;
+      if (to > stop) to = stop;
+      return from <= end && to >= start;
+    });
+  }
+  function isoOf(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  // The n most recent periods at a grouping, oldest first: [{ label, start, end }].
+  function recentPeriods(gran, n) {
+    var t = startOfToday(), y = t.getFullYear(), m = t.getMonth(), out = [], k, st, en;
+    if (gran === "all") return [{ label: "All time", start: "0000-00-00", end: todayISO() }];
+    for (k = n - 1; k >= 0; k--) {
+      if (gran === "year") { st = new Date(y - k, 0, 1); en = new Date(y - k, 11, 31); }
+      else if (gran === "quarter") { var q = Math.floor(m / 3) - k; st = new Date(y, q * 3, 1); en = new Date(y, q * 3 + 3, 0); }
+      else if (gran === "week") { st = new Date(y, m, t.getDate() - ((t.getDay() + 6) % 7) - 7 * k); en = new Date(st.getFullYear(), st.getMonth(), st.getDate() + 6); }
+      else { st = new Date(y, m - k, 1); en = new Date(y, m - k + 1, 0); }
+      out.push({ label: periodKey(isoOf(st), gran), start: isoOf(st), end: isoOf(en) });
+    }
+    return out;
+  }
+
   // ---- Work Items view -------------------------------------------------
   // A plain date has no time zone: read "2026-01-01" as local midnight on that day,
   // never as UTC midnight (which is the previous day for anyone west of UTC).
@@ -1505,6 +1586,8 @@
       var titleTd = tdc(w.title || "");
       var wHref = w.link ? safeHref(w.link) : null;
       if (wHref) { titleTd.textContent = ""; var a = elem("a", null, w.title || "(item)"); a.href = wHref; a.target = "_blank"; a.rel = "noopener"; titleTd.appendChild(a); }
+      var prev = previousOwners(w);
+      if (prev.length) titleTd.appendChild(elem("span", "wi-proj", "previously " + prev.map(managerName).join(", ")));
       var rp = relatedProject(w);
       if (rp) {
         var sub = elem("span", "wi-proj", "↳ ");
@@ -1599,6 +1682,34 @@
     reportBody.appendChild(wrap);
     if (rb.keys.length > REPORT_ROWS) reportBody.appendChild(elem("p", "hint", "Showing the " + REPORT_ROWS +
       " most recent of " + rb.keys.length + " periods. Download CSV includes every period."));
+    reportBody.appendChild(carriedTable(items, repGran.value));
+  }
+  // Work items each manager carried — owned at any point — in the latest few periods.
+  // Built from owner history, so an item reassigned mid-quarter counts for both people.
+  function carriedTable(items, gran) {
+    var wrap = elem("div", "panel carried");
+    wrap.appendChild(elem("h3", "sec", "Work items carried per manager"));
+    wrap.appendChild(elem("p", "hint", "Each item counts for everyone who owned it at any point in the period, so work that " +
+      "changed hands counts for both. Project roles aren't included."));
+    var periods = recentPeriods(gran, 4);
+    var rows = data.managers.map(function (m) {
+      return { m: m, n: periods.map(function (p) { return items.filter(function (w) { return ownedDuring(w, m.id, p.start, p.end); }).length; }) };
+    }).filter(function (r) { return r.m.active || r.n.some(function (x) { return x; }); });
+    if (!rows.length) { wrap.appendChild(elem("div", "d-empty", "No managers yet.")); return wrap; }
+    var tbl = elem("table"), thead = elem("thead"), hr = elem("tr");
+    hr.appendChild(elem("th", null, "Manager"));
+    periods.forEach(function (p) { hr.appendChild(elem("th", "num", p.label)); });
+    thead.appendChild(hr); tbl.appendChild(thead);
+    var tb = elem("tbody");
+    rows.forEach(function (r) {
+      var tr = elem("tr"); if (!r.m.active) tr.className = "archived";
+      var nameTd = elem("td"); nameTd.appendChild(linkBtn(r.m.name + (r.m.active ? "" : " (archived)"), function () { goToManager(r.m.id); }));
+      tr.appendChild(nameTd);
+      r.n.forEach(function (x) { tr.appendChild(elem("td", "num", String(x))); });
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb); wrap.appendChild(tbl);
+    return wrap;
   }
   var REPORT_ROWS = 20;
   // Work items counted per period (by opened date) and type. keys come back oldest
@@ -2110,7 +2221,8 @@
       id: genId(), type: v.type, typeOther: typeOtherOf(v), title: v.title, managerId: v.managerId, relatedProjectId: v.relatedProjectId,
       status: v.status, priority: v.priority, openedDate: v.openedDate, dueDate: v.dueDate, rollOffDate: v.rollOffDate,
       // Logged as already Done: straight to History, the same as marking it done later.
-      completedDate: (v.status === "done") ? todayISO() : null, archived: (v.status === "done"), link: v.link, notes: v.notes
+      completedDate: (v.status === "done") ? todayISO() : null, archived: (v.status === "done"), link: v.link, notes: v.notes,
+      ownerHistory: v.managerId ? [{ managerId: v.managerId, from: v.openedDate || todayISO(), to: null }] : []
     });
     commit();
   }
@@ -2128,6 +2240,7 @@
     var wasDone = (w.status === "done");
     if (v.status === "done") { if (!w.completedDate) w.completedDate = todayISO(); w.archived = true; }
     else { w.completedDate = null; if (wasDone) w.archived = false; } // reopening restores from history
+    if ((v.managerId || null) !== (w.managerId || null)) reassignOwner(w, v.managerId);
     w.type = v.type; w.typeOther = typeOtherOf(v); w.title = v.title; w.managerId = v.managerId; w.relatedProjectId = v.relatedProjectId;
     w.status = v.status; w.priority = v.priority; w.openedDate = v.openedDate; w.dueDate = v.dueDate;
     w.rollOffDate = v.rollOffDate; w.link = v.link; w.notes = v.notes;
@@ -2423,6 +2536,7 @@
     })));
     drawerBody.appendChild(drawerSection("Recently completed (wins)", d.wins.map(carryLine)));
     drawerBody.appendChild(drawerSection("Rolling off soon / overdue", d.roll.map(carryLine)));
+    if (d.handed.length) drawerBody.appendChild(drawerSection("Handed off (last 90 days)", d.handed.map(carryLine)));
   }
   function managerCarry(id) {
     var current = [], wins = [], roll = [];
@@ -2442,10 +2556,19 @@
       if (w.status === "done" && w.completedDate) wins.push({ text: typeLabel(w) + ": " + w.title + " (done " + w.completedDate + ")", wiId: w.id, date: w.completedDate });
       if (!w.archived && w.status !== "done" && w.rollOffDate && soon(w.rollOffDate)) roll.push({ text: typeLabel(w) + ": " + w.title + " rolls off " + w.rollOffDate, wiId: w.id });
     });
+    // Work they owned until recently and gave to someone else (or back to the Backlog).
+    var handed = [], since = isoOf(addDays(startOfToday(), -HANDOFF_DAYS));
+    data.workItems.forEach(function (w) {
+      if (w.managerId === id) return;
+      var gave = null;
+      (w.ownerHistory || []).forEach(function (e) { if (e.managerId === id && e.to && e.to >= since) gave = e.to; });
+      if (gave) handed.push({ text: typeLabel(w) + ": " + w.title + " → " + (w.managerId ? managerName(w.managerId) : "Backlog") + " (" + gave + ")", wiId: w.id, date: gave });
+    });
+    handed.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
     // Newest first by completion date — sorting on the text sorted by type label — and
     // only the most recent few, so "Recently completed" stays recent as history grows.
     wins.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
-    return { current: current, wins: wins.slice(0, MAX_WINS), roll: roll };
+    return { current: current, wins: wins.slice(0, MAX_WINS), roll: roll, handed: handed };
   }
   function summaryText(id) {
     var m = findById(data.managers, id); if (!m) return "";
@@ -2455,7 +2578,8 @@
     return "1:1 Prep — " + m.name + (m.title ? " (" + m.title + ")" : "") + (m.location ? " — " + m.location : "") + "\n" +
       "Generated " + new Date().toLocaleString() + "\n" + "Workload: " + b.label + " (score " + scoreText(sc) + ")\n\n" +
       block("Currently carrying:", d.current) + "\n" +
-      block("Recently completed (wins):", d.wins) + "\n" + block("Rolling off soon / overdue:", d.roll);
+      block("Recently completed (wins):", d.wins) + "\n" + block("Rolling off soon / overdue:", d.roll) +
+      (d.handed.length ? "\n" + block("Handed off (last " + HANDOFF_DAYS + " days):", d.handed) : "");
   }
   async function copySummary(id) {
     var text = summaryText(id);

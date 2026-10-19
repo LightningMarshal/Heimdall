@@ -7,7 +7,7 @@ Vanilla JS, HTML, and CSS — no framework, no build step, no runtime package ma
 no runtime dependencies of any kind (npm is used only for the dev-time test suite). The entire application is one file,
 `heimdall.html` (~2,390 lines: inlined `<style>` + a single IIFE `<script>`
 using ES5-style `function` expressions, not classes/modules). Currently at
-`APP_VERSION = "0.12.0"`. Double-clicking the file runs it — there is no
+`APP_VERSION = "0.13.0"`. Double-clicking the file runs it — there is no
 `npm install`, no dev server, no compiler.
 
 ## Deployment
@@ -74,6 +74,14 @@ No server, no port, no Electron wrapper.
 - **Related project** — a work item's optional `relatedProjectId`. Shown under
   the title in the queue, beside the item in the drawer and 1:1 summary, and
   counted on the project card; the queue's Project filter selects by it.
+- **Owner history** — `workItems[].ownerHistory`, `[{managerId, from, to}]`
+  in local dates, `to: null` for the current owner. Changing an owner must go
+  through `reassignOwner(w, newId)` (today only `editWorkItem` does; Backlog
+  *Assign…* and Needs attention *Reassign…* both route through it).
+  `validate()` → `normalizeOwnerHistory` backfills older items from
+  `openedDate` and repairs history an older client left stale. "Carried"
+  counts (`ownedDuring`) end at the completion date, else the roll-off date
+  for archived items, else today.
 - **Orphaned work** — an open work item whose owner is archived. It is off the
   board and not in the Backlog, so Needs attention lists it ("Owner archived")
   until it is reassigned.

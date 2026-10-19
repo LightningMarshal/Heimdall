@@ -1,6 +1,6 @@
 # Heimdall — Roadmap
 
-_Last updated: 2026-10-19 · app version 0.12.0_
+_Last updated: 2026-10-19 · app version 0.13.0_
 
 Post-MVP ideas, ranked by how much they improve the one question Heimdall exists to
 answer — **who is carrying too much, and who has room** — against what they cost in a
@@ -129,7 +129,12 @@ last few hundred entries) would make conflicts diagnosable after the fact withou
 pretending to solve them. Grows the data file, so the cap matters; the shared file is
 read whole on every sync.
 
-### 7. Reassignment history
+### 7. Reassignment history — *built in 0.13.0*
+**Built:** `workItems[].ownerHistory`, backfilled for existing items. Shown as
+"previously …" in the queue, *Handed off* in the drawer and 1:1 summary, and a
+*Work items carried per manager* table in Reports (last four periods at the chosen
+grouping). Original note:
+
 When a work item changes owner, the previous owner disappears from the record — the
 item simply belongs to someone else, and "how much did Ada carry last quarter" quietly
 becomes unanswerable. Storing an owner history on `workItems[]` is a small model
