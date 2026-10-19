@@ -14,7 +14,8 @@ it and it runs.
 ## Quick start
 
 1. Open `heimdall.html` in a modern browser (Microsoft Edge or Chrome recommended).
-2. Add your managers (name, title, location).
+2. Add your managers (name, title, location, and capacity — 100% unless they are
+   part-time or still ramping).
 3. Add projects and build each team inline: a Lead (occasionally two co-leads), any
    Contributors, and an effort level (Light / Medium / Heavy) per person.
 4. Log work items as they arrive. Leave the owner blank to park an item in the
@@ -30,6 +31,10 @@ once so the "Last saved by" banner can attribute changes.
 - **Workload Board** — one card per manager: heat label, score, and counts for
   projects leading / supporting, escalations, DITL, one-offs. Escalations pop in red.
   Hover a heat label to see the band's score range and the exact score behind it.
+- **Capacity per manager** — a percentage of a full load (default 100%). The heat
+  band uses score ÷ capacity, so a half-time manager with 6 points reads as 12
+  (Heavy). Whenever capacity isn't 100% the card shows both numbers
+  ("score 12 · raw 6") and a Capacity chip.
 - **Manager drawer** — click a card for everything that manager carries, recent
   wins, and upcoming roll-offs, plus in-context quick-add and a copy / export /
   print **1:1 summary** for weekly one-on-ones (printing from the drawer prints the
@@ -79,6 +84,11 @@ Project weights are multiplied by effort: Light ×1, Medium ×1.5, Heavy ×2. On
 active projects and open / in-progress items count. Heat bands: 0–4 Light ·
 5–9 Balanced · 10–14 Heavy · 15+ Overloaded.
 
+**Capacity** then divides the total: the band is chosen from
+`score ÷ capacity`, where capacity is the manager's share of a full load (1 = 100%,
+set as a percentage between 10 and 300 in the manager form). At 100% nothing changes.
+The raw score is always shown alongside the adjusted one.
+
 Because effort multiplies, scores are fractional and can land between two
 whole-number bands — 4.5, say. Such a score belongs to the band below it: the highest
 band it has actually reached. One medium-effort lead role is 3 × 1.5 = 4.5, which is
@@ -124,7 +134,7 @@ band it has actually reached. One medium-effort lead role is 3 × 1.5 = 4.5, whi
 
 ## Data model (in `heimdall-data.json`)
 
-`managers[]` (id, name, title, location, active) · `projects[]` (id, name,
+`managers[]` (id, name, title, location, capacity, active) · `projects[]` (id, name,
 description, status, priority, startDate, targetDate, completedDate, link, archived) ·
 `assignments[]` (id, projectId, managerId, role, effort, startDate, endDate,
 archived) · `workItems[]` (id, type, typeOther, title, managerId, relatedProjectId,

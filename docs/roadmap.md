@@ -1,6 +1,6 @@
 # Heimdall — Roadmap
 
-_Last updated: 2026-10-19 · app version 0.7.0_
+_Last updated: 2026-10-19 · app version 0.8.0_
 
 Post-MVP ideas, ranked by how much they improve the one question Heimdall exists to
 answer — **who is carrying too much, and who has room** — against what they cost in a
@@ -65,7 +65,11 @@ It would not touch `heimdall.html`, so the one-file, no-dependency constraint su
 intact — the cost is that the repo gains dev-time tooling it has so far done without.
 That is the trade to weigh. **Cost: small. Value: compounding.**
 
-### 2. Capacity per manager
+### 2. Capacity per manager — *built in 0.8.0*
+**Built:** `managers[].capacity` (percentage in the manager form, 100% default). The
+band is chosen from score ÷ capacity, and both numbers are shown — "score 12 · raw 6"
+plus a Capacity chip — whenever capacity isn't 100%. Original note:
+
 Heat bands are global, so a part-time manager, a new hire still ramping, and a
 25-year veteran are all judged against 0–4 / 5–9 / 10–14 / 15+. A per-manager
 `capacity` multiplier (or a "score ÷ capacity" normalization) would make the board

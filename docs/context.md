@@ -7,7 +7,7 @@ Vanilla JS, HTML, and CSS — no framework, no build step, no runtime package ma
 no runtime dependencies of any kind (npm is used only for the dev-time test suite). The entire application is one file,
 `heimdall.html` (~2,390 lines: inlined `<style>` + a single IIFE `<script>`
 using ES5-style `function` expressions, not classes/modules). Currently at
-`APP_VERSION = "0.7.0"`. Double-clicking the file runs it — there is no
+`APP_VERSION = "0.8.0"`. Double-clicking the file runs it — there is no
 `npm install`, no dev server, no compiler.
 
 ## Deployment
@@ -48,6 +48,13 @@ No server, no port, no Electron wrapper.
   data file, not hardcoded assumptions. Scores are fractional (effort
   multiplies), so one landing between two whole-number bands resolves
   *downward*, to the highest band it has reached — see `bandFor`.
+- **Capacity** — `managers[].capacity`, a fraction of a full load (1 = 100%,
+  entered as a percentage 10–300 in the manager form; validate() turns a
+  missing, non-numeric, or non-positive value into 1). `managerScore`
+  returns `score` (raw), `capacity`, and `load` = score ÷ capacity; the heat
+  band is always `bandFor(sc.load)`, never `bandFor(sc.score)`. Wherever a
+  score is shown, use `scoreText(sc)` so the raw number appears beside the
+  adjusted one when capacity isn't 100%.
 - **Archiving** — the app's only form of deletion. Nothing is hard-deleted;
   archived managers, assignments, work items, and projects are preserved for
   history. A project is *closed out* when finished and *archived* only when it

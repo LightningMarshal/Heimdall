@@ -235,6 +235,7 @@
   .ff input, .ff select, .ff textarea { font: inherit; padding: 9px 11px; border: 1px solid var(--border-strong);
                                          border-radius: 8px; width: 100%; }
   .ff textarea { min-height: 62px; resize: vertical; }
+  .ff .hint { color: var(--muted); font-size: 12px; }
   .ff.check { flex-direction: row; align-items: center; gap: 8px; }
   .ff.check input { width: auto; }
   .ff.check label { font-weight: 500; color: var(--text); }
@@ -476,7 +477,8 @@
 
     <div class="panel">
       <h3 class="sec">Managers</h3>
-      <p class="hint">Edit details or archive managers here (kept out of the board to avoid accidental taps).</p>
+      <p class="hint">Edit details, capacity, or archive managers here (archive is kept off the board to avoid accidental taps).
+        Capacity is a percentage of a full load; the heat band uses score ÷ capacity.</p>
       <div id="settingsManagers"></div>
     </div>
 
@@ -505,7 +507,7 @@
     <div class="panel">
       <h3>Quick start</h3>
       <ul>
-        <li><strong>1.</strong> Add your managers (Board → “Add manager”, or the “+ Add” button top right).</li>
+        <li><strong>1.</strong> Add your managers (Board → “Add manager”, or the “+ Add” button top right). Leave capacity at 100% unless someone is part-time or still ramping.</li>
         <li><strong>2.</strong> Add projects and build the team inline — pick a Lead (occasionally two), Contributors, and an effort level for each person.</li>
         <li><strong>3.</strong> Log work items (escalations, DITL requests, one-offs) as they arrive. Leave the owner as “— none —” to park an item in the Backlog until you decide who takes it.</li>
         <li><strong>4.</strong> Read the Board: each card shows a weighted heat label — who is overloaded, who has room.</li>
@@ -564,6 +566,11 @@
       <h3>How the workload score works</h3>
       <p>Counting items alone is useless — a heavy lead role is not a token one-off. Each item contributes a weight (defaults: project lead 3, contributor 1, escalation 4, DITL 2, one-off 1, other 1), and project weights are multiplied by effort (Light ×1, Medium ×1.5, Heavy ×2). Only active projects and open / in-progress items count toward current load.</p>
       <p>The total maps to a heat band: 0–4 Light · 5–9 Balanced · 10–14 Heavy · 15+ Overloaded. Every weight, multiplier, and band is editable in Settings — calibrate against your real team after a couple of weeks.</p>
+      <p><strong>Capacity:</strong> the bands are the same for everyone, but people are not — a part-timer, a new hire
+        still ramping, someone with a standing commitment outside this tracker. Each manager has a capacity (Edit
+        manager), as a percentage of a full load: 100 by default. The heat band uses the score <em>divided by</em>
+        capacity, so 6 points at 50% capacity reads as 12 — Heavy, not Balanced. Wherever capacity isn't 100%, the
+        card shows both numbers (“score 12 · raw 6”) and a Capacity chip, so the adjustment is never hidden.</p>
       <p>Scores are fractional (effort multiplies them), so a score can land between two whole-number bands — 4.5, say. It belongs to the band below: the highest band it has actually reached. One medium-effort lead role is 3 × 1.5 = 4.5, which is <em>Light</em>, not the next band up. Hover a heat label to see the band's range and the exact score.</p>
     </div>
 
@@ -675,7 +682,7 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.7.0";
+  var APP_VERSION = "0.8.0";
   var MAX_BACKUPS = 10;
   // Minimum spacing between backups. One per save meant ten quick edits rotated out
   // every older backup, so the ten on disk only ever covered the last few minutes.
@@ -704,6 +711,9 @@
   var TYPE_COLOR = { escalation: "#dc2626", ditl: "#2563eb", oneoff: "#d97706", other: "#6b7280" };
   var TYPE_OTHER_MAX = 60;   // free-text label captured when Type is "Other"
   var MAX_WINS = 10;         // "Recently completed" entries shown in the drawer and 1:1 summary
+  // Capacity is entered as a percentage of a full load (100 = full time, 50 = half,
+  // a new hire still ramping) and stored as a fraction on the manager.
+  var CAPACITY_MIN_PCT = 10, CAPACITY_MAX_PCT = 300;
 
   // ---- Session state ---------------------------------------------------
   var data = null, userName = null;
@@ -780,6 +790,10 @@
       out[k] = parsed[k].filter(isPlainObject);
       out[k].forEach(function (r) { if (typeof r.id !== "string" || !r.id) r.id = genId(); });
     });
+    // Capacity divides the score, so it must be a positive number: a string would
+    // divide oddly, and 0 or a negative would put Infinity or nonsense on the board.
+    // Anything unusable (including a file from before 0.8.0) means a full load.
+    out.managers.forEach(function (m) { var c = toNum(m.capacity); m.capacity = (c != null && c > 0) ? c : 1; });
     if (isPlainObject(parsed.settings)) {
       var s = parsed.settings;
       out.settings.appVersion = (s.appVersion != null) ? s.appVersion : out.settings.appVersion;
@@ -856,6 +870,8 @@
     });
     return o;
   }
+  function capacityOf(m) { var c = m && toNum(m.capacity); return (c != null && c > 0) ? c : 1; }
+  function capacityPct(c) { return Math.round(c * 100) + "%"; }
   function isActiveManager(id) { var m = findById(data.managers, id); return !!(m && m.active); }
   function activeAssignments(projectId) {
     return data.assignments.filter(function (a) { return a.projectId === projectId && !a.archived; });
@@ -1033,7 +1049,10 @@
       else if (wi.type === "oneoff") { score += (w.oneoff || 0); c.oneoff++; }
       else { score += (w.other || 0); c.other++; }
     });
-    return { score: score, counts: c };
+    // score is the raw weighted total; load is that score divided by the manager's
+    // capacity, and is what decides the heat band. At full capacity they are equal.
+    var m = findById(data.managers, id), capacity = capacityOf(m);
+    return { score: score, load: score / capacity, capacity: capacity, counts: c };
   }
   // Heat bands are authored as whole-number ranges (0–4, 5–9, 10–14, 15+), but scores
   // are fractional — the effort multipliers put 4.5 or 9.5 on the board. A plain
@@ -1079,11 +1098,18 @@
     if (!b || typeof b.min !== "number") return "";
     return (b.max == null) ? (b.min + "+") : (b.min + "–" + b.max);
   }
-  function heatLabelEl(b, score) {
+  // sc is a managerScore() result. The band is decided by load (score ÷ capacity).
+  function heatLabelEl(b, sc) {
     var e = elem("span", "heat " + (b.heat || "heat-na"), b.label);
     var r = bandRange(b);
-    e.title = b.label + (r ? " · score " + r : "") + " · this score: " + round1(score);
+    e.title = b.label + (r ? " · score " + r : "") + " · this score: " + scoreText(sc);
     return e;
+  }
+  // "6" at full capacity; "12 (6 raw at 50% capacity)" otherwise — both numbers, so
+  // the adjustment is never hidden behind the band it produces.
+  function scoreText(sc) {
+    if (sc.capacity === 1) return String(round1(sc.score));
+    return round1(sc.load) + " (" + round1(sc.score) + " raw at " + capacityPct(sc.capacity) + " capacity)";
   }
 
   // ---- Board view ------------------------------------------------------
@@ -1106,16 +1132,18 @@
     clear(boardCards);
     if (!active.length) { boardCards.appendChild(elem("div", "empty", list.length ? "All managers are archived. Restore one in Settings, or add a manager." : "No managers yet — click “Add manager”.")); return; }
     active.forEach(function (m) {
-      var sc = managerScore(m.id), b = bandFor(sc.score);
+      var sc = managerScore(m.id), b = bandFor(sc.load);
       var card = elem("div", "mcard");
       card.appendChild(elem("div", "m-name", m.name));
       var sub = [m.title, m.location].filter(Boolean).join(" · ");
       if (sub) card.appendChild(elem("div", "m-sub", sub));
       var hr = elem("div", "m-heat-row");
-      hr.appendChild(heatLabelEl(b, sc.score));
-      hr.appendChild(elem("span", "m-score", "score " + round1(sc.score)));
+      hr.appendChild(heatLabelEl(b, sc));
+      hr.appendChild(elem("span", "m-score", sc.capacity === 1 ? "score " + round1(sc.score)
+        : "score " + round1(sc.load) + " · raw " + round1(sc.score)));
       card.appendChild(hr);
       var chips = elem("div", "chips");
+      if (sc.capacity !== 1) chips.appendChild(chip("Capacity", capacityPct(sc.capacity)));
       if (sc.counts.escalation) chips.appendChild(chip("Escalations", sc.counts.escalation, true));
       chips.appendChild(chip("Leading", sc.counts.led));
       chips.appendChild(chip("Supporting", sc.counts.supporting));
@@ -1125,7 +1153,7 @@
       card.appendChild(chips);
       card.addEventListener("click", function () { openManager(m.id); });
       // Reachable and openable from the keyboard, like every other click-through.
-      card.tabIndex = 0; card.setAttribute("role", "button"); card.setAttribute("aria-label", m.name + " — " + b.label + ", score " + round1(sc.score));
+      card.tabIndex = 0; card.setAttribute("role", "button"); card.setAttribute("aria-label", m.name + " — " + b.label + ", score " + scoreText(sc));
       card.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openManager(m.id); } });
       boardCards.appendChild(card);
     });
@@ -1387,7 +1415,7 @@
     if (!list.length) { settingsManagers.appendChild(elem("div", "empty", "No managers yet.")); return; }
     var tbl = elem("table");
     var thead = elem("thead"); var hr = elem("tr");
-    ["Name", "Title", "Location", "Active", ""].forEach(function (h) { hr.appendChild(elem("th", null, h)); });
+    ["Name", "Title", "Location", "Capacity", "Active", ""].forEach(function (h) { hr.appendChild(elem("th", null, h)); });
     thead.appendChild(hr); tbl.appendChild(thead);
     var tb = elem("tbody");
     list.forEach(function (m) {
@@ -1395,6 +1423,7 @@
       tr.appendChild(tdc(m.name || ""));
       tr.appendChild(tdc(m.title || "—"));
       tr.appendChild(tdc(m.location || "—"));
+      tr.appendChild(tdc(capacityPct(capacityOf(m))));
       tr.appendChild(tdc(m.active ? "Yes" : "No"));
       var act = elem("td", "actions");
       act.appendChild(miniBtn("Edit", function () { editManager(m.id); }, "ghost"));
@@ -1491,7 +1520,11 @@
         if (f.type === "textarea") input = elem("textarea");
         else if (f.type === "select") { input = elem("select"); (f.options || []).forEach(function (o) { var op = elem("option", null, o.label !== undefined ? o.label : o); op.value = (o.value !== undefined) ? o.value : o; input.appendChild(op); }); }
         else if (f.type === "checkbox") { input = elem("input"); input.type = "checkbox"; }
-        else { input = elem("input"); input.type = (f.type === "date") ? "date" : "text"; if (f.placeholder) input.placeholder = f.placeholder; }
+        else {
+          input = elem("input"); input.type = (f.type === "date" || f.type === "number") ? f.type : "text";
+          if (f.type === "number") { input.step = "any"; if (f.min != null) input.min = f.min; if (f.max != null) input.max = f.max; }
+          if (f.placeholder) input.placeholder = f.placeholder;
+        }
         if (f.maxLength && input.tagName !== "SELECT") input.maxLength = f.maxLength;
         input.id = "ff_" + f.key;
         var v = values[f.key];
@@ -1550,31 +1583,39 @@
   function commit() { renderAll(); scheduleSave(); }
 
   // Managers
+  var MANAGER_FIELDS = [
+    { key: "name", label: "Name", type: "text", required: true },
+    { key: "title", label: "Title", type: "text" },
+    { key: "location", label: "Location", type: "text", placeholder: "e.g. Austin, TX / Remote" },
+    { key: "capacityPct", label: "Capacity (% of a full load)", type: "number", required: true,
+      min: CAPACITY_MIN_PCT, max: CAPACITY_MAX_PCT,
+      hint: "100 = full load. Lower it for a part-timer or someone still ramping (e.g. 50); the heat band then uses score ÷ capacity." },
+    { key: "active", label: "Active", type: "checkbox" }
+  ];
+  function capacityCheck(o) {
+    var n = parseFloat(o.capacityPct);
+    if (!isFinite(n) || n < CAPACITY_MIN_PCT || n > CAPACITY_MAX_PCT)
+      return "Capacity must be between " + CAPACITY_MIN_PCT + " and " + CAPACITY_MAX_PCT + "%.";
+    return "";
+  }
+  function capacityFrom(o) { return Math.round(parseFloat(o.capacityPct)) / 100; }
   async function addManager() {
     if (!(await ensureName())) return;
-    var v = await openForm("Add manager", [
-      { key: "name", label: "Name", type: "text", required: true },
-      { key: "title", label: "Title", type: "text" },
-      { key: "location", label: "Location", type: "text", placeholder: "e.g. Austin, TX / Remote" },
-      { key: "active", label: "Active", type: "checkbox" }
-    ], { active: true });
+    var v = await openForm("Add manager", MANAGER_FIELDS, { active: true, capacityPct: 100 }, { check: capacityCheck });
     if (!v) return;
-    data.managers.push({ id: genId(), name: v.name, title: v.title, location: v.location, active: v.active });
+    data.managers.push({ id: genId(), name: v.name, title: v.title, location: v.location, capacity: capacityFrom(v), active: v.active });
     commit();
   }
   async function editManager(id) {
     var m = findById(data.managers, id); if (!m) return;
     if (!(await ensureName())) return;
-    var v = await openForm("Edit manager", [
-      { key: "name", label: "Name", type: "text", required: true },
-      { key: "title", label: "Title", type: "text" },
-      { key: "location", label: "Location", type: "text", placeholder: "e.g. Austin, TX / Remote" },
-      { key: "active", label: "Active", type: "checkbox" }
-    ], { name: m.name, title: m.title, location: m.location, active: m.active });
+    var v = await openForm("Edit manager", MANAGER_FIELDS,
+      { name: m.name, title: m.title, location: m.location, capacityPct: Math.round(capacityOf(m) * 100), active: m.active },
+      { check: capacityCheck });
     if (!v) return;
     m = findById(data.managers, id); if (!m) { notice(GONE_MSG, "err"); return; }
     if (m.active && !v.active && !confirmArchiveManager(m)) return;
-    m.name = v.name; m.title = v.title; m.location = v.location; m.active = v.active;
+    m.name = v.name; m.title = v.title; m.location = v.location; m.capacity = capacityFrom(v); m.active = v.active;
     commit();
   }
   async function toggleManagerActive(id) {
@@ -1902,10 +1943,10 @@
     head.appendChild(miniBtn("✕", closeDrawer, "ghost d-close"));
     drawerBody.appendChild(head);
 
-    var sc = managerScore(m.id), b = bandFor(sc.score);
+    var sc = managerScore(m.id), b = bandFor(sc.load);
     var heatRow = elem("div"); heatRow.style.margin = "12px 0 4px";
-    heatRow.appendChild(heatLabelEl(b, sc.score));
-    var scoreSpan = elem("span", "m-score", "  score " + round1(sc.score)); scoreSpan.style.marginLeft = "8px";
+    heatRow.appendChild(heatLabelEl(b, sc));
+    var scoreSpan = elem("span", "m-score", "  score " + scoreText(sc)); scoreSpan.style.marginLeft = "8px";
     heatRow.appendChild(scoreSpan);
     drawerBody.appendChild(heatRow);
 
@@ -1960,11 +2001,11 @@
   }
   function summaryText(id) {
     var m = findById(data.managers, id); if (!m) return "";
-    var sc = managerScore(id), b = bandFor(sc.score), d = managerCarry(id);
+    var sc = managerScore(id), b = bandFor(sc.load), d = managerCarry(id);
     // Every list managerCarry returns holds {text, …} entries, not strings.
     function block(t, items) { return t + "\n" + (items.length ? items.map(function (x) { return "  - " + x.text; }).join("\n") : "  (none)") + "\n"; }
     return "1:1 Prep — " + m.name + (m.title ? " (" + m.title + ")" : "") + (m.location ? " — " + m.location : "") + "\n" +
-      "Generated " + new Date().toLocaleString() + "\n" + "Workload: " + b.label + " (score " + round1(sc.score) + ")\n\n" +
+      "Generated " + new Date().toLocaleString() + "\n" + "Workload: " + b.label + " (score " + scoreText(sc) + ")\n\n" +
       block("Currently carrying:", d.current) + "\n" +
       block("Recently completed (wins):", d.wins) + "\n" + block("Rolling off soon / overdue:", d.roll);
   }
