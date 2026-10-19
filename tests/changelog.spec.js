@@ -73,9 +73,12 @@ test("a newer copy from another tab keeps both sides' log entries", async ({ pag
   await expect(page.locator("#wiRows")).toContainText("Plan v2");   // last write won the data…
   await nav(page, "settings");
   const rows = page.locator("#changeLog tbody tr");
-  await expect(rows).toHaveCount(2);                                // …but our archive is still on record
+  // …but our archive (archived + archivedDate) is still on record beside theirs.
+  await expect(rows).toHaveCount(3);
   await expect(rows.filter({ hasText: "Other Tab" })).toContainText("Plan v2");
-  await expect(rows.filter({ hasText: "Tester" })).toContainText("archived");
+  const mine = rows.filter({ hasText: "Tester" }).locator("td:nth-child(4)");
+  await expect(mine).toHaveCount(2);
+  expect((await mine.allTextContents()).sort()).toEqual(["archived", "archivedDate"]);
 });
 
 test("the log keeps the newest 500 and downloads as CSV", async ({ page }) => {

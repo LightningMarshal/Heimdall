@@ -87,8 +87,11 @@ No server, no port, no Electron wrapper.
   *Assign…* and Needs attention *Reassign…* both route through it).
   `validate()` → `normalizeOwnerHistory` backfills older items from
   `openedDate` and repairs history an older client left stale. "Carried"
-  counts (`ownedDuring`) end at the completion date, else the roll-off date
-  for archived items, else today.
+  counts (`ownedDuring`) end at `carriedUntil`: the completion date; for an
+  item archived without being done, its `archivedDate` (stamped by every
+  work-item archive path since 0.15.0, cleared on restore / reopen), else —
+  for older rows — the last archive in `changes[]`, the roll-off, due, or
+  opened date; for open items, today.
 - **Orphaned work** — an open work item whose owner is archived. It is off the
   board and not in the Backlog, so Needs attention lists it ("Owner archived")
   until it is reassigned.

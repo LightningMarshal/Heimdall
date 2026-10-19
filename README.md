@@ -88,8 +88,9 @@ once so the "Last saved by" banner can attribute changes.
   oldest first; UTF-8 with a byte-order mark so Excel reads it correctly).
 - **Change log** — Settings → Change log: every saved change, field by field (when,
   who, record, old → new), the last 500 kept, downloadable as CSV. When one copy
-  overwrites another, the data is still last-write-wins but both copies' log entries
-  are kept, so a lost edit can be seen and redone.
+  overwrites another, the data is still last-write-wins but the log is merged: the
+  person whose edit was overwritten still sees it in their log, and it reaches
+  everyone else with their next save — so a lost edit can be seen and redone.
 - **Settings** — every weight, effort multiplier, and heat band is editable and
   stored in the data file; manager archive lives here (off the board) on purpose.
 - **Dark mode** — follows the operating system's light / dark setting; Settings →
@@ -136,7 +137,8 @@ band it has actually reached. One medium-effort lead role is 3 × 1.5 = 4.5, whi
 - **Conflict model:** last write wins by save timestamp (documented and accepted —
   the banner always shows who saved last, and *Reload latest* re-reads on demand).
   The change log is the exception: it is union-merged by entry, so an overwritten
-  edit is still on record.
+  edit stays on record (in the overwritten person's copy at once, and in the shared
+  file with their next save).
 - **Upgrade together:** everyone on a shared file should run the same version of
   `heimdall.html`. An older copy keeps only the data it knows about, so its next save
   drops newer top-level data such as `changes[]`.
@@ -172,8 +174,8 @@ band it has actually reached. One medium-effort lead role is 3 × 1.5 = 4.5, whi
 description, status, priority, startDate, targetDate, completedDate, link, archived) ·
 `assignments[]` (id, projectId, managerId, role, effort, startDate, endDate,
 archived) · `workItems[]` (id, type, typeOther, title, managerId, relatedProjectId,
-status, priority, openedDate, dueDate, rollOffDate, completedDate, archived, link,
-notes, ownerHistory[] of {managerId, from, to}) ·
+status, priority, openedDate, dueDate, rollOffDate, completedDate, archived,
+archivedDate, link, notes, ownerHistory[] of {managerId, from, to}) ·
 `changes[]` (id, at, by, entity, entityId, label, field, from, to — capped at 500) ·
 `settings` (weights, effort, bands, appVersion, lastSavedBy, lastSavedAt).
 
@@ -198,6 +200,8 @@ npm test           # runs every spec in tests/
   attention, reports, settings, search.
 - `tests/dates.spec.js` — the date-sensitive checks, run in UTC, New York (late
   evening) and Auckland (early morning), where the local and UTC dates differ.
+- One spec per roadmap feature: `capacity`, `undo`, `report-csv`, `timeline`,
+  `changelog`, `owner-history`, `trend`, and `dark-mode` (`tests/<name>.spec.js`).
 - Chromium comes from the environment's Playwright install; the pinned
   `@playwright/test` version must match it, or run `npx playwright install chromium`.
 

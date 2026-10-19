@@ -68,6 +68,36 @@ test("back to the Backlog and to someone else; history survives reload", async (
   await expect(page.locator("#wiRows tr", { hasText: "Plan" }).locator(".wi-proj")).toHaveText("previously Ada");
 });
 
+test("a manually archived item stops counting as carried on the day it was archived", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-07-20T12:00:00Z"));
+  await openApp(page, seed({
+    managers: [ADA],
+    workItems: [{ id: "w-1", type: "oneoff", title: "Parked", managerId: "m-ada", status: "open", openedDate: "2026-07-01" }]
+  }));
+  await nav(page, "workitems");
+  await page.locator("#wiRows tr", { hasText: "Parked" }).getByRole("button", { name: "Archive" }).click();
+  await waitSaved(page);
+  await page.clock.setFixedTime(new Date("2026-10-19T12:00:00Z"));
+  await page.reload();
+  await nav(page, "reports");
+  await expect(page.locator(".carried tr", { hasText: "Ada" }).locator("td.num")).toHaveText(["1", "0", "0", "0"]);
+});
+
+test("older archived rows are bounded by the change log, else their own dates", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-19T12:00:00Z"));
+  const d = seed({
+    managers: [ADA],
+    workItems: [
+      { id: "w-1", type: "oneoff", title: "Logged", managerId: "m-ada", status: "open", archived: true, openedDate: "2026-07-01" },
+      { id: "w-2", type: "oneoff", title: "Unlogged", managerId: "m-ada", status: "open", archived: true, openedDate: "2026-07-01", dueDate: "2026-08-05" }
+    ]
+  });
+  d.changes = [{ id: "c1", at: "2026-09-10T12:00:00.000Z", by: "Old", entity: "workItems", entityId: "w-1", label: "Logged", field: "archived", from: "false", to: "true" }];
+  await openApp(page, d);
+  await nav(page, "reports");
+  await expect(page.locator(".carried tr", { hasText: "Ada" }).locator("td.num")).toHaveText(["2", "2", "1", "0"]);
+});
+
 test("an older client's silent reassignment is repaired on load", async ({ page }) => {
   await openApp(page, seed({
     managers: [ADA, BOB],

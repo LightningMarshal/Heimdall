@@ -57,6 +57,19 @@ for (const z of ZONES) {
       await expect(page.locator(".bucket .lab")).toHaveText(["2026-03"]);
     });
 
+    test("timeline offsets count local days", async ({ page }) => {
+      await openApp(page, seed({
+        managers: [{ id: "m-1", name: "Ada", active: true }],
+        workItems: [
+          { id: "w-1", type: "oneoff", title: "Today", managerId: "m-1", status: "open", rollOffDate: z.today },
+          { id: "w-2", type: "oneoff", title: "Past", managerId: "m-1", status: "open", rollOffDate: z.yesterday }
+        ]
+      }));
+      await nav(page, "timeline");
+      await expect(page.locator(".tl-track .tl-mark")).toHaveAttribute("title", "One-off: Today — rolls off " + z.today + " (today)");
+      await expect(page.locator(".tl-gut.past")).toHaveText("1 past");
+    });
+
     test("closing out a project defaults to the local date", async ({ page }) => {
       await openApp(page, seed({ projects: [{ id: "p-1", name: "Apollo", status: "active" }] }));
       await nav(page, "projects");

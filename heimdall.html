@@ -784,8 +784,8 @@
         <li><strong>Conflicts:</strong> last write wins, decided by save timestamp. The banner always shows who saved last; “Reload latest” re-reads the shared file on demand.</li>
         <li><strong>Change log:</strong> Settings → Change log lists every saved change field by field — when, who, which
           record, old → new — newest first, and downloads as CSV. It doesn't prevent a lost edit, but it lets you see what
-          was lost and redo it: when one copy overwrites another, the data is last-write-wins, but both copies' log entries
-          are kept. The last 500 changes are kept. Everyone sharing a file should run the same Heimdall version — an older
+          was lost and redo it: when one copy overwrites another, the data is last-write-wins, but the log is merged — the
+          person whose edit was overwritten still sees it in their log, and it reaches everyone else with their next save. The last 500 changes are kept. Everyone sharing a file should run the same Heimdall version — an older
           copy (before 0.12) drops the log when it saves.</li>
         <li><strong>Other tabs:</strong> two Heimdall tabs or windows in the same browser share one local copy; switching to a tab loads anything newer the other one saved.</li>
         <li><strong>Backups:</strong> synced saves also write a timestamped <code>heimdall-data.backup-…json</code> beside the shared file — at most one every 30 minutes, so the 10 that are kept span hours of work rather than the last ten edits. If the shared file is ever corrupted, Heimdall refuses to overwrite it and offers to restore from a backup.</li>
@@ -1714,13 +1714,20 @@
     });
     return out;
   }
-  // The last day a work item was being carried at all: its completion date when done,
-  // its roll-off date when archived without being done (the archive day itself is not
-  // recorded), otherwise today.
+  // The last day a work item was being carried at all: its completion date when done;
+  // when archived without being done, the day it was archived (archivedDate, recorded
+  // since 0.15.0), else — for older rows — the latest archive in the change log, its
+  // roll-off date, or its due / opened date; otherwise, still open, today.
   function carriedUntil(w) {
     if (w.status === "done" && w.completedDate) return w.completedDate;
-    if (w.archived && w.rollOffDate) return w.rollOffDate;
-    return todayISO();
+    if (!w.archived) return todayISO();
+    if (w.archivedDate) return w.archivedDate;
+    var logged = null;
+    (data.changes || []).forEach(function (c) {
+      if (c.entityId === w.id && c.field === "archived" && c.to === "true") logged = c.at;
+    });
+    if (logged && tsValue(logged)) return isoOf(new Date(tsValue(logged)));
+    return w.rollOffDate || w.dueDate || w.openedDate || "0000-00-00";
   }
   // Did manager id own work item w at any point between two local dates (inclusive)?
   function ownedDuring(w, id, start, end) {
@@ -2454,7 +2461,7 @@
     w = findById(data.workItems, id); if (!w) { notice(GONE_MSG, "err"); return; }
     var wasDone = (w.status === "done");
     if (v.status === "done") { if (!w.completedDate) w.completedDate = todayISO(); w.archived = true; }
-    else { w.completedDate = null; if (wasDone) w.archived = false; } // reopening restores from history
+    else { w.completedDate = null; if (wasDone) { w.archived = false; w.archivedDate = null; } } // reopening restores from history
     if ((v.managerId || null) !== (w.managerId || null)) reassignOwner(w, v.managerId);
     w.type = v.type; w.typeOther = typeOtherOf(v); w.title = v.title; w.managerId = v.managerId; w.relatedProjectId = v.relatedProjectId;
     w.status = v.status; w.priority = v.priority; w.openedDate = v.openedDate; w.dueDate = v.dueDate;
@@ -2471,12 +2478,16 @@
       fieldChange("workItems", w, "archived", true)
     ], "Marked done — moved to History (Work Items → Show: History).");
   }
+  // Archiving a work item records the day, so "carried" reports know when it stopped.
+  function archiveWorkItemChanges(w) {
+    return [fieldChange("workItems", w, "archived", true), fieldChange("workItems", w, "archivedDate", todayISO())];
+  }
   async function toggleWorkItemArchived(id) {
     var w = findById(data.workItems, id); if (!w) return;
     if (!(await ensureName())) return;
     w = findById(data.workItems, id); if (!w) { notice(GONE_MSG, "err"); return; }
-    if (w.archived) { w.archived = false; commit(); return; }
-    applyWithUndo("archive “" + w.title + "”", [fieldChange("workItems", w, "archived", true)],
+    if (w.archived) { w.archived = false; w.archivedDate = null; commit(); return; }
+    applyWithUndo("archive “" + w.title + "”", archiveWorkItemChanges(w),
       "Archived “" + w.title + "” — it stays in History.");
   }
 
@@ -2917,27 +2928,26 @@
     });
   }
   function openAttn() { renderAttnList(); attnOverlay.className = "overlay show"; }
-  // The archive change for a roll-off row in Needs attention, or null if it is gone.
-  function attnArchiveChange(it) {
-    var coll = (it.kind === "as-roll") ? "assignments" : "workItems", r = findById(data[coll], it.id);
-    return r ? fieldChange(coll, r, "archived", true) : null;
+  // The archive changes for a roll-off row in Needs attention ([] if it is gone).
+  function attnArchiveChanges(it) {
+    if (it.kind === "as-roll") { var a = findById(data.assignments, it.id); return a ? [fieldChange("assignments", a, "archived", true)] : []; }
+    var w = findById(data.workItems, it.id); return w ? archiveWorkItemChanges(w) : [];
   }
   async function archiveFromAttn(it) {
     if (!(await ensureName())) return;
-    var c = attnArchiveChange(it);
-    applyWithUndo("archive 1 item", c ? [c] : [], "Archived — it remains in History.");
+    applyWithUndo("archive 1 item", attnArchiveChanges(it), "Archived — it remains in History.");
     renderAttnList();
   }
   async function archiveAllPastRollOff() {
     if (!(await ensureName())) return;
-    var changes = [];
+    var changes = [], n = 0;
     attentionItems().forEach(function (it) {
       if (it.kind !== "wi-roll" && it.kind !== "as-roll") return;
-      var c = attnArchiveChange(it); if (c) changes.push(c);
+      n++; changes = changes.concat(attnArchiveChanges(it));
     });
     if (!changes.length) { notice("Nothing is past its roll-off date.", "info"); return; }
-    applyWithUndo("archive " + changes.length + " past roll-off", changes,
-      changes.length + " past roll-off item" + (changes.length === 1 ? "" : "s") + " archived — they remain in History.");
+    applyWithUndo("archive " + n + " past roll-off", changes,
+      n + " past roll-off item" + (n === 1 ? "" : "s") + " archived — they remain in History.");
     renderAttnList();
   }
 
