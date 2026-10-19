@@ -1,6 +1,6 @@
 # Heimdall — Roadmap
 
-_Last updated: 2026-10-19 · app version 0.9.0_
+_Last updated: 2026-10-19 · app version 0.10.0_
 
 Post-MVP ideas, ranked by how much they improve the one question Heimdall exists to
 answer — **who is carrying too much, and who has room** — against what they cost in a
@@ -90,7 +90,11 @@ roll-off" is a bulk action with no way back short of hunting through History. A 
 few dozen lines and removes real hesitation from the panel that most wants to be used
 without hesitation.
 
-### 4. CSV export from Reports
+### 4. CSV export from Reports — *built in 0.10.0*
+**Built:** *Download CSV* on the Reports view — one row per period at the chosen
+grouping, every period (the chart stops at 20), oldest first, Total plus a column per
+type. Original note:
+
 The Reports view answers volume questions well and then dead-ends: the numbers cannot
 leave. A CSV download of the current buckets (same `Blob` route Export already uses)
 makes the tool feed the quarterly review deck instead of being retyped into it.

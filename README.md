@@ -68,7 +68,9 @@ once so the "Last saved by" banner can attribute changes.
   Needs attention dialog until the next change. It restores only the fields that action
   changed, and skips any record edited again since.
 - **Reports** — work-item volume over all time or by year / quarter / month / week,
-  segmented by type.
+  segmented by type. The chart shows the 20 most recent periods; **Download CSV**
+  saves every period at the chosen grouping (Period, Total, one column per type,
+  oldest first; UTF-8 with a byte-order mark so Excel reads it correctly).
 - **Settings** — every weight, effort multiplier, and heat band is editable and
   stored in the data file; manager archive lives here (off the board) on purpose.
 - **Help** — a full in-app guide (Help tab).

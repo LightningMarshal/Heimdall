@@ -447,15 +447,18 @@
   <section class="view" id="view-reports" hidden>
     <div class="view-head">
       <h2>Reports</h2>
-      <label style="font-size:13px;color:var(--muted);">Group by
-        <select id="repGran" style="font:inherit;padding:6px 9px;border:1px solid var(--border-strong);border-radius:8px;margin-left:6px;">
-          <option value="all">All time</option>
-          <option value="year">Yearly</option>
-          <option value="quarter">Quarterly</option>
-          <option value="month" selected>Monthly</option>
-          <option value="week">Weekly</option>
-        </select>
-      </label>
+      <div class="head-acts">
+        <label style="font-size:13px;color:var(--muted);">Group by
+          <select id="repGran" style="font:inherit;padding:6px 9px;border:1px solid var(--border-strong);border-radius:8px;margin-left:6px;">
+            <option value="all">All time</option>
+            <option value="year">Yearly</option>
+            <option value="quarter">Quarterly</option>
+            <option value="month" selected>Monthly</option>
+            <option value="week">Weekly</option>
+          </select>
+        </label>
+        <button id="btnReportCsv" class="mini">Download CSV</button>
+      </div>
     </div>
     <div id="reportBody"></div>
   </section>
@@ -562,6 +565,10 @@
           Needs attention dialog), until you make another change. Undo puts back only what that action changed; anything
           edited again since is left as it is.</li>
         <li><strong>Age:</strong> the queue flags items that have been open 14+ days.</li>
+        <li><strong>Reports:</strong> counts work items by the period they were opened in (all time, year, quarter,
+          month, or ISO week), split by type. The chart shows the 20 most recent periods. <em>Download CSV</em> saves
+          every period at the grouping you've picked — one row per period, oldest first, with Total and a column per
+          type (custom “Other” labels count as Other) — ready to paste into a review deck or spreadsheet.</li>
       </ul>
       <p>Reference tickets by ID or short title plus a link — never put sensitive incident details or customer data in this file.</p>
     </div>
@@ -687,7 +694,7 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.9.0";
+  var APP_VERSION = "0.10.0";
   var MAX_BACKUPS = 10;
   // Minimum spacing between backups. One per save meant ten quick edits rotated out
   // every older backup, so the ten on disk only ever covered the last few minutes.
@@ -742,7 +749,7 @@
   var btnAddWorkItem = el("btnAddWorkItem"), wiRows = el("wiRows"), wiCount = el("wiCount");
   var fType = el("fType"), fManager = el("fManager"), fStatus = el("fStatus"),
       fFrom = el("fFrom"), fTo = el("fTo"), fClear = el("fClear"), fProject = el("fProject");
-  var repGran = el("repGran"), reportBody = el("reportBody");
+  var repGran = el("repGran"), reportBody = el("reportBody"), btnReportCsv = el("btnReportCsv");
   var weightsBody = el("weightsBody"), btnSaveSettings = el("btnSaveSettings"),
       btnResetSettings = el("btnResetSettings"), settingsManagers = el("settingsManagers"),
       syncHint = el("syncHint"), syncControls = el("syncControls");
@@ -1358,14 +1365,9 @@
     });
     reportBody.appendChild(legend);
 
-    var gran = repGran.value;
-    var map = {};
-    items.forEach(function (w) {
-      var k = periodKey(w.openedDate, gran); if (k == null) k = "(no date)";
-      if (!map[k]) map[k] = { total: 0, types: { escalation: 0, ditl: 0, oneoff: 0, other: 0 } };
-      map[k].total++; if (w.type in map[k].types) map[k].types[w.type]++;
-    });
-    var keys = Object.keys(map).sort().reverse().slice(0, 20);
+    var rb = reportBuckets(items, repGran.value), map = rb.map;
+    // Newest first, and only the most recent REPORT_ROWS on screen; the CSV has them all.
+    var keys = rb.keys.slice().reverse().slice(0, REPORT_ROWS);
     var max = 1; keys.forEach(function (k) { if (map[k].total > max) max = map[k].total; });
     var wrap = elem("div");
     keys.forEach(function (k) {
@@ -1382,6 +1384,52 @@
       wrap.appendChild(row);
     });
     reportBody.appendChild(wrap);
+    if (rb.keys.length > REPORT_ROWS) reportBody.appendChild(elem("p", "hint", "Showing the " + REPORT_ROWS +
+      " most recent of " + rb.keys.length + " periods. Download CSV includes every period."));
+  }
+  var REPORT_ROWS = 20;
+  // Work items counted per period (by opened date) and type. keys come back oldest
+  // first, with "(no date)" — items with no opened date — last.
+  function reportBuckets(items, gran) {
+    var map = {};
+    items.forEach(function (w) {
+      var k = periodKey(w.openedDate, gran); if (k == null) k = NO_DATE;
+      if (!map[k]) map[k] = { total: 0, types: { escalation: 0, ditl: 0, oneoff: 0, other: 0 } };
+      map[k].total++; if (w.type in map[k].types) map[k].types[w.type]++;
+    });
+    var keys = Object.keys(map).filter(function (k) { return k !== NO_DATE; }).sort();
+    if (map[NO_DATE]) keys.push(NO_DATE);
+    return { map: map, keys: keys };
+  }
+  var NO_DATE = "(no date)";
+
+  // ---- CSV export of the report ----------------------------------------
+  // One row per period at the chosen grouping, oldest first, every period (not just
+  // the ones on screen). Same Blob download route as Export JSON — no network.
+  function csvCell(v) {
+    var t = (v == null) ? "" : String(v);
+    // Spreadsheet apps run a cell that starts with = + - @ as a formula.
+    if (/^[=+\-@]/.test(t)) t = "'" + t;
+    return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  }
+  function reportCsv(gran) {
+    var rb = reportBuckets((data && data.workItems) || [], gran);
+    var lines = [["Period", "Total"].concat(WORK_TYPES.map(function (t) { return lab("type", t); }))];
+    rb.keys.forEach(function (k) {
+      var b = rb.map[k];
+      lines.push([k, b.total].concat(WORK_TYPES.map(function (t) { return b.types[t]; })));
+    });
+    // CRLF and a byte-order mark, so Excel opens it as UTF-8 with the rows split.
+    return "\ufeff" + lines.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n") + "\r\n";
+  }
+  function downloadReportCsv() {
+    var items = (data && data.workItems) || [];
+    if (!items.length) { notice("No work items to export yet.", "info"); return; }
+    var gran = repGran.value, d = new Date();
+    var name = "heimdall-report-" + gran + "-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + ".csv";
+    var blob = new Blob([reportCsv(gran)], { type: "text/csv;charset=utf-8" }); var url = URL.createObjectURL(blob);
+    var a = elem("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    notice("Downloaded " + name + ".", "ok");
   }
 
   // ---- Settings view ---------------------------------------------------
@@ -2427,6 +2475,7 @@
   [fScope, fType, fManager, fProject, fStatus, fFrom, fTo].forEach(function (s) { s.addEventListener("change", renderWorkItemsView); });
   fClear.addEventListener("click", function () { fScope.value = "active"; fType.value = ""; fManager.value = ""; fProject.value = ""; fStatus.value = ""; fFrom.value = ""; fTo.value = ""; renderWorkItemsView(); });
   repGran.addEventListener("change", renderReports);
+  btnReportCsv.addEventListener("click", downloadReportCsv);
   btnSaveSettings.addEventListener("click", saveSettings);
   btnResetSettings.addEventListener("click", resetSettings);
   projAddMember.addEventListener("click", addTeamMember);
