@@ -1,6 +1,6 @@
 # Heimdall — Roadmap
 
-_Last updated: 2026-10-19 · app version 0.8.0_
+_Last updated: 2026-10-19 · app version 0.9.0_
 
 Post-MVP ideas, ranked by how much they improve the one question Heimdall exists to
 answer — **who is carrying too much, and who has room** — against what they cost in a
@@ -77,7 +77,12 @@ honest about a team that is not uniform. Needs a new field on `managers[]`, a Se
 explanation, and a decision about whether the displayed score is raw or normalized —
 showing both is probably right.
 
-### 3. Undo for the last archive
+### 3. Undo for the last archive — *built in 0.9.0*
+**Built:** an *Undo* button on the message bar (and in the Needs attention dialog)
+for the most recent archive, Done, or *Archive all past roll-off*, good until the next
+change. It records only the fields it changed and skips records edited since.
+Original note:
+
 Archiving is one click and reversible in principle (Restore in the work items table,
 Settings for managers) but not obviously so in the moment, and "Archive all past
 roll-off" is a bulk action with no way back short of hunting through History. A single

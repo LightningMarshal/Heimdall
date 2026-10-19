@@ -63,6 +63,10 @@ once so the "Last saved by" banner can attribute changes.
   silently removed; a review panel lets you archive them deliberately. Active projects
   past their target date show up there too, with a *Close out* action, and so does open
   work whose owner has been archived, with a *Reassign* action.
+- **Undo** — the most recent archive (a work item, project, or manager, marking an
+  item Done, or *Archive all past roll-off*) can be undone from the message bar or the
+  Needs attention dialog until the next change. It restores only the fields that action
+  changed, and skips any record edited again since.
 - **Reports** — work-item volume over all time or by year / quarter / month / week,
   segmented by type.
 - **Settings** — every weight, effort multiplier, and heat band is editable and

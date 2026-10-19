@@ -557,6 +557,10 @@
         <li><strong>Done:</strong> marking an item Done stamps its completion date and moves it to History; it then feeds the owner's “Recently completed” list in the drawer.</li>
         <li><strong>Roll-off:</strong> when an item's roll-off date (or an assignment's end date) passes, nothing disappears silently — a “Needs attention” chip appears in the nav. Open it to review and archive items deliberately, one by one or all at once. Active projects past their target date appear there too, with a <em>Close out</em> action; assignments on a closed-out project stop appearing, because closing out settles them.</li>
         <li><strong>History:</strong> Work Items → “Show: History” lists everything archived. Nothing is ever hard-deleted.</li>
+        <li><strong>Undo:</strong> the most recent archive — a work item, a project, a manager, marking an item Done, or
+          <em>Archive all past roll-off</em> — can be undone with the <em>Undo</em> button on the message bar (or in the
+          Needs attention dialog), until you make another change. Undo puts back only what that action changed; anything
+          edited again since is left as it is.</li>
         <li><strong>Age:</strong> the queue flags items that have been open 14+ days.</li>
       </ul>
       <p>Reference tickets by ID or short title plus a link — never put sensitive incident details or customer data in this file.</p>
@@ -653,6 +657,7 @@
       <ul class="attn-list" id="attnList"></ul>
     </div>
     <div class="actions">
+      <button id="attnUndo" class="ghost" hidden>Undo</button>
       <button id="attnArchiveAll">Archive all past roll-off</button>
       <button id="attnClose" class="primary">Close</button>
     </div>
@@ -682,7 +687,7 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.8.0";
+  var APP_VERSION = "0.9.0";
   var MAX_BACKUPS = 10;
   // Minimum spacing between backups. One per save meant ten quick edits rotated out
   // every older backup, so the ten on disk only ever covered the last few minutes.
@@ -750,7 +755,7 @@
       projTeam = el("projTeam"), projAddMember = el("projAddMember"), projOk = el("projOk"), projCancel = el("projCancel");
   var drawerOverlay = el("drawerOverlay"), drawerBody = el("drawerBody");
   var attnChip = el("attnChip"), attnOverlay = el("attnOverlay"), attnList = el("attnList"),
-      attnArchiveAll = el("attnArchiveAll"), attnClose = el("attnClose");
+      attnArchiveAll = el("attnArchiveAll"), attnClose = el("attnClose"), attnUndo = el("attnUndo");
   var searchInput = el("searchInput"), searchPop = el("searchPop");
   var btnQuickAdd = el("btnQuickAdd"), quickMenu = el("quickMenu");
   var backlogPanel = el("backlogPanel"), fScope = el("fScope");
@@ -895,6 +900,8 @@
 
   var noticeTimer = null;
   function notice(msg, kind) {
+    // Any other message replaces an Undo offer on the bar (the undo itself stays
+    // available from Needs attention until the next change).
     noticeEl.textContent = msg;
     noticeEl.className = "notice show " + (kind || "info");
     if (noticeTimer) clearTimeout(noticeTimer);
@@ -1578,9 +1585,55 @@
     });
   }
 
+  // ---- Undo (most recent archive action only) ---------------------------
+  // Archiving is reversible in principle, but Restore lives in History or Settings, and
+  // "Archive all past roll-off" touches many records at once. The last archive-type
+  // action can be undone from the notice bar (or the Needs attention dialog) until the
+  // next change. It records only the fields it changed — {coll, id, field, prev, next}
+  // per record — and undoes by finding each record again by id and putting back a field
+  // only if it still holds the value the action set. It never restores a snapshot of
+  // the whole data set, which would wipe anything a sync brought in meanwhile.
+  var lastUndo = null;   // { label, changes: [...] }
+  function fieldChange(coll, rec, field, next) {
+    return { coll: coll, id: rec.id, field: field, prev: (rec[field] === undefined ? null : rec[field]), next: next };
+  }
+  // Apply a list of field changes (built by fieldChange) and offer to undo them.
+  function applyWithUndo(label, changes, message) {
+    changes.forEach(function (c) { var r = findById(data[c.coll], c.id); if (r) r[c.field] = c.next; });
+    commit();
+    if (!changes.length) return;
+    lastUndo = { label: label, changes: changes };
+    notice(message, "ok");
+    if (noticeTimer) clearTimeout(noticeTimer);   // stays up until replaced or the next change
+    noticeEl.appendChild(document.createTextNode(" "));
+    var b = miniBtn("Undo", undoLast); b.id = "btnUndo"; noticeEl.appendChild(b);
+    updateUndoUI();
+  }
+  async function undoLast() {
+    var u = lastUndo; if (!u) return;
+    if (!(await ensureName())) return;
+    if (u !== lastUndo) return;   // something else changed while the name prompt was up
+    var restored = 0, skipped = 0;
+    u.changes.forEach(function (c) {
+      var r = findById(data[c.coll], c.id);
+      if (r && r[c.field] === c.next) { r[c.field] = c.prev; restored++; } else skipped++;
+    });
+    commit();
+    notice("Undone: " + u.label + "." + (skipped ? " " + skipped + " change" + (skipped === 1 ? "" : "s") +
+      " not undone — edited again since, or no longer in the data." : ""), skipped ? "info" : "ok");
+  }
+  function updateUndoUI() {
+    attnUndo.hidden = !lastUndo;
+    if (lastUndo) attnUndo.textContent = "Undo: " + lastUndo.label;
+  }
+
   // ---- Mutations -------------------------------------------------------
   var GONE_MSG = "That record is no longer in the data — a newer copy was loaded while the form was open. Nothing was changed.";
-  function commit() { renderAll(); scheduleSave(); }
+  // Every change ends the window for undoing the previous archive action.
+  function commit() {
+    if (lastUndo) { lastUndo = null; var ub = el("btnUndo"); if (ub) noticeEl.className = "notice"; updateUndoUI(); }
+    renderAll(); scheduleSave();
+  }
 
   // Managers
   var MANAGER_FIELDS = [
@@ -1606,6 +1659,7 @@
     data.managers.push({ id: genId(), name: v.name, title: v.title, location: v.location, capacity: capacityFrom(v), active: v.active });
     commit();
   }
+  function archiveManagerChange(m) { return [fieldChange("managers", m, "active", false)]; }
   async function editManager(id) {
     var m = findById(data.managers, id); if (!m) return;
     if (!(await ensureName())) return;
@@ -1615,13 +1669,19 @@
     if (!v) return;
     m = findById(data.managers, id); if (!m) { notice(GONE_MSG, "err"); return; }
     if (m.active && !v.active && !confirmArchiveManager(m)) return;
-    m.name = v.name; m.title = v.title; m.location = v.location; m.capacity = capacityFrom(v); m.active = v.active;
+    var archiving = m.active && !v.active;
+    m.name = v.name; m.title = v.title; m.location = v.location; m.capacity = capacityFrom(v);
+    if (archiving) { applyWithUndo("archive " + m.name, archiveManagerChange(m), "“" + m.name + "” archived — Settings → Restore brings them back."); return; }
+    m.active = v.active;
     commit();
   }
   async function toggleManagerActive(id) {
     var m = findById(data.managers, id); if (!m) return;
     if (m.active && !confirmArchiveManager(m)) return;
-    if (!(await ensureName())) return; m.active = !m.active; commit();
+    if (!(await ensureName())) return;
+    m = findById(data.managers, id); if (!m) { notice(GONE_MSG, "err"); return; }
+    if (m.active) { applyWithUndo("archive " + m.name, archiveManagerChange(m), "“" + m.name + "” archived — Settings → Restore brings them back."); return; }
+    m.active = true; commit();
   }
   // Archiving takes a manager off the board and out of scoring, but not their work —
   // say what they still carry before it drops out of sight.
@@ -1700,11 +1760,21 @@
   async function markWorkItemDone(id) {
     var w = findById(data.workItems, id); if (!w) return;
     if (!(await ensureName())) return;
-    w.status = "done"; w.completedDate = todayISO(); w.archived = true; // done -> history
-    commit();
-    notice("Marked done — moved to History (Work Items → Show: History).", "ok");
+    w = findById(data.workItems, id); if (!w) { notice(GONE_MSG, "err"); return; }
+    // done -> history
+    applyWithUndo("mark “" + w.title + "” done", [
+      fieldChange("workItems", w, "status", "done"), fieldChange("workItems", w, "completedDate", todayISO()),
+      fieldChange("workItems", w, "archived", true)
+    ], "Marked done — moved to History (Work Items → Show: History).");
   }
-  async function toggleWorkItemArchived(id) { var w = findById(data.workItems, id); if (!w) return; if (!(await ensureName())) return; w.archived = !w.archived; commit(); }
+  async function toggleWorkItemArchived(id) {
+    var w = findById(data.workItems, id); if (!w) return;
+    if (!(await ensureName())) return;
+    w = findById(data.workItems, id); if (!w) { notice(GONE_MSG, "err"); return; }
+    if (w.archived) { w.archived = false; commit(); return; }
+    applyWithUndo("archive “" + w.title + "”", [fieldChange("workItems", w, "archived", true)],
+      "Archived “" + w.title + "” — it stays in History.");
+  }
 
   // Assign a manager to a project (from the drawer); excludes projects they're already on.
   async function assignManagerToProject(managerId) {
@@ -1909,9 +1979,11 @@
         "(Finished projects are usually closed out instead.)")) return;
     if (!(await ensureName())) return;
     p = findById(data.projects, id); if (!p) { notice(GONE_MSG, "err"); return; }
-    p.archived = !p.archived;
+    if (!p.archived) { applyWithUndo("archive “" + p.name + "”", [fieldChange("projects", p, "archived", true)],
+      "“" + p.name + "” archived. Projects → Show archived lists it."); return; }
+    p.archived = false;
     commit();
-    notice(p.archived ? "“" + p.name + "” archived. Projects → Show archived lists it." : "“" + p.name + "” restored.", "ok");
+    notice("“" + p.name + "” restored.", "ok");
   }
 
   // ---- Manager detail drawer -------------------------------------------
@@ -2121,20 +2193,28 @@
     });
   }
   function openAttn() { renderAttnList(); attnOverlay.className = "overlay show"; }
+  // The archive change for a roll-off row in Needs attention, or null if it is gone.
+  function attnArchiveChange(it) {
+    var coll = (it.kind === "as-roll") ? "assignments" : "workItems", r = findById(data[coll], it.id);
+    return r ? fieldChange(coll, r, "archived", true) : null;
+  }
   async function archiveFromAttn(it) {
     if (!(await ensureName())) return;
-    if (it.kind === "as-roll") { var a = findById(data.assignments, it.id); if (a) a.archived = true; }
-    else { var w = findById(data.workItems, it.id); if (w) w.archived = true; }
-    commit(); renderAttnList();
+    var c = attnArchiveChange(it);
+    applyWithUndo("archive 1 item", c ? [c] : [], "Archived — it remains in History.");
+    renderAttnList();
   }
   async function archiveAllPastRollOff() {
     if (!(await ensureName())) return;
+    var changes = [];
     attentionItems().forEach(function (it) {
-      if (it.kind === "wi-roll") { var w = findById(data.workItems, it.id); if (w) w.archived = true; }
-      else if (it.kind === "as-roll") { var a = findById(data.assignments, it.id); if (a) a.archived = true; }
+      if (it.kind !== "wi-roll" && it.kind !== "as-roll") return;
+      var c = attnArchiveChange(it); if (c) changes.push(c);
     });
-    commit(); renderAttnList();
-    notice("Past roll-off items archived — they remain in History.", "ok");
+    if (!changes.length) { notice("Nothing is past its roll-off date.", "info"); return; }
+    applyWithUndo("archive " + changes.length + " past roll-off", changes,
+      changes.length + " past roll-off item" + (changes.length === 1 ? "" : "s") + " archived — they remain in History.");
+    renderAttnList();
   }
 
   // ---- Global search -----------------------------------------------------
@@ -2356,6 +2436,7 @@
   attnChip.addEventListener("click", openAttn);
   attnClose.addEventListener("click", function () { attnOverlay.className = "overlay"; });
   attnArchiveAll.addEventListener("click", archiveAllPastRollOff);
+  attnUndo.addEventListener("click", function () { undoLast().then(renderAttnList); });
   searchInput.addEventListener("input", renderSearch);
   searchInput.addEventListener("focus", renderSearch);
   btnQuickAdd.addEventListener("click", function (e) { e.stopPropagation(); closeSearch(); toggleQuickMenu(); });
