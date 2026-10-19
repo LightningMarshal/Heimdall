@@ -134,6 +134,31 @@ notes) ·
 
 Nothing is hard-deleted — archiving preserves the historical record.
 
+## Development & tests
+
+`heimdall.html` needs nothing installed to run. The repo carries one piece of
+dev-time tooling: a Playwright smoke suite in `tests/` that drives the real file over
+`file://` in Chromium and asserts on what is rendered.
+
+```sh
+npm install        # once — installs @playwright/test (pinned) into node_modules/
+npm test           # runs every spec in tests/
+```
+
+- `tests/helpers.js` — `openApp(page, data)` seeds IndexedDB (db `heimdall`, store
+  `kv`, keys `data` and `name`) and reloads, so each test starts from a known data
+  file without clicking through setup; `seed({...})` builds a minimal valid file.
+  Every test also fails on any uncaught page error.
+- `tests/smoke.spec.js` — board, drawer, projects, work items, backlog, Needs
+  attention, reports, settings, search.
+- `tests/dates.spec.js` — the date-sensitive checks, run in UTC, New York (late
+  evening) and Auckland (early morning), where the local and UTC dates differ.
+- Chromium comes from the environment's Playwright install; the pinned
+  `@playwright/test` version must match it, or run `npx playwright install chromium`.
+
+Add a test with every behavior change. The tests never touch `heimdall.html`; they
+are not shipped with it.
+
 ## Possible future enhancements
 
 See **[docs/roadmap.md](docs/roadmap.md)** for the ranked list of post-MVP ideas —

@@ -1,6 +1,6 @@
 # Heimdall — Roadmap
 
-_Last updated: 2026-10-02 · app version 0.7.0_
+_Last updated: 2026-10-19 · app version 0.7.0_
 
 Post-MVP ideas, ranked by how much they improve the one question Heimdall exists to
 answer — **who is carrying too much, and who has room** — against what they cost in a
@@ -46,7 +46,12 @@ Each needed a product decision rather than a bug fix. Outcomes:
 
 ## Near-term — small, high leverage
 
-### 1. A test harness
+### 1. A test harness — *built 2026-10-19*
+**Built:** `tests/` holds a Playwright smoke suite (`npm install`, `npm test`) that
+seeds IndexedDB, drives the real file over `file://`, and asserts on rendered DOM,
+with the date checks repeated in UTC, New York and Auckland. See the README's
+*Development & tests* section. `heimdall.html` is untouched by it. Original note:
+
 The highest-value thing missing. The repo has no tests; every regression so far was
 caught by reading code or by a user hitting it in production. Chromium is the only
 dependency needed to drive the real file over `file://`, so a `tests/` directory with

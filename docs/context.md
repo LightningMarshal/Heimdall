@@ -1,10 +1,10 @@
 # Project Context: Heimdall
-_Last updated: 2026-10-02_
+_Last updated: 2026-10-19_
 _This file changes rarely. If the stack or architecture shifts significantly, re-run /first-principles._
 
 ## Stack
-Vanilla JS, HTML, and CSS — no framework, no build step, no package manager,
-no dependencies of any kind. The entire application is one file,
+Vanilla JS, HTML, and CSS — no framework, no build step, no runtime package manager,
+no runtime dependencies of any kind (npm is used only for the dev-time test suite). The entire application is one file,
 `heimdall.html` (~2,390 lines: inlined `<style>` + a single IIFE `<script>`
 using ES5-style `function` expressions, not classes/modules). Currently at
 `APP_VERSION = "0.7.0"`. Double-clicking the file runs it — there is no
@@ -83,12 +83,14 @@ No server, no port, no Electron wrapper.
   writing to the object it held before the await: returning to the tab runs
   `syncFromLocal` / `syncFromFile`, which can replace `data` wholesale while
   a form is open, and an edit written to the old object is silently lost.
-- No test framework, no linter config present — this is a hand-verified,
-  manually-tested single file. Changes are best verified by driving the real
-  file over `file://` in Chromium (Playwright), seeding IndexedDB
-  (db `heimdall`, store `kv`, key `data`) and asserting on rendered DOM —
-  done ad hoc so far; `docs/roadmap.md` item 1 weighs checking such a
-  harness in.
+- Tests: a Playwright smoke suite lives in `tests/` (`npm install`, then
+  `npm test`). It drives the real file over `file://` in Chromium, seeds
+  IndexedDB through `openApp(page, seed({...}))` in `tests/helpers.js`
+  (db `heimdall`, store `kv`, keys `data` and `name`), and asserts on
+  **rendered DOM** only — the app exports nothing to test against. Date
+  checks run in several time zones with `page.clock.setFixedTime()` given a
+  UTC instant. `package.json` exists only for this dev tooling; the shipped
+  artifact is still the one HTML file with no dependencies. No linter config.
 - No git submodules/monorepo; this is the whole repo.
 
 ## Known gotchas
