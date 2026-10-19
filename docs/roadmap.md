@@ -1,6 +1,6 @@
 # Heimdall — Roadmap
 
-_Last updated: 2026-10-19 · app version 0.13.0_
+_Last updated: 2026-10-19 · app version 0.14.0_
 
 Post-MVP ideas, ranked by how much they improve the one question Heimdall exists to
 answer — **who is carrying too much, and who has room** — against what they cost in a
@@ -148,7 +148,12 @@ repetitive data entry. The catch: with no server nothing fires while the tab is
 closed, so "recurring" means "offer to create the due ones when you next open the
 app", which needs a clear UI or it feels like the app is inventing work.
 
-### 9. Workload trend over time
+### 9. Workload trend over time — *built in 0.14.0*
+**Built:** `managers[].scoreHistory`, one snapshot per day written on save. A 12-week
+sparkline on each card, a six-month chart over the heat bands in the drawer, and
+"Heavy since … (N days)" in the drawer and 1:1 summary. Reassignment (#7) is recorded,
+so the trend reflects who actually held the work. Original note:
+
 The board is a snapshot with no memory: it cannot show that someone has been Heavy for
 three months. A periodic score snapshot per manager (written on save, deduplicated to
 one per day) would enable a sparkline on each card and a trend line in the drawer —

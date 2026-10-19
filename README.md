@@ -35,6 +35,10 @@ once so the "Last saved by" banner can attribute changes.
   band uses score ÷ capacity, so a half-time manager with 6 points reads as 12
   (Heavy). Whenever capacity isn't 100% the card shows both numbers
   ("score 12 · raw 6") and a Capacity chip.
+- **Workload trend** — every save records each active manager's score for the day.
+  Cards show a 12-week sparkline; the drawer charts six months against the heat bands
+  and says how long they've been in their current band ("Heavy since 2026-07-20
+  (91 days)"), which the 1:1 summary includes too.
 - **Manager drawer** — click a card for everything that manager carries, recent
   wins, and upcoming roll-offs, plus in-context quick-add and a copy / export /
   print **1:1 summary** for weekly one-on-ones (printing from the drawer prints the
@@ -160,7 +164,8 @@ band it has actually reached. One medium-effort lead role is 3 × 1.5 = 4.5, whi
 
 ## Data model (in `heimdall-data.json`)
 
-`managers[]` (id, name, title, location, capacity, active) · `projects[]` (id, name,
+`managers[]` (id, name, title, location, capacity, active, scoreHistory[] of
+{d, s, c} — date, raw score, capacity; one per day, kept for 400) · `projects[]` (id, name,
 description, status, priority, startDate, targetDate, completedDate, link, archived) ·
 `assignments[]` (id, projectId, managerId, role, effort, startDate, endDate,
 archived) · `workItems[]` (id, type, typeOther, title, managerId, relatedProjectId,

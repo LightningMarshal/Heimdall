@@ -136,6 +136,16 @@
   .heat-na         { background: #eef0f3; color: #6b7280; }
   .mcard .m-score { font-variant-numeric: tabular-nums; color: var(--faint); font-size: 12px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .m-trend { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 11px; color: var(--faint); white-space: nowrap; }
+  svg.spark { width: 100%; height: 22px; flex: 1 1 auto; overflow: visible; }
+  svg.spark .line, svg.trend .line { fill: none; stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  .d-trend { margin: 6px 0 4px; }
+  svg.trend { width: 100%; height: 70px; display: block; border-radius: 7px; overflow: hidden; }
+  svg.trend .line { stroke-width: 2; }
+  svg.trend rect.heat-light { fill: #e7f7ee; } svg.trend rect.heat-balanced { fill: #fbf3df; }
+  svg.trend rect.heat-heavy { fill: #fdeede; }  svg.trend rect.heat-overloaded { fill: #fde4e4; }
+  .d-trend-lab { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--faint); margin-top: 3px; }
+  .d-trend-lab span:nth-child(2) { color: var(--muted); font-weight: 600; text-align: center; }
   .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 3px 9px;
           border-radius: 7px; background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); }
   .chip b { color: var(--text); font-variant-numeric: tabular-nums; }
@@ -360,7 +370,7 @@
   @media print {
     .appbar, .banner, .nav, .nav-right, .notice, .footer-note, .drawer .d-actions, .drawer .d-close, .tl-sort { display: none !important; }
     /* Heat chips and timeline markers carry meaning in their color. */
-    .heat, .tl-mark, .tl-proj span { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .heat, .tl-mark, .tl-proj span, svg.trend rect { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .drawer-overlay { position: static; background: none; }
     .drawer { position: static; width: auto; max-width: none; height: auto; box-shadow: none; transform: none; }
     /* Print from the drawer prints the 1:1 summary, not the board underneath it. */
@@ -586,6 +596,12 @@
       <h3>The Board and the manager drawer</h3>
       <p>The Board shows one card per active manager: weighted workload heat (Light → Overloaded), the numeric score, and counts for projects leading / supporting, escalations (red), DITL, and one-offs. Hover the heat label to see which score range that band covers.</p>
       <p>Click any card (or Tab to it and press Enter) to open that manager's drawer: everything they're carrying, their ten most recent wins, and what's rolling off soon. From the drawer you can add a work item (owner pre-filled), assign them to a project, mark items done, edit their details, and copy / export / print a 1:1 summary — built for weekly 1:1s. Print from the drawer prints the drawer alone.</p>
+      <p><strong>Trend:</strong> every save also records each active manager's score for that day (the latest save of the
+        day wins). Cards show a 12-week sparkline once there is more than a day of history, and the drawer shows six
+        months against the heat bands with a line like “Heavy since 2026-07-20 (91 days)”, which also goes into the 1:1
+        summary. A day with no saves keeps the previous day's score — the score only moves when the data does. The raw
+        score and capacity are stored separately, so changing someone's capacity later doesn't rewrite their past;
+        changing the band thresholds re-reads the whole history against the new bands.</p>
       <p>Archiving a manager (Settings) takes them off the board. If they still own open work, you're asked first, and those items then appear under <em>Needs attention</em> as “Owner archived” until you reassign them.</p>
     </div>
 
@@ -786,7 +802,7 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.13.0";
+  var APP_VERSION = "0.14.0";
   var MAX_BACKUPS = 10;
   // Minimum spacing between backups. One per save meant ten quick edits rotated out
   // every older backup, so the ten on disk only ever covered the last few minutes.
@@ -815,6 +831,8 @@
   var TYPE_COLOR = { escalation: "#dc2626", ditl: "#2563eb", oneoff: "#d97706", other: "#6b7280" };
   var TYPE_OTHER_MAX = 60;   // free-text label captured when Type is "Other"
   var CHANGE_CAP = 500;      // change-log entries kept; the oldest drop off first
+  var TREND_KEEP = 400;      // score snapshots kept per manager (one per day at most)
+  var TREND_CARD_DAYS = 84, TREND_DRAWER_DAYS = 182;   // sparkline on the card / chart in the drawer
   var HANDOFF_DAYS = 90;     // the drawer's "Handed off" look-back
   var MAX_WINS = 10;         // "Recently completed" entries shown in the drawer and 1:1 summary
   // Capacity is entered as a percentage of a full load (100 = full time, 50 = half,
@@ -903,6 +921,7 @@
     // divide oddly, and 0 or a negative would put Infinity or nonsense on the board.
     // Anything unusable (including a file from before 0.8.0) means a full load.
     out.managers.forEach(function (m) { var c = toNum(m.capacity); m.capacity = (c != null && c > 0) ? c : 1; });
+    out.managers.forEach(function (m) { m.scoreHistory = normalizeScoreHistory(m.scoreHistory); });
     out.workItems.forEach(normalizeOwnerHistory);
     out.changes = mergeChanges([], changes.filter(function (c) { return isPlainObject(c) && typeof c.id === "string" && c.id; }));
     if (isPlainObject(parsed.settings)) {
@@ -928,6 +947,20 @@
       }
     }
     return { ok: true, data: out };
+  }
+  // managers[].scoreHistory: [{ d: "YYYY-MM-DD", s: raw score, c: capacity }], oldest
+  // first, at most one per day. Raw score and capacity are stored separately so a later
+  // capacity change does not rewrite how loaded someone was back then.
+  function normalizeScoreHistory(h) {
+    if (!Array.isArray(h)) return [];
+    var byDay = {};
+    h.forEach(function (e) {
+      if (!isPlainObject(e) || !/^\d{4}-\d{2}-\d{2}$/.test(String(e.d))) return;
+      var sc = toNum(e.s), c = toNum(e.c);
+      if (sc == null) return;
+      byDay[e.d] = { d: e.d, s: sc, c: (c != null && c > 0) ? c : 1 };
+    });
+    return Object.keys(byDay).sort().slice(-TREND_KEEP).map(function (k) { return byDay[k]; });
   }
   // workItems[].ownerHistory: [{ managerId, from, to }] — who owned the item and when
   // (plain local dates; to is null for the current owner). Items from before 0.13.0
@@ -1266,6 +1299,81 @@
     return round1(sc.load) + " (" + round1(sc.score) + " raw at " + capacityPct(sc.capacity) + " capacity)";
   }
 
+  // ---- Workload trend --------------------------------------------------
+  // Every save writes today's score for each active manager (overwriting today's earlier
+  // one). A score only changes when the data does, so a day with no save carries the
+  // previous value forward; entries equal to the one before are not stored at all.
+  function recordScoreHistory() {
+    var today = todayISO();
+    data.managers.forEach(function (m) {
+      if (!m.active) return;
+      var sc = managerScore(m.id), e = { d: today, s: round1(sc.score), c: sc.capacity };
+      var h = Array.isArray(m.scoreHistory) ? m.scoreHistory : (m.scoreHistory = []);
+      var last = h[h.length - 1];
+      if (last && last.d > today) return;   // clock went backwards; leave history alone
+      if (last && last.d === today) h.pop();
+      var prev = h[h.length - 1];
+      if (!prev || prev.s !== e.s || prev.c !== e.c) h.push(e);
+      if (h.length > TREND_KEEP) h.splice(0, h.length - TREND_KEEP);
+    });
+  }
+  // One load (score ÷ capacity) per day for the last `days` days, oldest first; null
+  // before the first snapshot. Today is the live score, not the last saved one.
+  function trendSeries(m, days) {
+    var h = m.scoreHistory || [], out = [], i = 0, cur = null, t = startOfToday();
+    for (var k = days - 1; k >= 1; k--) {
+      var day = isoOf(addDays(t, -k));
+      while (i < h.length && h[i].d <= day) { cur = h[i].s / h[i].c; i++; }
+      out.push({ d: day, v: cur });
+    }
+    out.push({ d: todayISO(), v: managerScore(m.id).load });
+    return out;
+  }
+  // How long the manager has been in the band they are in now: the first day of the
+  // unbroken run ending today, and whether the run reaches back past the first record.
+  function bandSince(m) {
+    var series = trendSeries(m, TREND_KEEP), now = bandFor(series[series.length - 1].v).label, since = todayISO(), open = false;
+    for (var i = series.length - 2; i >= 0; i--) {
+      if (series[i].v == null) { open = true; break; }
+      if (bandFor(series[i].v).label !== now) break;
+      since = series[i].d;
+    }
+    return { label: now, since: since, days: dayDiff(parseISODate(since), startOfToday()), fromStart: open };
+  }
+  function bandSinceText(m) {
+    var b = bandSince(m);
+    if (b.days < 1) return b.label + " since today";
+    return b.label + (b.fromStart ? " since records began, " : " since ") + b.since + " (" + b.days + " day" + (b.days === 1 ? "" : "s") + ")";
+  }
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function svgEl(tag, attrs) { var e = document.createElementNS(SVGNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  // A load line over the series. With bands, the chart's background is striped by heat
+  // band so "Heavy for three months" can be read straight off it.
+  function trendSvg(series, w, h, withBands, cls) {
+    var bands = normalizedBands(), top = 1;
+    series.forEach(function (p) { if (p.v != null && p.v > top) top = p.v; });
+    bands.forEach(function (b) { if (b.max == null && b.min > top * 0.8) top = Math.max(top, b.min * 1.15); });
+    top *= 1.1;
+    var svg = svgEl("svg", { viewBox: "0 0 " + w + " " + h, preserveAspectRatio: "none", "class": cls, "aria-hidden": "true" });
+    function y(v) { return (h - 2) - (Math.min(v, top) / top) * (h - 4); }
+    if (withBands) bands.forEach(function (b) {
+      var lo = y(b.min), hi = (b.max == null) ? 0 : y(Math.min(b.max + 1, top));
+      if (lo > hi) svg.appendChild(svgEl("rect", { x: 0, y: hi, width: w, height: lo - hi, "class": b.heat }));
+    });
+    var n = series.length, pts = [], k;
+    function flush() { if (pts.length > 1) svg.appendChild(svgEl("polyline", { points: pts.join(" "), "class": "line" })); pts = []; }
+    for (k = 0; k < n; k++) {
+      var p = series[k];
+      if (p.v == null) { flush(); continue; }
+      var x = (n === 1) ? w : (k / (n - 1)) * w;
+      if (pts.length) pts.push(x.toFixed(1) + "," + pts[pts.length - 1].split(",")[1]);   // step: hold until it changes
+      pts.push(x.toFixed(1) + "," + y(p.v).toFixed(1));
+    }
+    flush();
+    return svg;
+  }
+  function hasTrend(m) { return (m.scoreHistory || []).some(function (e) { return e.d < todayISO(); }); }
+
   // ---- Board view ------------------------------------------------------
   function chip(label, n, alert) {
     var c = elem("span", "chip" + (alert ? " alert" : ""));
@@ -1305,6 +1413,14 @@
       if (sc.counts.oneoff) chips.appendChild(chip("One-offs", sc.counts.oneoff));
       if (sc.counts.other) chips.appendChild(chip("Other", sc.counts.other));
       card.appendChild(chips);
+      if (hasTrend(m)) {
+        var tr = elem("div", "m-trend");
+        var series = trendSeries(m, TREND_CARD_DAYS);
+        tr.appendChild(trendSvg(series, 100, 22, false, "spark"));
+        tr.appendChild(elem("span", null, "12 wk"));
+        tr.title = bandSinceText(m);
+        card.appendChild(tr);
+      }
       card.addEventListener("click", function () { openManager(m.id); });
       // Reachable and openable from the keyboard, like every other click-through.
       card.tabIndex = 0; card.setAttribute("role", "button"); card.setAttribute("aria-label", m.name + " — " + b.label + ", score " + scoreText(sc));
@@ -2022,6 +2138,14 @@
   // Data replaced from elsewhere: keep both logs, and diff future commits from here.
   function replaceData(next) {
     next.changes = mergeChanges(data && data.changes, next.changes);
+    // Score snapshots live on the manager row, which is last-write-wins as a whole;
+    // merge them by day (the incoming copy wins a day both have) so the losing side's
+    // days are not lost with it.
+    if (data) next.managers.forEach(function (m) {
+      var old = findById(data.managers, m.id);
+      if (old && old.scoreHistory && old.scoreHistory.length)
+        m.scoreHistory = normalizeScoreHistory(old.scoreHistory.concat(m.scoreHistory || []));
+    });
     data = next; resetBaseline();
   }
   function recordLabel(coll, r) {
@@ -2510,6 +2634,14 @@
     var scoreSpan = elem("span", "m-score", "  score " + scoreText(sc)); scoreSpan.style.marginLeft = "8px";
     heatRow.appendChild(scoreSpan);
     drawerBody.appendChild(heatRow);
+    var trendBox = elem("div", "d-trend");
+    if (hasTrend(m)) {
+      trendBox.appendChild(trendSvg(trendSeries(m, TREND_DRAWER_DAYS), 400, 70, true, "trend"));
+      var tl = elem("div", "d-trend-lab");
+      tl.appendChild(elem("span", null, "6 months ago")); tl.appendChild(elem("span", null, bandSinceText(m))); tl.appendChild(elem("span", null, "today"));
+      trendBox.appendChild(tl);
+    } else trendBox.appendChild(elem("div", "d-empty", "Trend: builds up from today — one point per day the data is saved."));
+    drawerBody.appendChild(trendBox);
 
     var actions = elem("div", "d-actions");
     actions.appendChild(miniBtn("+ Work item", function () { addWorkItem(m.id); }, "primary"));
@@ -2576,7 +2708,8 @@
     // Every list managerCarry returns holds {text, …} entries, not strings.
     function block(t, items) { return t + "\n" + (items.length ? items.map(function (x) { return "  - " + x.text; }).join("\n") : "  (none)") + "\n"; }
     return "1:1 Prep — " + m.name + (m.title ? " (" + m.title + ")" : "") + (m.location ? " — " + m.location : "") + "\n" +
-      "Generated " + new Date().toLocaleString() + "\n" + "Workload: " + b.label + " (score " + scoreText(sc) + ")\n\n" +
+      "Generated " + new Date().toLocaleString() + "\n" + "Workload: " + b.label + " (score " + scoreText(sc) + ")\n" +
+      (hasTrend(m) ? "Trend: " + bandSinceText(m) + "\n" : "") + "\n" +
       block("Currently carrying:", d.current) + "\n" +
       block("Recently completed (wins):", d.wins) + "\n" + block("Rolling off soon / overdue:", d.roll) +
       (d.handed.length ? "\n" + block("Handed off (last " + HANDOFF_DAYS + " days):", d.handed) : "");
@@ -2797,6 +2930,7 @@
     if (!data) return;
     setSaveStatus("saving");
     var who = userName || (data.settings && data.settings.lastSavedBy) || "Unknown";
+    recordScoreHistory();
     data.settings.lastSavedBy = who; data.settings.lastSavedAt = new Date().toISOString();
     data.settings.appVersion = APP_VERSION;
     await saveLocal(); updateBanner();
