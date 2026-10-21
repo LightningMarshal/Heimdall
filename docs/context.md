@@ -7,7 +7,7 @@ Vanilla JS, HTML, and CSS — no framework, no build step, no runtime package ma
 no runtime dependencies of any kind (npm is used only for the dev-time test suite). The entire application is one file,
 `heimdall.html` (~3,240 lines: inlined `<style>` + a single IIFE `<script>`
 using ES5-style `function` expressions, not classes/modules). Currently at
-`APP_VERSION = "0.15.0"`. Double-clicking the file runs it — there is no
+`APP_VERSION = "0.15.1"`. Double-clicking the file runs it — there is no
 `npm install`, no dev server, no compiler.
 
 ## Deployment

@@ -549,7 +549,14 @@
     <div class="view-head">
       <h2>Projects <span class="count" id="projCount"></span></h2>
       <div class="head-acts">
-        <label class="toggle" id="projArchivedToggle" hidden><input type="checkbox" id="projShowArchived"> Show archived</label>
+        <label id="projScopeWrap" style="font-size:13px;color:var(--muted);" hidden>Show
+          <select id="projScope" style="font:inherit;padding:6px 9px;border:1px solid var(--border-strong);border-radius:8px;margin-left:6px;">
+            <option value="current" selected>Current</option>
+            <option value="closed">Closed out</option>
+            <option value="archived">Archived</option>
+            <option value="all">All</option>
+          </select>
+        </label>
         <button id="btnAddProject" class="primary">Add project</button>
       </div>
     </div>
@@ -720,7 +727,10 @@
       <p><strong>Archiving a project</strong> is for one that shouldn't be on the list at all — entered by mistake, a
         duplicate, or cancelled before it started. (Finished work is closed out instead.) An archived project leaves the
         Projects list and stops counting toward workload, roll-offs, and Needs attention, but its team and related work
-        items are kept: tick <em>Show archived</em> on the Projects view and click <em>Restore</em> to bring it back as it was.</p>
+        items are kept: choose <em>Show: Archived</em> on the Projects view and click <em>Restore</em> to bring it back as it was.</p>
+      <p><strong>What the Projects view lists:</strong> by default only <em>current</em> projects — Active and On hold —
+        so the ones that can still need attention aren't buried. Closed-out and archived projects are kept out of sight;
+        pick <em>Closed out</em>, <em>Archived</em> or <em>All</em> from <em>Show</em> to pull them up.</p>
       <p><strong>Related work:</strong> a work item can name a related project. The project card counts its related
         work items (click the count to see them in the queue, filtered to that project), <em>+ Work item</em> on the card
         logs one already linked, and the queue, the drawer, and the 1:1 summary show the project beside the item.</p>
@@ -891,7 +901,7 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.15.0";
+  var APP_VERSION = "0.15.1";
   var MAX_BACKUPS = 10;
   // Minimum spacing between backups. One per save meant ten quick edits rotated out
   // every older backup, so the ten on disk only ever covered the last few minutes.
@@ -947,7 +957,7 @@
   var btnLoadBackup = el("btnLoadBackup"), btnGuardUnlink = el("btnGuardUnlink");
   var btnAddManager = el("btnAddManager"), boardCards = el("boardCards"), mgrCount = el("mgrCount");
   var btnAddProject = el("btnAddProject"), projList = el("projList"), projCount = el("projCount"),
-      projArchivedToggle = el("projArchivedToggle"), projShowArchived = el("projShowArchived");
+      projScopeWrap = el("projScopeWrap"), projScope = el("projScope");
   var btnAddWorkItem = el("btnAddWorkItem"), wiRows = el("wiRows"), wiCount = el("wiCount");
   var fType = el("fType"), fManager = el("fManager"), fStatus = el("fStatus"),
       fFrom = el("fFrom"), fTo = el("fTo"), fClear = el("fClear"), fProject = el("fProject");
@@ -1645,16 +1655,27 @@
     });
     return span;
   }
+  // Which bucket of the Projects list a project falls in: current (active or on hold —
+  // the ones that can still need attention), closed out, or archived.
+  function projectScope(p) { return p.archived ? "archived" : (p.status === "complete" ? "closed" : "current"); }
+  var PROJ_SCOPE_EMPTY = {
+    current: "No current projects — every project is closed out or archived. Use “Show” to see them.",
+    closed: "No closed-out projects.", archived: "No archived projects."
+  };
   function renderProjectsView() {
     var all = (data && data.projects) || [];
-    var archivedN = all.filter(function (p) { return p.archived; }).length;
-    // Archived projects stay out of the list unless asked for, like the work item History.
-    projArchivedToggle.hidden = !archivedN;
-    if (!archivedN) projShowArchived.checked = false;
-    var list = projShowArchived.checked ? all : all.filter(function (p) { return !p.archived; });
-    projCount.textContent = !all.length ? "" : "(" + (all.length - archivedN) + (archivedN ? " · " + archivedN + " archived" : "") + ")";
+    var n = { current: 0, closed: 0, archived: 0 };
+    all.forEach(function (p) { n[projectScope(p)]++; });
+    // Closed-out and archived projects stay out of the list unless asked for, like the
+    // work item History, so the ones that can still need attention are easy to find (#11).
+    projScopeWrap.hidden = !(n.closed || n.archived);
+    if (projScopeWrap.hidden) projScope.value = "current";
+    var scope = projScope.value;
+    var list = scope === "all" ? all : all.filter(function (p) { return projectScope(p) === scope; });
+    projCount.textContent = !all.length ? "" : "(" + n.current + " current" + (n.closed ? " · " + n.closed + " closed out" : "") +
+      (n.archived ? " · " + n.archived + " archived" : "") + ")";
     clear(projList);
-    if (!list.length) { projList.appendChild(elem("div", "empty", all.length ? "Every project is archived — tick “Show archived” to see them." : "No projects yet — click “Add project”.")); return; }
+    if (!list.length) { projList.appendChild(elem("div", "empty", all.length ? PROJ_SCOPE_EMPTY[scope] : "No projects yet — click “Add project”.")); return; }
     list.forEach(function (p) {
       var card = elem("div", "pcard" + (p.archived ? " archived" : "")); if (p.status === "complete" && !p.archived) card.style.opacity = ".65";
       var top = elem("div", "p-top");
@@ -2673,7 +2694,7 @@
     p = findById(data.projects, id); if (!p) { notice(GONE_MSG, "err"); return; }
     p.status = "complete"; p.completedDate = v.completedDate;
     commit();
-    notice("“" + p.name + "” closed out. It no longer counts toward workload; its team and history are kept.", "ok");
+    notice("“" + p.name + "” closed out. It no longer counts toward workload; its team and history are kept — Projects → Show: Closed out lists it.", "ok");
   }
   async function reopenProject(id) {
     var p = findById(data.projects, id); if (!p) return;
@@ -2690,12 +2711,12 @@
   async function toggleProjectArchived(id) {
     var p = findById(data.projects, id); if (!p) return;
     if (!p.archived && !window.confirm("Archive “" + p.name + "”? It leaves the Projects list and stops counting toward " +
-        "anyone's workload. Its team and related work items are kept, and Projects → Show archived → Restore brings it back.\n\n" +
+        "anyone's workload. Its team and related work items are kept, and Projects → Show: Archived → Restore brings it back.\n\n" +
         "(Finished projects are usually closed out instead.)")) return;
     if (!(await ensureName())) return;
     p = findById(data.projects, id); if (!p) { notice(GONE_MSG, "err"); return; }
     if (!p.archived) { applyWithUndo("archive “" + p.name + "”", [fieldChange("projects", p, "archived", true)],
-      "“" + p.name + "” archived. Projects → Show archived lists it."); return; }
+      "“" + p.name + "” archived. Projects → Show: Archived lists it."); return; }
     p.archived = false;
     commit();
     notice("“" + p.name + "” restored.", "ok");
@@ -3153,7 +3174,7 @@
   btnGuardUnlink.addEventListener("click", unlinkSharedFile);
   btnAddManager.addEventListener("click", addManager);
   btnAddProject.addEventListener("click", function () { openProjectModal(null); });
-  projShowArchived.addEventListener("change", renderProjectsView);
+  projScope.addEventListener("change", renderProjectsView);
   btnAddWorkItem.addEventListener("click", function () { addWorkItem(null); });
   btnExport.addEventListener("click", exportJson);
   btnImport.addEventListener("click", importJson);

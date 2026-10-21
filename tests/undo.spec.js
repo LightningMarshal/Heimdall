@@ -65,7 +65,7 @@ test("archiving a project or a manager can be undone", async ({ page }) => {
   await nav(page, "projects");
   page.on("dialog", (d) => d.accept());
   await page.locator(".pcard").getByRole("button", { name: "Archive" }).click();
-  await expect(page.locator("#projList")).toContainText("Every project is archived");
+  await expect(page.locator("#projList")).toContainText("No current projects");
   await undoBtn(page).click();
   await expect(page.locator(".pcard", { hasText: "Apollo" })).toBeVisible();
 

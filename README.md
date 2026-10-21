@@ -53,10 +53,11 @@ once so the "Last saved by" banner can attribute changes.
 - **Projects** — status, priority, dates, Jira epic link, and the team with the
   lead highlighted (co-leads are allowed). A person can appear only once per project.
   Each card counts its related work items and links to them; *+ Work item* logs one
-  already linked to the project.
+  already linked to the project. The list shows only current projects (Active and On
+  hold) by default; *Show* pulls up the closed-out, archived, or all projects.
 - **Archive / Restore projects** — for a project entered by mistake, duplicated, or
   cancelled. It leaves the list and stops counting anywhere, but keeps its team and
-  related work; *Show archived* lists it again with a *Restore* button.
+  related work; *Show: Archived* lists it again with a *Restore* button.
 - **Close out / Reopen** — one click on the project card. Closing out asks for a
   completion date (today by default, backdate it freely) and never requires a start,
   target, or end date, so open-ended and non-time-bound projects close the same way.
