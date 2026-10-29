@@ -212,7 +212,7 @@
   .mcard .m-score { font-variant-numeric: tabular-nums; color: var(--faint); font-size: 12px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .m-trend { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 11px; color: var(--faint); white-space: nowrap; }
-  svg.spark { width: 100%; height: 22px; flex: 1 1 auto; overflow: visible; }
+  svg.spark { width: 100%; height: 44px; flex: 1 1 auto; overflow: visible; }
   svg.spark .line, svg.trend .line { fill: none; stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
   .d-trend { margin: 6px 0 4px; }
   svg.trend { width: 100%; height: 70px; display: block; border-radius: 7px; overflow: hidden; }
@@ -364,6 +364,11 @@
   .ff.check { flex-direction: row; align-items: center; gap: 8px; }
   .ff.check input { width: auto; }
   .ff.check label { font-weight: 500; color: var(--text); }
+  /* A list of checkboxes (openForm type "multi"), e.g. the other managers on a work item. */
+  .ff .multi { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 8px 11px; border: 1px solid var(--border-strong); border-radius: 8px; }
+  .ff .multi label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); cursor: pointer; }
+  .ff .multi label[hidden] { display: none; }
+  .ff .multi input { width: auto; padding: 0; }
 
   /* Team builder */
   .team-build { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; background: var(--surface-2); }
@@ -697,6 +702,11 @@
         summary. A day with no saves keeps the previous day's score — the score only moves when the data does. The raw
         score and capacity are stored separately, so changing someone's capacity later doesn't rewrite their past;
         changing the band thresholds re-reads the whole history against the new bands.</p>
+      <p><strong>Backdated work counts from its date.</strong> Log a work item with an earlier opened date, give a new
+        project an earlier start date, backdate a team member's <em>from</em> date, or close a project out as of last
+        month, and the trend changes from that date — not from the day you typed it in. Before a manager's first
+        recorded day, the trend is worked out from those dates. Changing an effort, a weight or a capacity never rewrites
+        the past; only dates do.</p>
       <p>Archiving a manager (Settings) takes them off the board. If they still own open work, you're asked first, and those items then appear under <em>Needs attention</em> as “Owner archived” until you reassign them.</p>
     </div>
 
@@ -722,6 +732,10 @@
     <div class="panel">
       <h3>Projects, leads &amp; effort</h3>
       <p>A project has a status (Active / On hold / Complete), a priority, dates, and an optional Jira epic link. Its team is managed on the project itself: one entry per person with a role (Lead or Contributor) and an effort (Light / Medium / Heavy). A person can appear only once per project; removing someone archives their assignment rather than deleting it, and so does switching a row to a different person (the new person gets a fresh assignment). Each team member can have an optional <em>until</em> date — the assignment's roll-off date.</p>
+      <p>Each team member has a <em>from</em> date (when they joined) as well as <em>until</em>. On a new project it
+        starts as the project's start date, so a project entered after the fact is backdated for its team too; someone
+        added later starts today unless you set it. Moving a project's start date moves the team members who started
+        with it.</p>
       <p>Most projects have one Lead; a project with two co-leads is fine — mark both as Lead and each scores as a lead.</p>
       <p>Only <em>Active</em> projects count toward workload.</p>
       <p><strong>Archiving a project</strong> is for one that shouldn't be on the list at all — entered by mistake, a
@@ -750,6 +764,11 @@
           free-text label (up to 60 characters) is then shown in place of “Other” everywhere the item
           appears — queue, board drawer, 1:1 summary, search — and it is searchable. Reports still group
           all of them under Other, and the Other weight in Settings still applies.</li>
+        <li><strong>More than one manager:</strong> for an item too big for one person, tick the others under
+          <em>Also working on it</em>. The owner stays the owner; everyone ticked carries the item at its full weight,
+          sees it in their drawer (“helping …”), and is counted for it in Reports. They are listed under the owner in
+          the queue, and the Manager filter finds the item for any of them. An item needs an owner before others can be
+          added.</li>
         <li><strong>Backlog:</strong> items with no owner appear in the amber Backlog panel on the Board, so you assign work where everyone's load is visible.</li>
         <li><strong>Click-through:</strong> a manager's name, a project's team member, or a work item's owner
           is a link — click it to jump straight to that manager, project, or work item, from the drawer,
@@ -901,7 +920,7 @@
   "use strict";
 
   // ---- Constants -------------------------------------------------------
-  var APP_VERSION = "0.15.1";
+  var APP_VERSION = "0.16.0";
   var MAX_BACKUPS = 10;
   // Minimum spacing between backups. One per save meant ten quick edits rotated out
   // every older backup, so the ten on disk only ever covered the last few minutes.
@@ -1024,6 +1043,7 @@
     out.managers.forEach(function (m) { var c = toNum(m.capacity); m.capacity = (c != null && c > 0) ? c : 1; });
     out.managers.forEach(function (m) { m.scoreHistory = normalizeScoreHistory(m.scoreHistory); });
     out.workItems.forEach(normalizeOwnerHistory);
+    out.workItems.forEach(normalizeHelpers);
     out.changes = mergeChanges([], changes.filter(function (c) { return isPlainObject(c) && typeof c.id === "string" && c.id; }));
     if (isPlainObject(parsed.settings)) {
       var s = parsed.settings;
@@ -1081,6 +1101,40 @@
     var open = (last && !last.to) ? last : null;
     if (w.managerId && !open) h.push({ managerId: w.managerId, from: todayISO(), to: null });
     w.ownerHistory = h;
+  }
+  // workItems[].helpers: [{ managerId, from, to }] — the other managers working on an
+  // item alongside its owner (issue #12), with the same from / to history as the owner,
+  // so reports and the trend know when each one was on it. to is null while they still
+  // are. Each manager is open at most once, and never alongside being the owner.
+  function normalizeHelpers(w) {
+    var open = {}, today = todayISO();
+    w.helpers = (Array.isArray(w.helpers) ? w.helpers : []).filter(function (e) {
+      return isPlainObject(e) && typeof e.managerId === "string" && e.managerId;
+    }).map(function (e) {
+      var r = { managerId: e.managerId, from: (typeof e.from === "string" && e.from) ? e.from : null,
+                to: (typeof e.to === "string" && e.to) ? e.to : null };
+      if (!r.to && (open[r.managerId] || r.managerId === w.managerId)) r.to = today;
+      if (!r.to) open[r.managerId] = true;
+      return r;
+    });
+  }
+  // The managers helping on a work item now (not its owner).
+  function helperIds(w) {
+    return (w.helpers || []).filter(function (e) { return !e.to; }).map(function (e) { return e.managerId; });
+  }
+  // Is manager id on work item w right now — as its owner or helping?
+  function isOnItem(w, id) { return w.managerId === id || helperIds(w).indexOf(id) >= 0; }
+  // Set who is helping on a work item: anyone dropped is closed today (or removed, if
+  // added the same day), anyone new starts on `from`. The owner is never also a helper.
+  function setHelpers(w, ids, from) {
+    var h = Array.isArray(w.helpers) ? w.helpers : (w.helpers = []), today = todayISO(), want = {};
+    (ids || []).forEach(function (id) { if (id && id !== w.managerId) want[id] = true; });
+    for (var i = h.length - 1; i >= 0; i--) {
+      var e = h[i]; if (e.to) continue;
+      if (want[e.managerId]) { delete want[e.managerId]; continue; }
+      if (e.from === today) h.splice(i, 1); else e.to = today;
+    }
+    Object.keys(want).forEach(function (id) { h.push({ managerId: id, from: from || today, to: null }); });
   }
   // Record a change of owner on a work item: close the current entry today and open one
   // for the new owner (none when it goes back to the Backlog).
@@ -1325,15 +1379,20 @@
                  text: p.name + " — " + lab("role", a.role) + " (" + lab("effort", a.effort) + ")", projectId: p.id, kind: "project" });
     });
     data.workItems.forEach(function (wi) {
-      if (wi.archived || wi.managerId !== id) return;
+      if (wi.archived || !isOnItem(wi, id)) return;
       if (wi.status !== "open" && wi.status !== "in-progress") return;
-      var t = (wi.type === "escalation" || wi.type === "ditl" || wi.type === "oneoff") ? wi.type : "other";
+      // Everyone on an item carries it at its full weight: it is on each of their plates.
+      var t = workTypeKey(wi);
       out.push({ weight: (w[t] || 0), count: t,
                  end: wi.rollOffDate || wi.dueDate || null, endKind: wi.rollOffDate ? "roll-off" : (wi.dueDate ? "due" : null),
-                 text: typeLabel(wi) + ": " + (wi.title || ""), wiId: wi.id, kind: t });
+                 text: typeLabel(wi) + ": " + (wi.title || "") + helpingText(wi, id), wiId: wi.id, kind: t });
     });
     return out;
   }
+  // The weight key a work item scores under.
+  function workTypeKey(wi) { return (wi.type === "escalation" || wi.type === "ditl" || wi.type === "oneoff") ? wi.type : "other"; }
+  // " (helping Ada)" when manager id is on the item but does not own it.
+  function helpingText(w, id) { return (w.managerId && w.managerId !== id) ? " (helping " + managerName(w.managerId) + ")" : ""; }
   function managerScore(id) {
     var score = 0, c = { led: 0, supporting: 0, escalation: 0, ditl: 0, oneoff: 0, other: 0 };
     scoreItems(id).forEach(function (it) { score += it.weight; c[it.count]++; });
@@ -1418,14 +1477,101 @@
       if (h.length > TREND_KEEP) h.splice(0, h.length - TREND_KEEP);
     });
   }
-  // One load (score ÷ capacity) per day for the last `days` days, oldest first; null
-  // before the first snapshot. Today is the live score, not the last saved one.
+  // What a manager was carrying, as spans of days (issue #13): one { key, from, to,
+  // weight } per stretch an item was theirs, plain local dates, to inclusive and today
+  // while it still is. Built from the dates the data records — an assignment's start to
+  // its archive date or the project's close-out; a work item's owner and helper history
+  // up to carriedUntil — and weighted at today's settings. A span with no start date,
+  // or an end that was never recorded, is left out rather than guessed.
+  function carriedSpans(d, id) {
+    var w = data.settings.weights || {}, eff = data.settings.effort || {}, today = todayISO(), out = [];
+    d.assignments.forEach(function (a) {
+      if (a.managerId !== id) return;
+      var p = findById(d.projects, a.projectId);
+      if (!p || p.archived) return;    // an archived project counts nowhere, the past included
+      var from = a.startDate || p.startDate, to = today;
+      if (a.archived) { if (!a.archivedDate) return; to = a.archivedDate; }
+      if (p.status === "complete") { if (!p.completedDate) return; if (p.completedDate < to) to = p.completedDate; }
+      if (!from || from > to) return;
+      var mult = (eff[a.effort] != null) ? eff[a.effort] : 1;
+      out.push({ key: "a" + a.id, from: from, to: to,
+                 weight: ((a.role === "lead") ? (w.projectLead || 0) : (w.projectContributor || 0)) * mult });
+    });
+    d.workItems.forEach(function (wi) {
+      var mine = (wi.ownerHistory || []).concat(wi.helpers || []).filter(function (e) { return e.managerId === id; });
+      if (!mine.length) return;
+      var stop = carriedUntil(wi), weight = w[workTypeKey(wi)] || 0;
+      if (stop > today) stop = today;
+      mine.forEach(function (e) {
+        var from = e.from || wi.openedDate, to = (e.to && e.to < stop) ? e.to : stop;
+        if (!from || from > to) return;
+        out.push({ key: "w" + wi.id, from: from, to: to, weight: weight });
+      });
+    });
+    return out;
+  }
+  // The summed weight of spans on each day from start to end (inclusive), oldest first.
+  function dailyTotals(spans, start, end) {
+    var t0 = parseISODate(start), n = dayDiff(t0, parseISODate(end)) + 1, out = [], k;
+    for (k = 0; k < n; k++) out.push(0);
+    spans.forEach(function (sp) {
+      if (sp.to < start || sp.from > end) return;
+      var i0 = (sp.from > start) ? dayDiff(t0, parseISODate(sp.from)) : 0;
+      var i1 = (sp.to < end) ? dayDiff(t0, parseISODate(sp.to)) : n - 1;
+      for (k = i0; k <= i1; k++) out[k] += sp.weight;
+    });
+    return out;
+  }
+  // Correct recorded days for a save that changed the past: a work item logged with an
+  // earlier opened date, a team member added with an earlier start, a project closed
+  // out as of last month. The snapshots for those days were taken without it, so each
+  // recorded day (before today) moves by the difference this save makes to what the
+  // manager was carrying then. Both sides are weighted the same — the item's weight
+  // after the save — so changing an effort, a weight or a capacity never rewrites the
+  // past; only dates do. Days before the first snapshot need nothing: trendSeries
+  // estimates those from the dates every time.
+  function backfillHistory() {
+    if (!baseline || !data) return;
+    var t = startOfToday(), yesterday = isoOf(addDays(t, -1)), floor = isoOf(addDays(t, -TREND_KEEP));
+    data.managers.forEach(function (m) {
+      var h = m.scoreHistory; if (!h || !h.length || h[0].d > yesterday) return;
+      var start = (h[0].d > floor) ? h[0].d : floor;
+      var after = carriedSpans(data, m.id), before = carriedSpans(baseline, m.id), wt = {};
+      after.forEach(function (sp) { wt[sp.key] = sp.weight; });
+      before.forEach(function (sp) { if (sp.key in wt) sp.weight = wt[sp.key]; });
+      var a = dailyTotals(after, start, yesterday), b = dailyTotals(before, start, yesterday);
+      if (!a.some(function (v, k) { return Math.abs(v - b[k]) > 1e-9; })) return;
+      // Expand the recorded days over the window, shift them, and store only the days
+      // that differ from the one before, as recordScoreHistory does.
+      var out = [], i = 0, cur = null, t0 = parseISODate(start);
+      while (i < h.length && h[i].d < start) { out.push(h[i]); cur = h[i]; i++; }
+      for (var k = 0; k < a.length; k++) {
+        var day = isoOf(addDays(t0, k));
+        while (i < h.length && h[i].d <= day) { cur = h[i]; i++; }
+        var e = { d: day, s: Math.max(0, round1(cur.s + a[k] - b[k])), c: cur.c }, prev = out[out.length - 1];
+        if (!prev || prev.s !== e.s || prev.c !== e.c) out.push(e);
+      }
+      m.scoreHistory = out.concat(h.slice(i)).slice(-TREND_KEEP);
+    });
+  }
+  // One load (score ÷ capacity) per day for the last `days` days, oldest first. Days
+  // with a snapshot (or after one) use it; days before the first snapshot are estimated
+  // from what the data says the manager was carrying then (carriedSpans), so work
+  // logged with an earlier date shows up there too; null before anything at all.
+  // Today is the live score, not the last saved one.
   function trendSeries(m, days) {
-    var h = m.scoreHistory || [], out = [], i = 0, cur = null, t = startOfToday();
+    var h = m.scoreHistory || [], out = [], i = 0, cur = null, t = startOfToday(), cap = capacityOf(m);
+    var first = h.length ? h[0].d : todayISO(), start = isoOf(addDays(t, -(days - 1))), est = null, earliest = null;
+    if (start < first) {
+      var spans = carriedSpans(data, m.id);
+      spans.forEach(function (sp) { if (!earliest || sp.from < earliest) earliest = sp.from; });
+      if (earliest) est = dailyTotals(spans, start, first);
+    }
     for (var k = days - 1; k >= 1; k--) {
       var day = isoOf(addDays(t, -k));
       while (i < h.length && h[i].d <= day) { cur = h[i].s / h[i].c; i++; }
-      out.push({ d: day, v: cur });
+      if (day < first) out.push({ d: day, v: (est && day >= earliest) ? est[days - 1 - k] / cap : null });
+      else out.push({ d: day, v: cur });
     }
     out.push({ d: todayISO(), v: managerScore(m.id).load });
     return out;
@@ -1473,7 +1619,12 @@
     flush();
     return svg;
   }
-  function hasTrend(m) { return (m.scoreHistory || []).some(function (e) { return e.d < todayISO(); }); }
+  // Anything to draw before today: a snapshot, or work the data dates earlier.
+  function hasTrend(m) {
+    var today = todayISO();
+    return (m.scoreHistory || []).some(function (e) { return e.d < today; }) ||
+      carriedSpans(data, m.id).some(function (sp) { return sp.from < today; });
+  }
 
   // ---- Board view ------------------------------------------------------
   function chip(label, n, alert) {
@@ -1517,7 +1668,7 @@
       if (hasTrend(m)) {
         var tr = elem("div", "m-trend");
         var series = trendSeries(m, TREND_CARD_DAYS);
-        tr.appendChild(trendSvg(series, 100, 22, false, "spark"));
+        tr.appendChild(trendSvg(series, 100, 44, false, "spark"));
         tr.appendChild(elem("span", null, "12 wk"));
         tr.title = bandSinceText(m);
         card.appendChild(tr);
@@ -1750,10 +1901,11 @@
     if (logged && tsValue(logged)) return isoOf(new Date(tsValue(logged)));
     return w.rollOffDate || w.dueDate || w.openedDate || "0000-00-00";
   }
-  // Did manager id own work item w at any point between two local dates (inclusive)?
+  // Did manager id own or help on work item w at any point between two local dates
+  // (inclusive)?
   function ownedDuring(w, id, start, end) {
     var stop = carriedUntil(w);
-    return (w.ownerHistory || []).some(function (e) {
+    return (w.ownerHistory || []).concat(w.helpers || []).some(function (e) {
       if (e.managerId !== id) return false;
       var from = e.from || w.openedDate || "0000-00-00", to = e.to || stop;
       if (to > stop) to = stop;
@@ -1796,7 +1948,7 @@
       if (sc === "active" && w.archived) return false;
       if (sc === "history" && !w.archived) return false;
       if (t && w.type !== t) return false;
-      if (m && w.managerId !== m) return false;
+      if (m && !isOnItem(w, m)) return false;
       if (pr && w.relatedProjectId !== pr) return false;
       if (s && (w.status || "open") !== s) return false;
       if (from && (w.openedDate || "") < from) return false;
@@ -1835,6 +1987,13 @@
       var ownerTd = elem("td");
       if (w.managerId) ownerTd.appendChild(linkBtn(managerName(w.managerId), function () { goToManager(w.managerId); }));
       else ownerTd.textContent = "—";
+      // Others working on it, each a click-through too.
+      helperIds(w).forEach(function (hid) {
+        var hs = elem("span", "wi-proj", "+ ");
+        var hb = elem("button", "lnk", managerName(hid)); hb.type = "button";
+        hb.addEventListener("click", function () { goToManager(hid); });
+        hs.appendChild(hb); ownerTd.appendChild(hs);
+      });
       tr.appendChild(ownerTd);
       tr.appendChild(tdc(lab("wstatus", w.status || "open")));
       var prTd = tdc(lab("priority", w.priority || "med"));
@@ -1924,8 +2083,8 @@
   function carriedTable(items, gran) {
     var wrap = elem("div", "panel carried");
     wrap.appendChild(elem("h3", "sec", "Work items carried per manager"));
-    wrap.appendChild(elem("p", "hint", "Each item counts for everyone who owned it at any point in the period, so work that " +
-      "changed hands counts for both. Project roles aren't included."));
+    wrap.appendChild(elem("p", "hint", "Each item counts for everyone who owned it or helped on it at any point in the period, so " +
+      "work that changed hands, or that several people worked together, counts for each of them. Project roles aren't included."));
     var periods = recentPeriods(gran, 4);
     var rows = data.managers.map(function (m) {
       return { m: m, n: periods.map(function (p) { return items.filter(function (w) { return ownedDuring(w, m.id, p.start, p.end); }).length; }) };
@@ -2171,6 +2330,16 @@
         if (f.type === "textarea") input = elem("textarea");
         else if (f.type === "select") { input = elem("select"); (f.options || []).forEach(function (o) { var op = elem("option", null, o.label !== undefined ? o.label : o); op.value = (o.value !== undefined) ? o.value : o; input.appendChild(op); }); }
         else if (f.type === "checkbox") { input = elem("input"); input.type = "checkbox"; }
+        else if (f.type === "multi") {
+          // A checkbox per option; the value is the array of checked option values.
+          input = elem("div", "multi"); input.setAttribute("role", "group");
+          var chosen = values[f.key] || [];
+          (f.options || []).forEach(function (o) {
+            var lb = elem("label"), cb = elem("input"); cb.type = "checkbox"; cb.value = o.value;
+            cb.checked = chosen.indexOf(o.value) >= 0;
+            lb.appendChild(cb); lb.appendChild(document.createTextNode(o.label)); input.appendChild(lb);
+          });
+        }
         else {
           input = elem("input"); input.type = (f.type === "date" || f.type === "number") ? f.type : "text";
           if (f.type === "number") { input.step = "any"; if (f.min != null) input.min = f.min; if (f.max != null) input.max = f.max; }
@@ -2180,9 +2349,12 @@
         input.id = "ff_" + f.key;
         var v = values[f.key];
         if (f.type === "checkbox") input.checked = !!v;
+        else if (f.type === "multi") { /* set above */ }
         else if (v != null) input.value = v;
         else if (f.type === "select" && f.options && f.options.length) input.value = (f.options[0].value !== undefined) ? f.options[0].value : f.options[0];
-        var label = elem("label", null, f.label + (f.required ? " *" : "")); label.setAttribute("for", input.id);
+        var label = elem("label", null, f.label + (f.required ? " *" : ""));
+        if (f.type === "multi") { label.id = input.id + "_lab"; input.setAttribute("aria-labelledby", label.id); }
+        else label.setAttribute("for", input.id);
         if (f.type === "checkbox") { wrap.appendChild(input); wrap.appendChild(label); } else { wrap.appendChild(label); wrap.appendChild(input); }
         if (f.hint) wrap.appendChild(elem("span", "hint", f.hint));
         formBody.appendChild(wrap); inputs[f.key] = { el: input, wrap: wrap, spec: f };
@@ -2207,6 +2379,19 @@
         if (ctrl) ctrl.el.addEventListener("change", function () { applyConditions(true); });
       });
       applyConditions(false);
+      // A multi field can leave out the option another field holds (excludeKey): the
+      // owner of a work item is not also listed as helping on it.
+      fields.forEach(function (f) {
+        if (f.type !== "multi" || !f.excludeKey || !inputs[f.excludeKey]) return;
+        var ctrl = inputs[f.excludeKey].el, boxes = inputs[f.key].el.querySelectorAll("input");
+        function sync() {
+          for (var i = 0; i < boxes.length; i++) {
+            var mine = boxes[i].value === ctrl.value;
+            boxes[i].parentNode.hidden = mine; if (mine) boxes[i].checked = false;
+          }
+        }
+        ctrl.addEventListener("change", sync); sync();
+      });
       formOverlay.className = "overlay show";
       var first = formBody.querySelector("input, select, textarea"); if (first) first.focus();
       function cleanup() { formOverlay.className = "overlay"; formOk.removeEventListener("click", onOk); formCancel.removeEventListener("click", onCancel); }
@@ -2214,8 +2399,13 @@
         var out = {};
         for (var key in inputs) {
           var rec = inputs[key], e = rec.el, spec = rec.spec;
-          if (!shown(rec)) { out[key] = (spec.type === "checkbox") ? false : null; continue; }
+          if (!shown(rec)) { out[key] = (spec.type === "checkbox") ? false : (spec.type === "multi") ? [] : null; continue; }
           if (spec.type === "checkbox") { out[key] = e.checked; continue; }
+          if (spec.type === "multi") {
+            out[key] = Array.prototype.filter.call(e.querySelectorAll("input"), function (c) { return c.checked && !c.parentNode.hidden; })
+              .map(function (c) { return c.value; });
+            continue;
+          }
           var val = e.value; if (typeof val === "string") val = val.trim();
           if ((spec.required || spec.requiredWhen) && !val) { notice("“" + spec.label + "” is required.", "err"); e.focus(); return; }
           out[key] = val || null;
@@ -2299,6 +2489,12 @@
         Object.keys(keys).forEach(function (k) {
           if (LOG_SKIP[k]) return;
           var x = (b[k] === undefined) ? null : b[k], y = (r[k] === undefined) ? null : r[k];
+          // Helpers are logged as who is on the item, not as their history entries.
+          if (k === "helpers") {
+            x = helperIds(b).map(managerName).join(", "); y = helperIds(r).map(managerName).join(", ");
+            if (x !== y) add(coll, r.id, label, "helpers", x, y);
+            return;
+          }
           if (JSON.stringify(x) !== JSON.stringify(y)) add(coll, r.id, label, k, x, y);
         });
       });
@@ -2362,7 +2558,7 @@
   // Every change ends the window for undoing the previous archive action.
   function commit() {
     if (lastUndo) { lastUndo = null; var ub = el("btnUndo"); if (ub) noticeEl.className = "notice"; updateUndoUI(); }
-    logChanges(); renderAll(); scheduleSave();
+    backfillHistory(); logChanges(); renderAll(); scheduleSave();
   }
 
   // Managers
@@ -2427,7 +2623,10 @@
   }
 
   // Work items
-  function workItemFields(currentManagerId, currentProjectId) {
+  function workItemFields(currentManagerId, currentProjectId, currentHelpers) {
+    // Active managers, plus anyone already helping who has since been archived.
+    var helperOpts = data.managers.filter(function (m) { return m.active || (currentHelpers || []).indexOf(m.id) >= 0; })
+      .map(function (m) { return { value: m.id, label: m.name + (m.active ? "" : " (archived)") }; });
     return [
       { key: "type", label: "Type", type: "select", options: enumOpts(WORK_TYPES, "type") },
       // Shown only when Type is "Other": the free-text label used everywhere in place of "Other".
@@ -2436,6 +2635,8 @@
         placeholder: "e.g. Vendor audit, Hiring loop, Conference" },
       { key: "title", label: "Title", type: "text", required: true, full: true },
       { key: "managerId", label: "Owner (manager)", type: "select", options: managerOpts(true, "— none —", currentManagerId) },
+      { key: "helpers", label: "Also working on it", type: "multi", options: helperOpts, excludeKey: "managerId", full: true,
+        hint: "For work too big for one person. Everyone ticked carries it at its full weight, as the owner does." },
       { key: "relatedProjectId", label: "Related project", type: "select",
         options: projectOpts("— none —", currentProjectId) },
       { key: "status", label: "Status", type: "select", options: enumOpts(WORK_STATUS, "wstatus") },
@@ -2451,6 +2652,7 @@
   function workItemDateCheck(o) {
     if (o.openedDate && o.dueDate && o.dueDate < o.openedDate) return "The due date is before the opened date.";
     if (o.openedDate && o.rollOffDate && o.rollOffDate < o.openedDate) return "The roll-off date is before the opened date.";
+    if (o.helpers && o.helpers.length && !o.managerId) return "Choose an owner before adding others working on it.";
     return "";
   }
   async function addWorkItem(presetManager, presetProject) {
@@ -2465,7 +2667,10 @@
       status: v.status, priority: v.priority, openedDate: v.openedDate, dueDate: v.dueDate, rollOffDate: v.rollOffDate,
       // Logged as already Done: straight to History, the same as marking it done later.
       completedDate: (v.status === "done") ? todayISO() : null, archived: (v.status === "done"), link: v.link, notes: v.notes,
-      ownerHistory: v.managerId ? [{ managerId: v.managerId, from: v.openedDate || todayISO(), to: null }] : []
+      ownerHistory: v.managerId ? [{ managerId: v.managerId, from: v.openedDate || todayISO(), to: null }] : [],
+      // Anyone on it from the start has been on it since it was opened, like the owner.
+      helpers: (v.helpers || []).filter(function (id) { return id !== v.managerId; })
+        .map(function (id) { return { managerId: id, from: v.openedDate || todayISO(), to: null }; })
     });
     commit();
   }
@@ -2474,8 +2679,8 @@
     if (!(await ensureName())) return;
     // Items saved without a priority or status display as Med / Open; seed the form with
     // the same, or it falls back to the first option (Low) and saves that instead.
-    var shown = Object.assign({}, w, { priority: w.priority || "med", status: w.status || "open" });
-    var v = await openForm("Edit work item", workItemFields(w.managerId, w.relatedProjectId), shown, { wide: true, check: workItemDateCheck });
+    var shown = Object.assign({}, w, { priority: w.priority || "med", status: w.status || "open", helpers: helperIds(w) });
+    var v = await openForm("Edit work item", workItemFields(w.managerId, w.relatedProjectId, helperIds(w)), shown, { wide: true, check: workItemDateCheck });
     if (!v) return;
     // A sync can replace `data` while the form is open (returning to the tab pulls the
     // shared file); writing to the object captured before it would silently drop the edit.
@@ -2484,7 +2689,13 @@
     if (v.status === "done") { if (!w.completedDate) w.completedDate = todayISO(); w.archived = true; }
     else { w.completedDate = null; if (wasDone) { w.archived = false; w.archivedDate = null; } } // reopening restores from history
     if ((v.managerId || null) !== (w.managerId || null)) reassignOwner(w, v.managerId);
+    // Moving the opened date moves whoever has been on it since it was opened, so the
+    // carried report and the trend count them from the new date (issue #13).
+    if (v.openedDate && v.openedDate !== w.openedDate) (w.ownerHistory || []).concat(w.helpers || []).forEach(function (e) {
+      if (e.from === w.openedDate || (e.from && e.from < v.openedDate)) e.from = v.openedDate;
+    });
     w.type = v.type; w.typeOther = typeOtherOf(v); w.title = v.title; w.managerId = v.managerId; w.relatedProjectId = v.relatedProjectId;
+    setHelpers(w, v.helpers, todayISO());
     w.status = v.status; w.priority = v.priority; w.openedDate = v.openedDate; w.dueDate = v.dueDate;
     w.rollOffDate = v.rollOffDate; w.link = v.link; w.notes = v.notes;
     commit();
@@ -2523,11 +2734,18 @@
       { key: "projectId", label: "Project", type: "select", required: true, options: avail.map(function (p) { return { value: p.id, label: p.name }; }) },
       { key: "role", label: "Role", type: "select", options: enumOpts(ROLES, "role") },
       { key: "effort", label: "Effort", type: "select", options: enumOpts(EFFORTS, "effort") },
+      { key: "startDate", label: "On it since", type: "date", required: true,
+        hint: "Today by default — backdate it if they were already on it, and their trend counts it from then." },
       { key: "endDate", label: "End date (roll-off, optional)", type: "date" }
-    ], { role: "contributor", effort: "medium" });
+    ], { role: "contributor", effort: "medium", startDate: todayISO() }, { check: assignmentDateCheck });
     if (!v) return;
-    data.assignments.push({ id: genId(), projectId: v.projectId, managerId: managerId, role: v.role, effort: v.effort, startDate: todayISO(), endDate: v.endDate, archived: false });
+    data.assignments.push({ id: genId(), projectId: v.projectId, managerId: managerId, role: v.role, effort: v.effort, startDate: v.startDate, endDate: v.endDate, archived: false });
     commit();
+  }
+  function assignmentDateCheck(o) {
+    if (o.startDate && o.startDate > todayISO()) return "The start date can't be in the future.";
+    if (o.startDate && o.endDate && o.endDate < o.startDate) return "The end date is before the start date.";
+    return "";
   }
   function activeForManager(id) { return data.assignments.filter(function (a) { return a.managerId === id && !a.archived; }); }
 
@@ -2584,7 +2802,7 @@
     });
     applyProjectConditions();
     // Build team draft from existing active assignments.
-    teamDraft = p ? activeAssignments(p.id).map(function (a) { return { assignmentId: a.id, managerId: a.managerId, role: a.role, effort: a.effort, endDate: a.endDate || "" }; }) : [];
+    teamDraft = p ? activeAssignments(p.id).map(function (a) { return { assignmentId: a.id, managerId: a.managerId, role: a.role, effort: a.effort, startDate: a.startDate || "", endDate: a.endDate || "" }; }) : [];
     renderTeamDraft();
     projectOverlay.className = "overlay show";
     var first = projFields.querySelector("input,select,textarea"); if (first) first.focus();
@@ -2617,6 +2835,14 @@
       var esel = elem("select"); EFFORTS.forEach(function (x) { var op = elem("option", null, lab("effort", x)); op.value = x; esel.appendChild(op); }); esel.value = row.effort; esel.addEventListener("change", function () { row.effort = esel.value; }); r.appendChild(esel);
       // The assignment's end date is its roll-off; before this it could only be set when
       // assigning from the drawer, and never changed afterwards.
+      // Its start: when they joined. Left empty on a new row, it is the project's start
+      // date for a new project (so a backdated project is backdated for its team too),
+      // else today.
+      var startWrap = elem("label", "t-end", "from");
+      var st = elem("input"); st.type = "date"; st.value = row.startDate || ""; st.title = "Start date — when they joined (optional)";
+      st.setAttribute("aria-label", "Start date for this team member");
+      st.addEventListener("change", function () { row.startDate = st.value; });
+      startWrap.appendChild(st); r.appendChild(startWrap);
       var endWrap = elem("label", "t-end", "until");
       var end = elem("input"); end.type = "date"; end.value = row.endDate || ""; end.title = "Roll-off (end) date — optional";
       end.setAttribute("aria-label", "Roll-off date for this team member");
@@ -2632,7 +2858,7 @@
     var used = {}; teamDraft.forEach(function (r) { if (r.managerId) used[r.managerId] = true; });
     var avail = actives.filter(function (m) { return !used[m.id]; });
     if (!avail.length) { notice("Every active manager is already on this project.", "info"); return; }
-    teamDraft.push({ assignmentId: null, managerId: avail[0].id, role: "contributor", effort: "medium", endDate: "" });
+    teamDraft.push({ assignmentId: null, managerId: avail[0].id, role: "contributor", effort: "medium", startDate: "", endDate: "" });
     renderTeamDraft();
   }
   async function saveProject() {
@@ -2645,12 +2871,22 @@
     var sd = el("pf_startDate").value, td = el("pf_targetDate").value, cd = el("pf_completedDate").value;
     if (sd && td && td < sd) { notice("The target date is before the start date.", "err"); el("pf_targetDate").focus(); return; }
     if (el("pf_status").value === "complete" && cd && cd > todayISO()) { notice("The completed date can't be in the future.", "err"); el("pf_completedDate").focus(); return; }
+    var badRow = teamDraft.filter(function (r) { return r.managerId && assignmentDateCheck(r); })[0];
+    if (badRow) { notice(managerName(badRow.managerId) + ": " + assignmentDateCheck(badRow), "err"); return; }
     if (!(await ensureName())) return;
     var fields = {};
     PROJECT_FIELD_SPEC.forEach(function (f) { var v = el("pf_" + f.key).value; if (typeof v === "string") v = v.trim(); fields[f.key] = v || null; });
     var p;
     if (editingProjectId) { p = findById(data.projects, editingProjectId); if (!p) { projectOverlay.className = "overlay"; notice(GONE_MSG, "err"); return; } }
     else { p = { id: genId() }; data.projects.push(p); }
+    var oldStart = editingProjectId ? p.startDate : null, today = todayISO();
+    // A new row starts with the project when the project is new, else today; never later
+    // than today. Moving the project's start moves the team members who started with it.
+    var rowDefault = (!editingProjectId && fields.startDate && fields.startDate < today) ? fields.startDate : today;
+    teamDraft.forEach(function (r) {
+      if (oldStart && fields.startDate && fields.startDate !== oldStart && r.startDate === oldStart)
+        r.startDate = (fields.startDate < today) ? fields.startDate : today;
+    });
     p.name = fields.name; p.description = fields.description; p.status = fields.status || "active";
     p.priority = fields.priority || "med"; p.startDate = fields.startDate; p.targetDate = fields.targetDate;
     p.link = fields.link;
@@ -2661,16 +2897,17 @@
     // reconcile assignments
     var existing = activeAssignments(p.id);
     var draftIds = {}; teamDraft.forEach(function (r) { if (r.assignmentId) draftIds[r.assignmentId] = true; });
-    existing.forEach(function (a) { if (!draftIds[a.id]) a.archived = true; }); // removed -> archive
+    // Archived assignments record the day, so the trend knows when they stopped counting.
+    existing.forEach(function (a) { if (!draftIds[a.id]) { a.archived = true; a.archivedDate = todayISO(); } }); // removed -> archive
     teamDraft.forEach(function (r) {
       if (!r.managerId) return;
       var a = r.assignmentId ? findById(data.assignments, r.assignmentId) : null;
       // Same person: update in place. A different person picked on an existing row is
       // a new assignment — rewriting the old record's managerId would erase the record
       // that the first person was ever on the project.
-      if (a && a.managerId === r.managerId) { a.role = r.role; a.effort = r.effort; a.endDate = r.endDate || null; a.archived = false; return; }
-      if (a) a.archived = true;
-      data.assignments.push({ id: genId(), projectId: p.id, managerId: r.managerId, role: r.role, effort: r.effort, startDate: todayISO(), endDate: r.endDate || null, archived: false });
+      if (a && a.managerId === r.managerId) { a.role = r.role; a.effort = r.effort; a.startDate = r.startDate || a.startDate || null; a.endDate = r.endDate || null; a.archived = false; a.archivedDate = null; return; }
+      if (a) { a.archived = true; a.archivedDate = today; }
+      data.assignments.push({ id: genId(), projectId: p.id, managerId: r.managerId, role: r.role, effort: r.effort, startDate: r.startDate || rowDefault, endDate: r.endDate || null, archived: false });
     });
     projectOverlay.className = "overlay";
     commit();
@@ -2804,11 +3041,13 @@
       if (p.status !== "complete" && a.endDate && soon(a.endDate)) roll.push({ text: "Assignment on " + p.name + " rolls off " + a.endDate, projectId: p.id });
     });
     data.workItems.forEach(function (w) {
-      if (w.managerId !== id) return;
+      // Items they own, and items they are helping on (saying whose those are).
+      if (!isOnItem(w, id)) return;
+      var withWho = helpingText(w, id);
       // Name the related project, so the drawer and the 1:1 summary say what it is for.
       var rp = relatedProject(w), forP = rp ? " · " + projectLabel(rp) : "";
-      if (!w.archived && (w.status === "open" || w.status === "in-progress")) current.push({ text: typeLabel(w) + ": " + w.title + forP + " [" + lab("wstatus", w.status) + "]", wiId: w.id });
-      if (w.status === "done" && w.completedDate) wins.push({ text: typeLabel(w) + ": " + w.title + " (done " + w.completedDate + ")", wiId: w.id, date: w.completedDate });
+      if (!w.archived && (w.status === "open" || w.status === "in-progress")) current.push({ text: typeLabel(w) + ": " + w.title + withWho + forP + " [" + lab("wstatus", w.status) + "]", wiId: w.id });
+      if (w.status === "done" && w.completedDate) wins.push({ text: typeLabel(w) + ": " + w.title + withWho + " (done " + w.completedDate + ")", wiId: w.id, date: w.completedDate });
       if (!w.archived && w.status !== "done" && w.rollOffDate && soon(w.rollOffDate)) roll.push({ text: typeLabel(w) + ": " + w.title + " rolls off " + w.rollOffDate, wiId: w.id });
     });
     // Work they owned until recently and gave to someone else (or back to the Backlog).
@@ -2951,7 +3190,7 @@
   function openAttn() { renderAttnList(); attnOverlay.className = "overlay show"; }
   // The archive changes for a roll-off row in Needs attention ([] if it is gone).
   function attnArchiveChanges(it) {
-    if (it.kind === "as-roll") { var a = findById(data.assignments, it.id); return a ? [fieldChange("assignments", a, "archived", true)] : []; }
+    if (it.kind === "as-roll") { var a = findById(data.assignments, it.id); return a ? [fieldChange("assignments", a, "archived", true), fieldChange("assignments", a, "archivedDate", todayISO())] : []; }
     var w = findById(data.workItems, it.id); return w ? archiveWorkItemChanges(w) : [];
   }
   async function archiveFromAttn(it) {

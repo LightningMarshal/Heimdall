@@ -38,7 +38,10 @@ once so the "Last saved by" banner can attribute changes.
 - **Workload trend** — every save records each active manager's score for the day.
   Cards show a 12-week sparkline; the drawer charts six months against the heat bands
   and says how long they've been in their current band ("Heavy since 2026-07-20
-  (91 days)"), which the 1:1 summary includes too.
+  (91 days)"), which the 1:1 summary includes too. Work logged with an earlier date
+  (an opened date, a project or team member's start, a backdated close-out) changes
+  the trend from that date, and before the first recorded day the trend is worked out
+  from the dates in the data. The card's sparkline is 44px tall.
 - **Manager drawer** — click a card for everything that manager carries, recent
   wins, and upcoming roll-offs, plus in-context quick-add and a copy / export /
   print **1:1 summary** for weekly one-on-ones (printing from the drawer prints the
@@ -69,6 +72,9 @@ once so the "Last saved by" banner can attribute changes.
 - **Work Items queue** — filterable by scope (Active / All / History), type, owner,
   related project, status, and date range, with an aging flag for items open 14+ days.
   An item's related project shows under its title and links to it.
+- **More than one manager on a work item** — *Also working on it* adds others
+  beside the owner. Each carries the item at its full weight, sees it in their drawer,
+  and is counted for it in Reports; the queue lists them under the owner.
 - **Reassignment history** — a work item remembers every owner and when they had it.
   The queue shows "previously …", the earlier owner's drawer and 1:1 summary list it
   under *Handed off* for 90 days, and Reports → *Work items carried per manager* counts
@@ -174,9 +180,9 @@ band it has actually reached. One medium-effort lead role is 3 × 1.5 = 4.5, whi
 {d, s, c} — date, raw score, capacity; one per day, kept for 400) · `projects[]` (id, name,
 description, status, priority, startDate, targetDate, completedDate, link, archived) ·
 `assignments[]` (id, projectId, managerId, role, effort, startDate, endDate,
-archived) · `workItems[]` (id, type, typeOther, title, managerId, relatedProjectId,
+archived, archivedDate) · `workItems[]` (id, type, typeOther, title, managerId, relatedProjectId,
 status, priority, openedDate, dueDate, rollOffDate, completedDate, archived,
-archivedDate, link, notes, ownerHistory[] of {managerId, from, to}) ·
+archivedDate, link, notes, ownerHistory[] and helpers[] of {managerId, from, to}) ·
 `changes[]` (id, at, by, entity, entityId, label, field, from, to — capped at 500) ·
 `settings` (weights, effort, bands, appVersion, lastSavedBy, lastSavedAt).
 
@@ -202,7 +208,8 @@ npm test           # runs every spec in tests/
 - `tests/dates.spec.js` — the date-sensitive checks, run in UTC, New York (late
   evening) and Auckland (early morning), where the local and UTC dates differ.
 - One spec per roadmap feature: `capacity`, `undo`, `report-csv`, `timeline`,
-  `changelog`, `owner-history`, `trend`, and `dark-mode` (`tests/<name>.spec.js`).
+  `changelog`, `owner-history`, `trend`, and `dark-mode` (`tests/<name>.spec.js`),
+  plus one per fixed issue: `multi-manager` (#12) and `backdate` (#13).
 - Chromium comes from the environment's Playwright install; the pinned
   `@playwright/test` version must match it, or run `npx playwright install chromium`.
 

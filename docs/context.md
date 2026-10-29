@@ -1,5 +1,5 @@
 # Project Context: Heimdall
-_Last updated: 2026-10-19_
+_Last updated: 2026-10-29_
 _This file changes rarely. If the stack or architecture shifts significantly, re-run /first-principles._
 
 ## Stack
@@ -7,7 +7,7 @@ Vanilla JS, HTML, and CSS — no framework, no build step, no runtime package ma
 no runtime dependencies of any kind (npm is used only for the dev-time test suite). The entire application is one file,
 `heimdall.html` (~3,240 lines: inlined `<style>` + a single IIFE `<script>`
 using ES5-style `function` expressions, not classes/modules). Currently at
-`APP_VERSION = "0.15.1"`. Double-clicking the file runs it — there is no
+`APP_VERSION = "0.16.0"`. Double-clicking the file runs it — there is no
 `npm install`, no dev server, no compiler.
 
 ## Deployment
@@ -81,6 +81,22 @@ No server, no port, no Electron wrapper.
   value forward over days with no entry, which is honest because the score
   only changes when the data does. Stored per manager row (not top level) so
   older clients keep it; `replaceData` merges it by day across copies.
+- **Carried spans / backdating** (issue #13) — `carriedSpans(d, id)` lists
+  what a manager carried as date ranges: assignments from `startDate` to
+  `archivedDate` / the project's `completedDate`; work items over their
+  `ownerHistory` and `helpers` entries up to `carriedUntil`. Anything whose
+  start or end was never recorded is left out, not guessed. Two uses:
+  `trendSeries` estimates the days *before* a manager's first snapshot from
+  them, and `commit()` → `backfillHistory()` shifts recorded past days by the
+  difference a save makes to them (baseline vs data). Both sides of that diff
+  use the item's weight *after* the save, so effort, weight and capacity
+  edits never rewrite history — only dates do. Assignments stamp
+  `archivedDate` on every archive path for this.
+- **Helpers** (issue #12) — `workItems[].helpers`, `[{managerId, from, to}]`,
+  the other managers on an item beside its owner, kept like owner history
+  (`to: null` while on it). Each scores the item at full weight. Read
+  current ones with `helperIds(w)` / `isOnItem(w, id)`; change them through
+  `setHelpers(w, ids, from)`, which never lists the owner. Requires an owner.
 - **Owner history** — `workItems[].ownerHistory`, `[{managerId, from, to}]`
   in local dates, `to: null` for the current owner. Changing an owner must go
   through `reassignOwner(w, newId)` (today only `editWorkItem` does; Backlog
