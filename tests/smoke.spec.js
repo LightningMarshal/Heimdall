@@ -87,22 +87,51 @@ test("projects: add with a team, close out, reopen, archive and restore", async 
   const pc = page.locator(".pcard", { hasText: "Hermes" });
   await expect(pc).toContainText("Ada Lovelace · Lead · Medium");
 
+  await expect(page.locator("#projScopeWrap")).toBeHidden();
   await pc.getByRole("button", { name: "Close out" }).click();
   await page.locator("#formOk").click();
+  // A closed-out project leaves the default list; Show: Closed out pulls it up.
+  await expect(pc).toHaveCount(0);
+  await expect(page.locator("#projList")).toContainText("No current projects");
+  await page.locator("#projScope").selectOption("closed");
   await expect(pc).toContainText("Complete");
   await nav(page, "board");
   await expect(card(page, "Ada Lovelace").locator(".m-score")).toHaveText("score 0");
 
   await nav(page, "projects");
   await pc.getByRole("button", { name: "Reopen" }).click();
+  // Nothing is hidden any more, so the list is back to current projects.
+  await expect(page.locator("#projScopeWrap")).toBeHidden();
   await expect(pc.locator(".pill.status").first()).toHaveText("Active");
 
   page.once("dialog", (d) => d.accept());
   await pc.getByRole("button", { name: "Archive" }).click();
-  await expect(page.locator("#projList")).toContainText("Every project is archived");
-  await page.locator("#projShowArchived").check();
+  await expect(page.locator("#projList")).toContainText("No current projects");
+  await page.locator("#projScope").selectOption("archived");
   await page.locator(".pcard", { hasText: "Hermes" }).getByRole("button", { name: "Restore" }).click();
   await expect(page.locator(".pcard", { hasText: "Hermes" })).not.toHaveClass(/archived/);
+});
+
+test("projects: only current projects are listed until Show asks for more (#11)", async ({ page }) => {
+  await openApp(page, seed({ projects: [
+    PROJ,
+    { id: "p-2", name: "Gemini", status: "on-hold", priority: "med" },
+    { id: "p-3", name: "Mercury", status: "complete", priority: "med", completedDate: "2020-06-01" },
+    { id: "p-4", name: "Skylab", status: "active", priority: "low", archived: true },
+    { id: "p-5", name: "Vostok", status: "complete", priority: "low", archived: true }
+  ] }));
+  await nav(page, "projects");
+  const names = page.locator("#projList .p-name");
+  await expect(page.locator("#projCount")).toHaveText("(2 current · 1 closed out · 2 archived)");
+  await expect(page.locator("#projScope")).toHaveValue("current");
+  await expect(names).toHaveText(["Apollo", "Gemini"]);
+  await page.locator("#projScope").selectOption("closed");
+  await expect(names).toHaveText(["Mercury"]);
+  await page.locator("#projScope").selectOption("archived");
+  // Archived wins over status: an archived closed-out project is listed as archived.
+  await expect(names).toHaveText(["Skylab", "Vostok"]);
+  await page.locator("#projScope").selectOption("all");
+  await expect(names).toHaveText(["Apollo", "Gemini", "Mercury", "Skylab", "Vostok"]);
 });
 
 test("work items: add, filter, mark done into History, restore", async ({ page }) => {

@@ -1,6 +1,6 @@
 # Heimdall — Roadmap
 
-_Last updated: 2026-10-19 · app version 0.15.0_
+_Last updated: 2026-10-29 · app version 0.16.0_
 
 Post-MVP ideas, ranked by how much they improve the one question Heimdall exists to
 answer — **who is carrying too much, and who has room** — against what they cost in a
@@ -34,7 +34,7 @@ the reasons the tool is usable at all.
 Each needed a product decision rather than a bug fix. Outcomes:
 
 - **Projects could not be removed** — *built in 0.7.0.* Projects now archive and
-  restore (Projects → Show archived); archived projects count nowhere.
+  restore (Projects → Show: Archived); archived projects count nowhere.
 - **`relatedProjectId` was write-only** — *built in 0.7.0.* Shown in the queue, the
   drawer, and the 1:1 summary; counted and linked on the project card; filterable.
 - **One Lead per project was not enforced** — *decided: don't enforce.* Two co-leads

@@ -76,6 +76,7 @@ for (const z of ZONES) {
       await page.locator(".pcard").getByRole("button", { name: "Close out" }).click();
       await expect(page.locator("#ff_completedDate")).toHaveValue(z.today);
       await page.locator("#formOk").click();
+      await page.locator("#projScope").selectOption("closed");
       await expect(page.locator(".pcard")).toContainText("completed " + z.today);
     });
   });
